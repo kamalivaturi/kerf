@@ -7,3 +7,4 @@ ui/dist/
 ui/dist-uxp/
 release/
 .venv/
+mogrt/build/
