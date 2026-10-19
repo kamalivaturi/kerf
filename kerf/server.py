@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 from pathlib import Path
 
-from . import REPO, __version__, captions, features, license, media, mogrt, settings, speech
+from . import REPO, __version__, captions, features, license, media, mogrt, settings, speech, tools
 from .timeline import Timeline
 
 PORT = 7878
@@ -104,6 +104,7 @@ class Handler(BaseHTTPRequestHandler):
                                    looks=list(mogrt.LOOKS), kinds=list(mogrt.KINDS), formats=list(mogrt.FORMATS)),
             "/changelog": lambda: dict(text=(Path(__file__).resolve().parent.parent / "CHANGELOG.md").read_text("utf-8")),
             "/languages": speech.languages,
+            "/fx": lambda: dict(presets=tools.fx_list()),
         }
         if u.path == "/mogrt/media":  # previews of library entries only (never arbitrary paths)
             e = next((x for x in mogrt.library() if x["id"] == q.get("id")), None)
@@ -133,6 +134,11 @@ class Handler(BaseHTTPRequestHandler):
             "/mogrt/build": lambda: mogrt.build([s for s in mogrt.catalog() if not b.get("ids") or s["id"] in b["ids"]]),
             "/captions/preview": lambda: captions.preview(b.get("path", ""), b.get("params", {}), float(b.get("t", 1.0)),
                                                           b.get("aspect", "9:16"), b.get("safe", True)),
+            "/fx/save": lambda: tools.fx_save(b["name"], b["chain"]),
+            "/fx/get": lambda: tools.fx_get(b["name"]),
+            "/fx/delete": lambda: tools.fx_delete(b["name"]),
+            "/frame": lambda: tools.frame_image(Timeline.from_dict(b["timeline"]) if isinstance(b["timeline"], dict)
+                                                else Timeline.from_media(b["timeline"], media.probe), b.get("t")),
             "/presets/export": lambda: features.export_presets(b.get("features")),
             "/presets/import": lambda: features.import_presets(b["bundle"]),
         }

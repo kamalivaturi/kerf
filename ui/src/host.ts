@@ -3,12 +3,14 @@
 import type { premierepro, Sequence, Project } from "@adobe/premierepro";
 
 export type Clip = { path: string; src_in: number; src_out: number; start: number; enabled: boolean };
-export type TimelineDict = { fps: number; width: number; height: number; name: string; video: Clip[][]; audio: Clip[][] };
+export type TimelineDict = { fps: number; width: number; height: number; name: string; video: Clip[][]; audio: Clip[][]; playhead?: number };
 export type RunResult = {
   xml?: string[]; sequence_names?: string[]; files?: string[]; imports?: string[]; srt?: string; text?: string;
   markers?: { t: number; name: string }[]; report?: Record<string, unknown>;
   items?: { id: number; label: string }[];
   mogrt?: { path: string; param: string; pages: { start: number; end: number; text: string }[] };
+  insert?: { path: string; at: number; duration: number };
+  sort?: { bins: Record<string, string[]>; sequences: string; other: string };
   error?: string;
 };
 
@@ -19,8 +21,19 @@ export interface Host {
   outDir(): Promise<string | undefined>;
   readToken(): Promise<string>;
   insertMogrt(path: string): Promise<string>; // at the playhead, on a new top track
+  tools?: HostTools;
+  projectKey?(): Promise<string>; // per-project UI layouts // NLE-side actions (Premiere): selection-based tools the engine can't do from files
   pickFile?(): Promise<string | undefined>;
   launchEngine?(kerfHome: string): Promise<void>;
+}
+
+export interface HostTools {
+  setAnchor(ax: number, ay: number): Promise<string>;
+  ease(mode: "linear" | "bezier" | "hold"): Promise<string>;
+  clearMarkers(prefix: string): Promise<string>;
+  copyFx(): Promise<{ components: unknown[] }>;
+  applyFx(chain: { components: any[] }): Promise<string>;
+  adjustment(): Promise<string>;
 }
 
 const req: ((m: string) => any) | undefined = (globalThis as any).require;
@@ -63,6 +76,167 @@ function premiere(): Host {
     return ok;
   }
 
+  async function allItems(folder: any, out: any[] = []): Promise<any[]> {
+    for (const it of await ppro.FolderItem.cast(folder).getItems()) {
+      out.push(it);
+      if (it.type === ppro.Constants.ProjectItemType.BIN) await allItems(it, out);
+    }
+    return out;
+  }
+  async function mediaPath(it: any) {
+    try { return (await ppro.ClipProjectItem.cast(it).getMediaFilePath()) || ""; } catch { return ""; }
+  }
+  const norm = (x: string) => x.replace(/\\/g, "/").toLowerCase();
+
+  async function insertAt(project: Project, seq: Sequence, item: any, seconds: number, label: string) {
+    const editor = ppro.SequenceEditor.getEditor(seq);
+    const vt = await seq.getVideoTrackCount();
+    transact(project, label, (add) => add(editor.createOverwriteItemAction(item, ppro.TickTime.createWithSeconds(seconds), vt, 0)));
+  }
+
+  async function sortProject(project: Project, s: NonNullable<RunResult["sort"]>) {
+    const root = await project.getRootItem();
+    const folder = ppro.FolderItem.cast(root as any);
+    const top = (await folder.getItems()) as any[];
+    const isBin = (x: any) => x.type === ppro.Constants.ProjectItemType.BIN;
+    const plan: [any, string][] = [];
+    for (const it of top.filter((x) => !isBin(x))) {
+      let bin = s.other;
+      try { if (await ppro.ClipProjectItem.cast(it).isSequence()) bin = s.sequences; } catch { /* not a clip */ }
+      if (bin === s.other) {
+        const ext = ((await mediaPath(it)).match(/\.[^.\\/]+$/)?.[0] || "").toLowerCase();
+        bin = Object.entries(s.bins).find(([, exts]) => exts.includes(ext))?.[0] || s.other;
+      }
+      plan.push([it, bin]);
+    }
+    const names = new Set(plan.map(([, b]) => b));
+    const have = new Set(top.filter(isBin).map((x) => x.name));
+    transact(project, "Kerf bins", (add) => [...names].filter((n) => !have.has(n)).forEach((n) => add(folder.createBinAction(n, false))));
+    const bins = Object.fromEntries(((await folder.getItems()) as any[]).filter(isBin).map((x) => [x.name, ppro.FolderItem.cast(x)]));
+    transact(project, "Kerf project sort", (add) => plan.forEach(([it, b]) => bins[b] && add(folder.createMoveItemAction(it, bins[b] as any))));
+    return `Sorted ${plan.length} item(s) into ${names.size} bin(s)`;
+  }
+
+  async function selectedVideo(): Promise<[Project, Sequence, any[]]> {
+    const [project, seq] = await active();
+    const items = await (await seq.getSelection()).getTrackItems();
+    const video = [];
+    for (const it of items as any[]) if ((await components(it)).out.some((c) => c.match === "AE.ADBE Motion")) video.push(it);
+    if (!video.length) throw new Error("Select one or more video clips in the timeline first.");
+    return [project, seq, video];
+  }
+  async function components(item: any) {
+    const chain = await item.getComponentChain();
+    const out: { comp: any; match: string }[] = [];
+    for (let i = 0; i < chain.getComponentCount(); i++) {
+      const comp = chain.getComponentAtIndex(i);
+      out.push({ comp, match: await comp.getMatchName() });
+    }
+    return { chain, out };
+  }
+  const INTRINSIC = new Set(["AE.ADBE Motion", "AE.ADBE Opacity", "AE.ADBE Time Remapping"]);
+  const plain = (v: any) => (v && typeof v === "object" && "x" in v && "y" in v ? [v.x, v.y] : v);
+  const typed = (v: any) => (Array.isArray(v) && v.length === 2 ? new (ppro as any).PointF(v[0], v[1]) : v);
+
+  const tools: HostTools = {
+    async setAnchor(ax, ay) {
+      // ponytail: assumes the clip fills the frame (normalized Motion coordinates); off-size media lands approximately
+      const [project, , items] = await selectedVideo();
+      const actions: any[] = [];
+      for (const it of items) {
+        const motion = (await components(it)).out.find((c) => c.match === "AE.ADBE Motion")!.comp;
+        const prm: Record<string, any> = {};
+        for (let i = 0; i < motion.getParamCount(); i++) prm[motion.getParam(i).displayName] = motion.getParam(i);
+        const pos = plain((await prm["Position"].getStartValue()).value.value);
+        const anc = plain((await prm["Anchor Point"].getStartValue()).value.value);
+        const sc = Number((await prm["Scale"].getStartValue()).value.value) / 100 || 1;
+        const np = [pos[0] + (ax - anc[0]) * sc, pos[1] + (ay - anc[1]) * sc];
+        actions.push(prm["Anchor Point"].createSetValueAction(prm["Anchor Point"].createKeyframe(typed([ax, ay])), true),
+                     prm["Position"].createSetValueAction(prm["Position"].createKeyframe(typed(np)), true));
+      }
+      transact(project, "Kerf anchor", (add) => actions.forEach(add));
+      return `Anchor moved on ${items.length} clip(s); the picture stays in place`;
+    },
+    async ease(mode) {
+      const [project, , items] = await selectedVideo();
+      const m = { linear: ppro.Keyframe.INTERPOLATION_MODE_LINEAR, bezier: ppro.Keyframe.INTERPOLATION_MODE_BEZIER,
+                  hold: ppro.Keyframe.INTERPOLATION_MODE_HOLD }[mode];
+      const actions: any[] = [];
+      for (const it of items) for (const { comp } of (await components(it)).out) {
+        for (let i = 0; i < comp.getParamCount(); i++) {
+          const prm = comp.getParam(i);
+          if (prm.isTimeVarying()) prm.getKeyframeListAsTickTimes().forEach((t: any) => actions.push(prm.createSetInterpolationAtKeyframeAction(t, m, true)));
+        }
+      }
+      transact(project, "Kerf keyframe ease", (add) => actions.forEach(add));
+      return actions.length ? `Set ${actions.length} keyframe(s) to ${mode}` : "The selected clips have no keyframes";
+    },
+    async clearMarkers(prefix) {
+      const [project, seq] = await active();
+      const markers = await ppro.Markers.getMarkers(seq);
+      const hit = markers.getMarkers().filter((m: any) => m.getName().startsWith(prefix));
+      transact(project, "Kerf clear markers", (add) => hit.forEach((m: any) => add(markers.createRemoveMarkerAction(m))));
+      return `Removed ${hit.length} “${prefix}” marker(s)`;
+    },
+    async copyFx() {
+      // ponytail: keyframe times are stored as Premiere reports them (clip-relative); retimed clips may need a nudge
+      const [, , items] = await selectedVideo();
+      const out = [];
+      for (const { comp, match } of (await components(items[0])).out) {
+        const params = [];
+        for (let i = 0; i < comp.getParamCount(); i++) {
+          const prm = comp.getParam(i);
+          try {
+            const keys = prm.isTimeVarying()
+              ? prm.getKeyframeListAsTickTimes().map((t: any) => ({ t: t.seconds, v: plain(prm.getKeyframePtr(t).value.value) })) : [];
+            params.push({ i, name: prm.displayName, value: plain((await prm.getStartValue()).value.value), keys });
+          } catch { /* colours and other opaque values are skipped */ }
+        }
+        out.push({ match, name: await comp.getDisplayName(), params });
+      }
+      return { components: out };
+    },
+    async applyFx(preset) {
+      const [project, , items] = await selectedVideo();
+      for (const it of items) {
+        const { chain } = await components(it);
+        const add: any[] = [];
+        for (const c of preset.components)
+          if (!INTRINSIC.has(c.match)) add.push(chain.createAppendComponentAction(await ppro.VideoFilterFactory.createComponent(c.match)));
+        transact(project, "Kerf apply effects", (a) => add.forEach(a));
+        const now = (await components(it)).out, used = new Set<number>(), actions: any[] = [];
+        for (const c of preset.components) {
+          const k = now.findIndex((x, j) => x.match === c.match && !used.has(j) && (INTRINSIC.has(c.match) || j >= now.length - add.length));
+          if (k < 0) continue;
+          used.add(k);
+          const comp = now[k].comp;
+          for (const p of c.params) {
+            try {
+              const prm = comp.getParam(p.i);
+              if (p.keys.length) {
+                actions.push(prm.createSetTimeVaryingAction(true));
+                for (const kf of p.keys) {
+                  const f = prm.createKeyframe(typed(kf.v));
+                  f.position = ppro.TickTime.createWithSeconds(kf.t);
+                  actions.push(prm.createAddKeyframeAction(f));
+                }
+              } else actions.push(prm.createSetValueAction(prm.createKeyframe(typed(p.value)), true));
+            } catch { /* a param type that can't be set this way */ }
+          }
+        }
+        transact(project, "Kerf effect values", (a) => actions.forEach(a));
+      }
+      return `Applied ${preset.components.length} effect(s) to ${items.length} clip(s)`;
+    },
+    async adjustment() {
+      const [project, seq] = await active();
+      const adj = (await allItems(await project.getRootItem())).find((x) => /adjustment layer/i.test(x.name) && x.type !== ppro.Constants.ProjectItemType.BIN);
+      if (!adj) return "Premiere has no scripting call to create adjustment layers: make one once (File › New › Adjustment Layer) and Kerf will reuse it";
+      await insertAt(project, seq, adj, (await seq.getPlayerPosition()).seconds, "Kerf adjustment layer");
+      return `Placed “${adj.name}” at the playhead`;
+    },
+  };
+
   // AE-authored MOGRT text params hold JSON ({"textEditValue": ...} plus style); plain strings elsewhere.
   async function textValue(prm: any, text: string) {
     try {
@@ -102,6 +276,8 @@ function premiere(): Host {
 
   return {
     name: "premiere",
+    tools,
+    async projectKey() { return (await ppro.Project.getActiveProject())?.path || "untitled"; },
     async readTimeline() {
       const [, seq] = await active();
       const fps = TICKS / Number(await seq.getTimebase());
@@ -109,10 +285,20 @@ function premiere(): Host {
       const video: Clip[][] = [], audio: Clip[][] = [];
       for (let i = 0; i < (await seq.getVideoTrackCount()); i++) video.push(await trackClips(await seq.getVideoTrack(i)));
       for (let i = 0; i < (await seq.getAudioTrackCount()); i++) audio.push(await trackClips(await seq.getAudioTrack(i)));
-      return { fps, width: Math.round(rect.width), height: Math.round(rect.height), name: seq.name, video, audio };
+      const playhead = (await seq.getPlayerPosition()).seconds;
+      return { fps, width: Math.round(rect.width), height: Math.round(rect.height), name: seq.name, video, audio, playhead };
     },
     async apply(res) {
       const notes: string[] = [];
+      if (res.sort) return [await sortProject(await ppro.Project.getActiveProject(), res.sort)];
+      if (res.insert) { // a generated layer goes onto the open sequence instead of into a new one
+        const [project, seq] = await active();
+        const root = await project.getRootItem();
+        await project.importFiles([res.insert.path], true, root as any, false);
+        let item = null;
+        for (const it of (await allItems(root)).reverse()) if (norm(await mediaPath(it)) === norm(res.insert.path)) { item = it; break; }
+        if (item) { await insertAt(project, seq, item, res.insert.at, "Kerf layer"); return [`Added ${res.insert.path.split(/[\\/]/).pop()} at the playhead`]; }
+      }
       if (res.imports?.length) { // downloads etc.: into the project bin, no open sequence required
         const project = await ppro.Project.getActiveProject();
         await project.importFiles(res.imports, true, (await project.getRootItem()) as any, false);

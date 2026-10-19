@@ -17,7 +17,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ai, broll, camera, captions, download, enhance, license, media, motion, render, silence, sound, speech
+from . import ai, broll, camera, captions, download, enhance, license, media, motion, render, silence, sound, speech, tools
 from .timeline import Timeline, to_xmeml
 
 
@@ -120,6 +120,35 @@ for _f in [
                 "Recipe: Music video / event recap (set music in Beat edit)": dict(steps=json.dumps([
                     {"feature": "beat_sync", "params": {"every": 2}}, {"feature": "sfx", "params": {"sound": "riser",
                                                                                                     "on": "cuts", "min_gap": 8.0}}]))}),
+    Feature("speed_ramp", "Speed ramp (speed graph)", tools.speed_ramp, tools.RAMP_DEFAULTS, tools.RAMP_CHOICES,
+            tools.RAMP_HELP, group="Graphs", presets={"Speedramp": dict(preset="speedramp"), "Ease in": dict(preset="ease_in"),
+                                                       "Ease out": dict(preset="ease_out"), "Ease in/out": dict(preset="ease_in_out"),
+                                                       "Linear": dict(preset="linear")}),
+    Feature("zoom_move", "Zoom in / out", tools.zoom_move, tools.ZOOMM_DEFAULTS, tools.ZOOMM_CHOICES, tools.ZOOMM_HELP,
+            group="Motion", presets={"Punch in (ease out)": dict(direction="in", ease="out", amount=125.0, duration=0.3),
+                                     "Slow push in": dict(direction="in", ease="in_out", amount=112.0, duration=3.0),
+                                     "Zoom out reveal": dict(direction="out", ease="out", amount=140.0, duration=0.8)}),
+    Feature("layout", "Anchor, align & distribute", tools.layout, tools.LAYOUT_DEFAULTS, tools.LAYOUT_CHOICES,
+            tools.LAYOUT_HELP, group="Motion", presets={"Picture-in-picture": dict(arrange="bottom_right", scale=32.0),
+                                                        "Side by side": dict(arrange="distribute_horizontal", tracks="1,2", scale=0.0),
+                                                        "2x2 grid": dict(arrange="grid", tracks="1,2,3,4", scale=0.0)}),
+    Feature("camera_shake", "Camera shake", tools.camera_shake, tools.SHAKE_DEFAULTS, tools.SHAKE_CHOICES, tools.SHAKE_HELP,
+            group="Shakes", presets={"Impact on cuts": dict(axis="all", amplitude=40.0, duration=0.35, flash=0),
+                                     "Handheld (whole clip)": dict(on="whole", axis="hv", amplitude=6.0, frequency=1.5, rotation=0.4, zoom=104),
+                                     "Earthquake": dict(axis="all", amplitude=70.0, frequency=18.0, duration=1.2, decay=0.3),
+                                     "Beat hits with flash (render)": dict(on="beats", output="render", flash=35, chromatic=6)}),
+    Feature("stabilize", "Stabilizer", tools.stabilize, tools.STAB_DEFAULTS, tools.STAB_CHOICES, tools.STAB_HELP, group="Tools"),
+    Feature("add_layer", "Add layer", tools.add_layer, tools.LAYER_DEFAULTS, tools.LAYER_CHOICES, tools.LAYER_HELP,
+            group="Tools", presets={"Black solid": dict(kind="solid"), "Transparent (null)": dict(kind="transparent"),
+                                    "Cinematic bars 2.39": dict(kind="letterbox", aspect=2.39, duration=0.0),
+                                    "Vignette": dict(kind="vignette", opacity=70, duration=0.0)}),
+    Feature("frame_export", "Frame export", tools.frame_export, tools.FRAME_DEFAULTS, tools.FRAME_CHOICES,
+            tools.FRAME_HELP, group="Tools"),
+    Feature("beat_markers", "Beat markers", tools.beat_markers, tools.BEATM_DEFAULTS, {}, tools.BEATM_HELP, group="Tools"),
+    Feature("quick_mask", "Quick mask (AI cutout)", tools.quick_mask, tools.MASK_DEFAULTS, tools.MASK_CHOICES,
+            tools.MASK_HELP, group="Tools"),
+    Feature("project_sort", "Project sorter", tools.project_sort, tools.SORT_DEFAULTS, {}, tools.SORT_HELP,
+            group="Tools", needs_timeline=False),
     Feature("download", "Download (yt-dlp)", download.run, download.DOWNLOAD_DEFAULTS, download.DOWNLOAD_CHOICES,
             download.DOWNLOAD_HELP, review=True, group="Import", needs_timeline=False,
             presets={"Best MP4": dict(quality="best", container="mp4"), "1080p for editing": dict(quality="1080"),

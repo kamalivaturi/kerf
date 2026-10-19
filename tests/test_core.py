@@ -136,6 +136,37 @@ def test_preset_share_caption_preview_and_hybrid():
     assert r["report"]["segments"] <= 7  # a pure tone is loud but not speech: hybrid can only keep less
 
 
+def test_toolkit():
+    from kerf import tools
+    sp = tools.speed_profile("speedramp", "", 30, 300)
+    assert sp(0.0) > 290 and sp(0.5) < 40  # fast → slow → fast
+    _, out_len = tools.ramp_expr(4.0, lambda u: 50)
+    assert abs(out_len - 8.0) < 1e-6  # half speed doubles the length
+    r = features.run("speed_ramp", str(VIDEO), {"preset": "ease_in_out", "min_speed": 50, "max_speed": 200,
+                                               "clips": "all"}, TMP / "out")
+    assert r["report"]["ramped"][0]["after"] != r["report"]["ramped"][0]["before"]
+    r = features.run("camera_shake", str(VIDEO), {"on": "times", "times": "2,6", "axis": "all"}, TMP / "out")
+    xml = Path(r["xml"][0]).read_text("utf-8")
+    assert "<parameterid>rotation</parameterid>" in xml and xml.count("<keyframe>") > 20
+    r = features.run("camera_shake", str(VIDEO), {"on": "times", "times": "1", "output": "render", "flash": 30,
+                                                  "chromatic": 4, "axis": "all"}, TMP / "out")
+    assert r["report"]["shakes"] == 1 and "shake" in Path(r["xml"][0]).read_text("utf-8")
+    r = features.run("layout", str(VIDEO), {"tracks": "1", "arrange": "top_left", "scale": 50.0}, TMP / "out")
+    root = ET.parse(r["xml"][0]).getroot()
+    assert float(root.find(".//parameter[parameterid='center']/value/horiz").text) < 0  # left of centre
+    for name, params in [("add_layer", {"kind": "letterbox"}), ("frame_export", {"time": "1.5", "folder": str(TMP)}),
+                         ("zoom_move", {"direction": "in", "ease": "out"}), ("stabilize", {"method": "deshake"})]:
+        assert features.run(name, str(VIDEO), params, TMP / "out")["report"], name
+    click = TMP / "click120.wav"
+    if not click.exists():
+        media.ffmpeg("-f", "lavfi", "-i", "aevalsrc='0.8*sin(2*PI*1000*t)*lt(mod(t,0.5),0.03)':s=44100:d=20", click)
+    m = features.run("beat_markers", str(VIDEO), {"music": str(click), "every": 2}, TMP / "out")
+    assert 15 <= len(m["markers"]) <= 25
+    assert set(tools.project_sort(None, tools.SORT_DEFAULTS, None)["sort"]["bins"]) >= {"Video", "Audio"}
+    tools.fx_save("Glow", {"components": [{"match": "AE.ADBE Glow"}]})
+    assert "Glow" in tools.fx_list() and tools.fx_get("Glow")["components"][0]["match"] == "AE.ADBE Glow"
+
+
 def test_xmeml_keyframes_and_disabled():
     tl = Timeline(fps=30, video=[[Clip(str(VIDEO), 0, 2, 0, scale=[(0, 100), (1, 120)]),
                                   Clip(str(VIDEO), 2, 4, 2, enabled=False)]], audio=[[]])

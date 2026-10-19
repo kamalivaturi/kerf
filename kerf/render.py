@@ -26,8 +26,8 @@ def candidates(codec, big):
     if codec not in ("auto", "h264", "hevc"):
         return [codec]
     hevc = codec == "hevc" or (codec == "auto" and big)
-    pref = (["hevc_nvenc", "hevc_qsv", "hevc_amf", "libx265"] if hevc
-            else ["h264_nvenc", "h264_qsv", "h264_amf", "libx264"])
+    pref = (["hevc_nvenc", "hevc_videotoolbox", "hevc_qsv", "hevc_amf", "libx265"] if hevc  # videotoolbox = macOS
+            else ["h264_nvenc", "h264_videotoolbox", "h264_qsv", "h264_amf", "libx264"])
     return [e for e in pref if f" {e} " in encoders()] or ["libx264"]
 
 

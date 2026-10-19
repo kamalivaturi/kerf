@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, store } from "./api";
 import Graphics from "./Graphics";
+import Toolkit, { ToolTab } from "./Toolkit";
 import { host, IN_UXP, RunResult, setStandaloneMedia } from "./host";
 import { LANGS, setLang, t } from "./i18n";
 
@@ -12,6 +13,7 @@ type Feature = {
   review: boolean; entitled: boolean; needs_timeline: boolean; presets: { builtin: string[]; user: string[] };
 };
 type Theme = "auto" | "light" | "dark";
+type View = ToolTab | "edit" | "graphics";
 type Item = { id: number; label: string; text?: string; editable?: boolean };
 type Prefs = { theme: Theme; accent: string; density: "compact" | "comfortable"; fontSize: number; favorites: string[]; showHelp: boolean; lang: string };
 type HistoryEntry = { feature: string; title: string; at: number; notes: string[]; params: Params; ok: boolean };
@@ -20,7 +22,7 @@ const GROUP_ORDER = ["★", "AI", "Import", "Cut", "Style", "Audio", "Multicam",
 const HIDDEN = new Set(["preview", "items", "plan_only"]);
 const LONG = new Set(["prompt", "steps", "extra_words", "urls"]);
 const FILES = new Set(["srt_import", "mogrt", "sound", "watermark", "folder", "output"]);
-const ACCENTS = ["#ff5a36", "#3d7cff", "#13b07a", "#a64dff", "#ff3d7f", "#f5a623"];
+const ACCENTS = ["#ff6b2c", "#3d7cff", "#13b07a", "#a64dff", "#ff3d7f", "#f5a623"];
 const DEFAULT_PREFS: Prefs = { theme: "auto", accent: ACCENTS[0], density: "comfortable", fontSize: 12, favorites: [], showHelp: true, lang: "auto" };
 
 const label = (k: string) => k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -74,7 +76,10 @@ export default function App() {
   const [started, setStarted] = useState(0);
   const [, tick] = useState(0);
   const [error, setError] = useState("");
-  const [panel, setPanel] = useState<"" | "settings" | "history" | "graphics" | "news">("");
+  const [panel, setPanel] = useState<"" | "settings" | "history" | "news">("");
+  const [view, setView] = useState<View>(store.get("view", "tools"));
+  const goView = (v: View) => { setView(v); store.set("view", v); };
+  const [projectKey, setProjectKey] = useState("standalone");
   const [history, setHistory] = useState<HistoryEntry[]>(store.get("history", []));
   const [update, setUpdate] = useState<{ latest: string; url: string } | null>(null);
   const [media, setMedia] = useState(store.get("media", ""));
@@ -98,6 +103,7 @@ export default function App() {
     const h = await api.health();
     setEngine(h ? h.version : null);
     if (!h) return;
+    host.projectKey?.().then(setProjectKey).catch(() => {});
     if (store.get("seenVersion", "") !== h.version) { setPanel("news"); store.set("seenVersion", h.version); }
     try {
       setFeatures((await api.get("/features")).features);
@@ -182,75 +188,94 @@ export default function App() {
 
   if (!engine) return <Offline onRetry={connect} prefs={prefs} setPrefs={setPrefs} />;
 
+  const NAV: [View, string, JSX.Element][] = [
+    ["tools", "Tools", <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>],
+    ["graphs", "Graphs", <svg viewBox="0 0 24 24"><path d="M3 20c4 0 5-16 9-16s5 16 9 16" /></svg>],
+    ["motion", "Motion", <svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3M20 16H8l3 3" /><circle cx="4" cy="16" r="1.5" /></svg>],
+    ["shakes", "Shakes", <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>],
+    ["edit", "Edit", <svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" /></svg>],
+    ["graphics", "Graphics", <svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" /></svg>],
+  ];
+  const needsMedia = !IN_UXP && view !== "graphics" && (view !== "edit" || f?.needs_timeline !== false);
+
   return (
     <div className="app">
       <header className="top">
-        <div className="brand"><span className="logo">K</span> Kerf</div>
-        <span className="status ok" title={`Engine ${engine}`}>● {engine}</span>
-        <ThemePicker prefs={prefs} set={setPrefs} />
-        {([["graphics", "▦", t("graphics")], ["news", "✦", t("whatsNew")], ["history", "⟲", t("history")], ["settings", "⚙", t("settings")]] as const).map(([k, icon, tip]) =>
-          <button key={k} className={`ghost icon ${panel === k ? "on" : ""}`} onClick={() => setPanel(panel === k ? "" : k)} aria-label={tip} title={tip}>{icon}</button>)}
-        <button className="ghost icon" onClick={openHelp} aria-label={t("help")} title={t("help")}>?</button>
+        <div className="brand"><span className="wordmark">kerf</span></div>
+        <span className="pill status ok" title={`Engine ${engine}`}><i />{IN_UXP ? "Premiere" : "Studio"}</span>
+        {([["news", "✦", t("whatsNew")], ["history", "⟲", t("history")], ["settings", "⚙", t("settings")]] as const).map(([k, icon, tip]) =>
+          <button key={k} className={`pill icon ${panel === k ? "on" : ""}`} onClick={() => setPanel(panel === k ? "" : k)} aria-label={tip} title={tip}>{icon}</button>)}
+        <button className="pill icon" onClick={openHelp} aria-label={t("help")} title={t("help")}>?</button>
+        <span className="pill ver">v{engine}</span>
       </header>
 
+      <nav className="mainnav" role="tablist">
+        {NAV.map(([k, label, icon]) => <button key={k} role="tab" aria-selected={view === k} className={view === k ? "on" : ""} onClick={() => goView(k)}>
+          {icon}<span>{label}</span></button>)}
+      </nav>
+
       {update && <div className="banner">Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></div>}
-      {panel === "graphics" && <Graphics onClose={() => setPanel("")} onCaptions={(file) => {
-        setName("captions"); setGroup(features.captions?.group || group); setPanel("");
-        setTimeout(() => setParams({ ...features.captions?.defaults, output: "mogrt", mogrt: file, mogrt_param: "Text" }), 0);
-      }} />}
       {panel === "news" && <News onClose={() => setPanel("")} />}
       {panel === "settings" && <Settings prefs={prefs} setPrefs={setPrefs} onClose={() => setPanel("")} />}
-      {panel === "history" && <History entries={history} onLoad={(h) => { setName(h.feature); setGroup(features[h.feature]?.group || group); setTimeout(() => setParams(h.params), 0); setPanel(""); }}
+      {panel === "history" && <History entries={history} onLoad={(h) => { goView("edit"); setName(h.feature); setGroup(features[h.feature]?.group || group); setTimeout(() => setParams(h.params), 0); setPanel(""); }}
         onClear={() => { setHistory([]); store.set("history", []); }} onClose={() => setPanel("")} />}
 
-      {!IN_UXP && f?.needs_timeline !== false && (
+      {needsMedia && (
         <section className="card source">
           <label htmlFor="media">{t("media")} <small>{t("mediaHint")}</small></label>
-          <textarea id="media" rows={2} value={media} onChange={(e) => setMedia(e.target.value)} placeholder="C:\Videos\interview.mp4" />
+          <textarea id="media" rows={1} value={media} onChange={(e) => setMedia(e.target.value)} placeholder="C:\Videos\interview.mp4" />
         </section>
       )}
 
-      <div className="search">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("search")} aria-label="Search features" />
-      </div>
-      {!query && (
-        <nav className="tabs">
-          {groups.map((g) => <button key={g} className={g === group ? "on" : ""} onClick={() => pickGroup(g)}>{g}</button>)}
-        </nav>
-      )}
-      <div className="chips">
-        {visible.map(([k, x]) => (
-          <button key={k} className={k === name ? "chip on" : "chip"} onClick={() => setName(k)}>
-            {fav(k) && <span className="star">★</span>}{x.title}{x.tier !== "free" && <em className="tier">{x.tier}</em>}
-          </button>
-        ))}
-        {!visible.length && <span className="help">{t("noMatch")}</span>}
-      </div>
+      {view === "graphics" && <Graphics onClose={() => goView("tools")} onCaptions={(file) => {
+        goView("edit"); setName("captions"); setGroup(features.captions?.group || group);
+        setTimeout(() => setParams({ ...features.captions?.defaults, output: "mogrt", mogrt: file, mogrt_param: "Text" }), 0);
+      }} />}
+      {(view === "tools" || view === "graphs" || view === "motion" || view === "shakes") && <Toolkit tab={view} projectKey={projectKey} />}
 
-      {f && (
-        <main className="card fade" key={name}>
-          <h2>
-            {f.title}
-            <button className={`ghost icon fav ${fav(name) ? "on" : ""}`} onClick={() => toggleFav(name)}
-              aria-label={fav(name) ? "Remove from favorites" : "Add to favorites"} title="Favorite">{fav(name) ? "★" : "☆"}</button>
-          </h2>
-          {prefs.showHelp && <p className="help">{f.help}</p>}
-          <Presets feature={name} f={f} params={params} setParams={setParams} reload={connect} />
-          <Form f={f} params={params} setParams={setParams} />
-          {name === "captions" && params.output !== "srt_only" && <CaptionPreview params={params} media={IN_UXP ? "" : paths()[0] || ""} />}
-          <div className="actions">
-            <button className="ghost" onClick={() => setParams({ ...f.defaults })} title="Reset to defaults">{t("reset")}</button>
-            {f.review && <button disabled={!!busy} onClick={() => run(true)}>{name === "prompt_edit" ? t("plan") : t("analyze")}</button>}
-            <button className="primary" disabled={!!busy || !f.entitled} onClick={() => run(false)}>
-              {f.entitled ? (items ? t("applySelected", { n: checked.size }) : name === "download" ? t("download") : t("apply")) : t("requires", { tier: f.tier })}
+      {view === "edit" && <>
+        <div className="search">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("search")} aria-label="Search features" />
+        </div>
+        {!query && (
+          <nav className="tabs">
+            {groups.map((g) => <button key={g} className={g === group ? "on" : ""} onClick={() => pickGroup(g)}>{g}</button>)}
+          </nav>
+        )}
+        <div className="chips">
+          {visible.map(([k, x]) => (
+            <button key={k} className={k === name ? "chip on" : "chip"} onClick={() => setName(k)}>
+              {fav(k) && <span className="star">★</span>}{x.title}{x.tier !== "free" && <em className="tier">{x.tier}</em>}
             </button>
-          </div>
-          {busy && <div className="busy"><span className="spinner" /> {busy}… <span className="elapsed">{Math.round((Date.now() - started) / 1000)}s</span></div>}
-          {error && <div className="error">{error}</div>}
-          {items && <Review items={items} checked={checked} setChecked={setChecked} edits={edits} setEdits={setEdits} />}
-          {result && <Result res={result} notes={notes} onUse={!IN_UXP ? (p) => { setMedia(p); pickGroup("Cut"); } : undefined} />}
-        </main>
-      )}
+          ))}
+          {!visible.length && <span className="help">{t("noMatch")}</span>}
+        </div>
+
+        {f && (
+          <main className="card fade" key={name}>
+            <h2>
+              {f.title}
+              <button className={`ghost icon fav ${fav(name) ? "on" : ""}`} onClick={() => toggleFav(name)}
+                aria-label={fav(name) ? "Remove from favorites" : "Add to favorites"} title="Favorite">{fav(name) ? "★" : "☆"}</button>
+            </h2>
+            {prefs.showHelp && <p className="help">{f.help}</p>}
+            <Presets feature={name} f={f} params={params} setParams={setParams} reload={connect} />
+            <Form f={f} params={params} setParams={setParams} />
+            {name === "captions" && params.output !== "srt_only" && <CaptionPreview params={params} media={IN_UXP ? "" : paths()[0] || ""} />}
+            <div className="actions">
+              <button className="ghost" onClick={() => setParams({ ...f.defaults })} title="Reset to defaults">{t("reset")}</button>
+              {f.review && <button disabled={!!busy} onClick={() => run(true)}>{name === "prompt_edit" ? t("plan") : t("analyze")}</button>}
+              <button className="primary" disabled={!!busy || !f.entitled} onClick={() => run(false)}>
+                {f.entitled ? (items ? t("applySelected", { n: checked.size }) : name === "download" ? t("download") : t("apply")) : t("requires", { tier: f.tier })}
+              </button>
+            </div>
+            {busy && <div className="busy"><span className="spinner" /> {busy}… <span className="elapsed">{Math.round((Date.now() - started) / 1000)}s</span></div>}
+            {error && <div className="error">{error}</div>}
+            {items && <Review items={items} checked={checked} setChecked={setChecked} edits={edits} setEdits={setEdits} />}
+            {result && <Result res={result} notes={notes} onUse={!IN_UXP ? (p) => { setMedia(p); pickGroup("Cut"); } : undefined} />}
+          </main>
+        )}
+      </>}
     </div>
   );
 }

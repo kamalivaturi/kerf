@@ -51,6 +51,7 @@ class Clip:
     enabled: bool = True
     scale: list = field(default_factory=list)   # [(t, pct)]
     center: list = field(default_factory=list)  # [(t, x, y)]
+    rotation: list = field(default_factory=list)  # [(t, degrees)]
 
     @property
     def dur(self):
@@ -68,6 +69,7 @@ class Clip:
         c.start = a
         c.scale = slice_kf([(self.start + t, *v) for t, *v in self.scale], a, b) if self.scale else []
         c.center = slice_kf([(self.start + t, *v) for t, *v in self.center], a, b) if self.center else []
+        c.rotation = slice_kf([(self.start + t, *v) for t, *v in self.rotation], a, b) if self.rotation else []
         return c
 
 
@@ -82,6 +84,7 @@ class Timeline:
     markers: list = field(default_factory=list)      # [(t, name, note)]
     transitions: list = field(default_factory=list)  # record times of audio crossfades
     transition_dur: float = 0.1
+    playhead: float = 0.0  # record time of the NLE playhead when read from a host
 
     @property
     def duration(self):
@@ -98,7 +101,7 @@ class Timeline:
         video = clips(d.get("video") or [[]])
         audio = clips(d["audio"]) if d.get("audio") else copy.deepcopy(video)
         return cls(float(d.get("fps", 30)), int(d.get("width", 1920)), int(d.get("height", 1080)),
-                   d.get("name", "Kerf"), video, audio)
+                   d.get("name", "Kerf"), video, audio, playhead=float(d.get("playhead") or 0.0))
 
     def to_dict(self):
         clip = lambda c: dict(path=c.path, src_in=c.src_in, src_out=c.src_out, start=c.start, enabled=c.enabled)
@@ -190,10 +193,12 @@ def split(tl, times, kinds=("video", "audio"), tracks=None):
     return out
 
 
-def set_keyframes(tl, tracks, scale=None, center=None):
+def set_keyframes(tl, tracks, scale=None, center=None, rotation=None):
     """Apply record-time keyframes [(t, *v)] to every clip on video `tracks`."""
     for ti in tracks:
         for c in tl.video[ti]:
+            if rotation is not None:
+                c.rotation = slice_kf(rotation, c.start, c.end)
             if scale is not None:
                 c.scale = slice_kf(scale, c.start, c.end)
             if center is not None:
@@ -249,7 +254,7 @@ def to_xmeml(tl, probe):
                 f"{rate}<duration>{dur}</duration><media>{media}</media></file>")
 
     def motion(c):
-        if not c.scale and not c.center:
+        if not c.scale and not c.center and not c.rotation:
             return ""
         base = F(c.src_in)
 
@@ -264,8 +269,9 @@ def to_xmeml(tl, probe):
         sc = param("scale", "Scale", c.scale, lambda v: f"{v[0]:.3f}")
         ce = param("center", "Center", c.center,
                    lambda v: f"<horiz>{v[0] * CENTER_UNIT:.5f}</horiz><vert>{v[1] * CENTER_UNIT:.5f}</vert>")
+        ro = param("rotation", "Rotation", c.rotation, lambda v: f"{v[0]:.3f}")
         return ("<filter><effect><name>Basic Motion</name><effectid>basic</effectid><effectcategory>motion</effectcategory>"
-                f"<effecttype>motion</effecttype><mediatype>video</mediatype>{sc}{ce}</effect></filter>")
+                f"<effecttype>motion</effecttype><mediatype>video</mediatype>{sc}{ro}{ce}</effect></filter>")
 
     def clipitem(c, kind, ch=1):
         fs, fe, fi = F(c.start), F(c.end), F(c.src_in)
