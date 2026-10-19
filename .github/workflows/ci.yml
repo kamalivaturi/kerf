@@ -22,9 +22,9 @@ jobs:
           case "$RUNNER_OS" in
             Linux) sudo apt-get update && sudo apt-get install -y ffmpeg ;;
             macOS) brew install ffmpeg ;;
-            Windows) choco install ffmpeg -y --no-progress ;;
+            Windows) curl -sSL -o ff.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
+                     unzip -q ff.zip -d "$RUNNER_TEMP/ff" && cygpath -w "$(ls -d "$RUNNER_TEMP"/ff/*/bin)" >> "$GITHUB_PATH" ;;
           esac
-          ffmpeg -hide_banner -version | head -n 1
       - run: pip install -e ".[dev]"
       - run: python -m pytest -q tests
 
