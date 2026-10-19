@@ -8,7 +8,7 @@ type Feature = {
   review: boolean; entitled: boolean; needs_timeline: boolean; presets: { builtin: string[]; user: string[] };
 };
 type Theme = "auto" | "light" | "dark";
-type Item = { id: number; label: string };
+type Item = { id: number; label: string; text?: string; editable?: boolean };
 type Prefs = { theme: Theme; accent: string; density: "compact" | "comfortable"; fontSize: number; favorites: string[]; showHelp: boolean };
 type HistoryEntry = { feature: string; title: string; at: number; notes: string[]; params: Params; ok: boolean };
 
@@ -66,6 +66,7 @@ export default function App() {
   const [params, setParams] = useState<Params>({});
   const [items, setItems] = useState<Item[] | null>(null);
   const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [edits, setEdits] = useState<Record<number, string>>({});
   const [result, setResult] = useState<RunResult | null>(null);
   const [notes, setNotes] = useState<string[]>([]);
   const [busy, setBusy] = useState("");
@@ -138,6 +139,7 @@ export default function App() {
     reset();
     const p: Params = { ...params };
     if (analyze) p[name === "prompt_edit" ? "plan_only" : "preview"] = true;
+    else if (items?.some((i) => i.editable)) p.edits = JSON.stringify(edits);
     else if (items) p.items = [...checked].join(",") || "-1";
     setStarted(Date.now());
     try {
@@ -154,6 +156,7 @@ export default function App() {
       if (analyze) {
         setItems(res.items || []);
         setChecked(new Set((res.items || []).map((i) => i.id)));
+        setEdits({});
         setResult({ report: res.report });
         return;
       }
@@ -232,7 +235,7 @@ export default function App() {
           </div>
           {busy && <div className="busy"><span className="spinner" /> {busy}… <span className="elapsed">{Math.round((Date.now() - started) / 1000)}s</span></div>}
           {error && <div className="error">{error}</div>}
-          {items && <Review items={items} checked={checked} setChecked={setChecked} />}
+          {items && <Review items={items} checked={checked} setChecked={setChecked} edits={edits} setEdits={setEdits} />}
           {result && <Result res={result} notes={notes} onUse={!IN_UXP ? (p) => { setMedia(p); pickGroup("Cut"); } : undefined} />}
         </main>
       )}
@@ -292,7 +295,10 @@ function Presets({ feature, f, params, setParams, reload }: {
   );
 }
 
-function Review({ items, checked, setChecked }: { items: Item[]; checked: Set<number>; setChecked: (s: Set<number>) => void }) {
+function Review({ items, checked, setChecked, edits, setEdits }: {
+  items: Item[]; checked: Set<number>; setChecked: (s: Set<number>) => void;
+  edits: Record<number, string>; setEdits: (e: Record<number, string>) => void;
+}) {
   const [filter, setFilter] = useState("");
   const toggle = (id: number) => { const s = new Set(checked); if (s.has(id)) s.delete(id); else s.add(id); setChecked(s); };
   const shown = items.filter((i) => i.label.toLowerCase().includes(filter.toLowerCase()));
@@ -305,7 +311,10 @@ function Review({ items, checked, setChecked }: { items: Item[]; checked: Set<nu
         <button className="ghost" onClick={() => setChecked(new Set())}>None</button>
       </div>
       <ul>{shown.map((i) => (
-        <li key={i.id} className={checked.has(i.id) ? "" : "off"}><label><input type="checkbox" checked={checked.has(i.id)} onChange={() => toggle(i.id)} /> {i.label}</label></li>
+        i.editable
+          ? <li key={i.id} className={`editrow${edits[i.id] !== undefined ? " edited" : ""}`}><span className="tc">{i.label.split("  ")[0]}</span>
+              <input value={edits[i.id] ?? i.text ?? ""} aria-label={`Sentence ${i.id + 1}`} onChange={(e) => setEdits({ ...edits, [i.id]: e.target.value })} /></li>
+          : <li key={i.id} className={checked.has(i.id) ? "" : "off"}><label><input type="checkbox" checked={checked.has(i.id)} onChange={() => toggle(i.id)} /> {i.label}</label></li>
       ))}</ul>
     </div>
   );

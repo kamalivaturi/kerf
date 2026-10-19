@@ -17,7 +17,7 @@ DEFAULTS = dict(
     gemini_model="gemini-2.5-pro",
     local_llm_url="",                  # OpenAI-compatible, e.g. http://localhost:11434/v1 (Ollama)
     local_llm_model="llama3.1",
-    whisper_model="small",             # any faster-whisper id or a local fine-tuned CTranslate2 folder
+    whisper_model="auto",              # auto = large-v3-turbo on GPU, small on CPU; or any faster-whisper id / fine-tuned folder
     whisper_device="auto",
     anthropic_api_key="", openai_api_key="", gemini_api_key="", elevenlabs_api_key="", pexels_api_key="",
     theme="auto",

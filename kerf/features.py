@@ -52,6 +52,8 @@ def register(f):
 for _f in [
     Feature("silences", "Silences", silence.run, silence.DEFAULTS, silence.CHOICES, silence.HELP, review=True,
             presets={k.title(): dict(preset=k) for k in silence.PRESETS}, group="Cut"),
+    Feature("transcript", "Transcript & language", speech.transcript, speech.TRANSCRIPT_DEFAULTS, {},
+            speech.TRANSCRIPT_HELP, review=True, group="Cut"),
     Feature("repeat", "Repeat (bad takes)", speech.repeat, speech.REPEAT_DEFAULTS, {}, speech.REPEAT_HELP,
             review=True, group="Cut"),
     Feature("profanity", "Profanity Filter", speech.profanity, speech.PROFANITY_DEFAULTS, speech.PROFANITY_CHOICES,

@@ -97,6 +97,18 @@ def test_download_options_map_to_yt_dlp():
     assert features.REGISTRY["download"].needs_timeline is False
 
 
+def test_transcript_corrections_win_and_teach_vocabulary():
+    from kerf import speech
+    words = [dict(w=w, s=i * .5, e=i * .5 + .4) for i, w in enumerate("welcome to the curf channel".split())]
+    fixed, learned = speech._apply_fix(words, 0, 2.4, "welcome to the Kerf channel")
+    assert [w["w"] for w in fixed] == ["welcome", "to", "the", "Kerf", "channel"] and learned == ["Kerf"]
+    assert fixed[0]["s"] == 0 and fixed[-1]["e"] == 2.4  # timing spread over the original span
+    speech.fixed_path(str(VIDEO)).write_text(json.dumps(dict(language="en", words=fixed)), "utf-8")
+    assert speech.transcribe(str(VIDEO))["words"][3]["w"] == "Kerf"  # served before any model runs
+    assert speech.learn(learned) == ["Kerf"] and speech.learn(learned) == []  # no duplicates
+    assert "hinglish" in speech.languages()["profiles"] and len(speech.languages()["codes"]) >= 99
+
+
 def test_xmeml_keyframes_and_disabled():
     tl = Timeline(fps=30, video=[[Clip(str(VIDEO), 0, 2, 0, scale=[(0, 100), (1, 120)]),
                                   Clip(str(VIDEO), 2, 4, 2, enabled=False)]], audio=[[]])

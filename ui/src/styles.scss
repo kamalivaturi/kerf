@@ -135,3 +135,5 @@ input[type="checkbox"] { width: auto; margin: 0 6px 0 0; accent-color: var(--acc
   summary { cursor: pointer; color: var(--muted); } }
 .source label { font-weight: 600; margin-bottom: 4px; }
 .offline pre { background: var(--field); padding: 8px; border-radius: 5px; }
+.review li.editrow { display: flex; align-items: center; .tc { flex: 0 0 auto; margin-right: 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  input { flex: 1; } &.edited input { border-color: var(--accent); } }

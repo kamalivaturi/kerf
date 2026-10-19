@@ -38,7 +38,59 @@ PROFILES = {
     "marathi": dict(language="mr"), "gujarati": dict(language="gu"), "kannada": dict(language="kn"),
     "malayalam": dict(language="ml"), "nepali": dict(language="ne"), "sinhala": dict(language="si"),
     "tanglish": dict(language="ta", romanize=True, prompt="Tamil and English mixed conversation."),
+    "benglish": dict(language="bn", romanize=True, multilingual=True, prompt="Bengali and English mixed conversation."),
+    "taglish": dict(language="tl", multilingual=True, prompt="Tagalog at English, halo-halo. Okay, so let's start."),
+    "spanglish": dict(language="es", multilingual=True, prompt="Spanish and English mixed, like, ¿sabes? Okay."),
+    "manglish": dict(language="ms", multilingual=True, prompt="Malay and English mixed lah, okay can."),
+    "arabizi": dict(language="ar", multilingual=True, prompt="Arabic and English mixed conversation."),
+    "franglais": dict(language="fr", multilingual=True, prompt="Français et anglais mélangés, okay, let's go."),
+    "konglish": dict(language="ko", multilingual=True, prompt="Korean and English mixed conversation."),
 }
+for _p in PROFILES.values():  # code-switching profiles detect the language per segment
+    _p.setdefault("multilingual", bool(_p.get("romanize")))
+VOCAB = media.HOME / "vocabulary.txt"
+
+
+def languages():
+    """Every language code Whisper knows, plus Kerf's named profiles (for UI pickers)."""
+    from faster_whisper.tokenizer import _LANGUAGE_CODES
+    return dict(profiles=sorted(PROFILES), codes=sorted(_LANGUAGE_CODES))
+
+
+def vocabulary():
+    return [w for w in VOCAB.read_text("utf-8").split("\n") if w.strip()] if VOCAB.exists() else []
+
+
+def learn(words):
+    """Add names/terms to the personal vocabulary used as Whisper hotwords (self-improving accuracy)."""
+    cur = vocabulary()
+    new = [w for w in dict.fromkeys(w.strip() for w in words) if w and w not in cur]
+    if new:
+        VOCAB.parent.mkdir(parents=True, exist_ok=True)
+        VOCAB.write_text("\n".join(cur + new), "utf-8")
+    return new
+
+
+def _whisper(model=None):
+    """(WhisperModel, name). 'auto' = large-v3-turbo on a CUDA GPU, small on CPU."""
+    from . import settings
+    import ctranslate2
+    from faster_whisper import WhisperModel
+    dev = settings.get("whisper_device")
+    gpu = dev != "cpu" and ctranslate2.get_cuda_device_count() > 0
+    name = model or settings.get("whisper_model")
+    if name in ("", "auto"):
+        name = "large-v3-turbo" if gpu else "small"
+    if name not in _models:
+        _models[name] = WhisperModel(name, device="cuda" if gpu else "cpu", compute_type="float16" if gpu else "int8")
+    return _models[name], name
+
+
+def detect_language(path, segments=4):
+    """Language of a file from several 30 s windows: (code, confidence, top-5 [(code, p)])."""
+    m, _ = _whisper()
+    code, prob, probs = m.detect_language(media.load_audio(path), language_detection_segments=segments)
+    return code, round(prob, 3), [(c, round(p, 3)) for c, p in probs[:5]]
 DEVANAGARI = re.compile(r"[ऀ-෿]")  # Devanagari … Sinhala blocks
 
 
@@ -72,20 +124,26 @@ def transcribe(path, language="", model=None):
     from . import settings
     prof = PROFILES.get((language or "").strip().lower(), {})
     lang = prof.get("language", language or "")
-    model = model or settings.get("whisper_model")
-    f = media.CACHE / f"{media.cache_key(path, 'words', model, language or '')}.json"
+    vocab = vocabulary()
+    key = media.cache_key(path, "words", model or settings.get("whisper_model"), language or "", len(vocab))
+    fixed = fixed_path(path, language)  # user corrections win over the model
+    if fixed.exists():
+        return json.loads(fixed.read_text("utf-8"))
+    f = media.CACHE / f"{key}.json"
     if f.exists():
         return json.loads(f.read_text("utf-8"))
-    from faster_whisper import WhisperModel
-    if model not in _models:
-        _models[model] = WhisperModel(model, device=settings.get("whisper_device"), compute_type="default")
-    segs, info = _models[model].transcribe(str(path), language=lang or None, initial_prompt=prof.get("prompt"),
-                                           word_timestamps=True, vad_filter=True)
+    m, _ = _whisper(model)
+    prompt = " ".join(x for x in (prof.get("prompt"), ", ".join(vocab[:80])) if x) or None
+    segs, info = m.transcribe(
+        str(path), language=lang or None, initial_prompt=prompt, hotwords=" ".join(vocab[:200]) or None,
+        multilingual=prof.get("multilingual", False), word_timestamps=True, beam_size=5,
+        condition_on_previous_text=False, hallucination_silence_threshold=2.0, language_detection_segments=4,
+        vad_filter=True, vad_parameters=dict(min_silence_duration_ms=400, speech_pad_ms=150))
     words = [dict(w=w.word.strip(), s=round(w.start, 3), e=round(w.end, 3))
              for s in segs for w in (s.words or []) if w.word.strip()]
     if prof.get("romanize"):
         words = romanize(words)
-    out = dict(language=info.language, words=words)
+    out = dict(language=info.language, language_probability=round(info.language_probability, 3), words=words, key=key)
     media.CACHE.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(out), "utf-8")
     return out
@@ -129,6 +187,63 @@ def selected(p, items):
         ids = [x for x in ids.split(",") if x.strip()]
     ids = {int(x) for x in ids}
     return [it for it in items if it["id"] in ids]
+
+
+# ---------------------------------------------------------------- Transcript review / corrections
+
+TRANSCRIPT_DEFAULTS = dict(language="", preview=False, items="", edits="")
+TRANSCRIPT_HELP = ("Review the transcript sentence by sentence and fix anything misheard. Corrections are saved and used by "
+                   "every feature (captions, repeat, chapters…), and new names/terms are learned as vocabulary so future "
+                   "transcriptions get them right. Shows the detected language and its confidence.")
+
+
+def fixed_path(path, language=""):
+    """Corrected transcript for a file: independent of model/vocabulary so corrections are never orphaned."""
+    return media.CACHE / f"{media.cache_key(path, 'fixed', language or '')}.json"
+
+
+def _apply_fix(words, start, end, text):
+    """Replace the words in [start, end] with `text`, spreading the original timing across the new tokens."""
+    idx = [i for i, w in enumerate(words) if w["s"] >= start - 1e-3 and w["e"] <= end + 1e-3]
+    toks = text.split()
+    if not idx or not toks:
+        return words, []
+    a, b = words[idx[0]]["s"], words[idx[-1]]["e"]
+    step = (b - a) / len(toks)
+    fixed = [dict(w=t, s=round(a + i * step, 3), e=round(a + (i + 1) * step, 3)) for i, t in enumerate(toks)]
+    old = {norm(words[i]["w"]) for i in idx}
+    learned = [t.strip(".,!?;:\"'") for t in toks if norm(t) not in old and (t[:1].isupper() or any(c.isdigit() for c in t))]
+    return words[:idx[0]] + fixed + words[idx[-1] + 1:], learned
+
+
+def transcript(tl, p, ctx):
+    track = 0
+    sents = sentences(timeline_words(tl, track, p["language"]))
+    clips = [c for c in tl.audio[track] if c.enabled] if tl.audio else []
+    langs = {c.path: transcribe(c.path, p["language"]) for c in clips}
+    lang = next(iter(langs.values()), {})
+    report = dict(sentences=len(sents), language=lang.get("language"), confidence=lang.get("language_probability"),
+                  vocabulary=len(vocabulary()))
+    items = [dict(id=i, label=f"{fmt_time(s['start'])}  {s['text']}", text=s["text"], start=s["start"], end=s["end"],
+                  editable=True) for i, s in enumerate(sents)]
+    if p["preview"] or not p["edits"]:
+        return dict(report=report, items=items)
+    edits = json.loads(p["edits"]) if isinstance(p["edits"], str) else p["edits"]
+    learned = []
+    for c in clips:  # map each edited record-time sentence back onto its source file's transcript
+        data = langs[c.path]
+        words = data["words"]
+        for sid, text in edits.items():
+            s = items[int(sid)]
+            if s["start"] < c.start or s["end"] > c.end + 0.05 or text.strip() == s["text"].strip():
+                continue
+            off = c.src_in - c.start
+            words, new = _apply_fix(words, s["start"] + off, s["end"] + off, text)
+            learned += new
+        fixed = fixed_path(c.path, p["language"])
+        fixed.write_text(json.dumps({**data, "words": words, "corrected": True}), "utf-8")
+    report.update(corrected=len(edits), learned=learn(learned))
+    return dict(report=report)
 
 
 # ---------------------------------------------------------------- Profanity
