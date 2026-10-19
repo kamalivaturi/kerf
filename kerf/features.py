@@ -17,7 +17,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ai, broll, camera, captions, download, enhance, license, media, motion, render, silence, speech
+from . import ai, broll, camera, captions, download, enhance, license, media, motion, render, silence, sound, speech
 from .timeline import Timeline, to_xmeml
 
 
@@ -78,6 +78,14 @@ for _f in [
     Feature("enhance", "Enhance Audio", enhance.run, enhance.ENHANCE_DEFAULTS, enhance.ENHANCE_CHOICES,
             enhance.ENHANCE_HELP, presets={"Podcast (-16 LUFS)": dict(loudness=-16.0), "Noisy street": dict(
                 strength="strong"), "Studio isolation (ElevenLabs)": dict(provider="elevenlabs")}, group="Audio"),
+    Feature("music", "Music (auto-duck)", sound.music, sound.MUSIC_DEFAULTS, {}, sound.MUSIC_HELP, group="Audio",
+            presets={"Subtle bed": dict(volume_db=-20.0), "Upbeat, strong duck": dict(volume_db=-12.0, duck_amount=12.0)}),
+    Feature("sfx", "Sound effects", sound.sfx, sound.SFX_DEFAULTS, sound.SFX_CHOICES, sound.SFX_HELP, group="Audio",
+            presets={k.replace("_", " ").title(): dict(sound=k) for k in sound.SFX}),
+    Feature("dub", "Translate & dub", sound.dub, sound.DUB_DEFAULTS, {}, sound.DUB_HELP, group="Audio"),
+    Feature("beat_sync", "Beat edit (music video)", sound.beat_sync, sound.BEAT_DEFAULTS, {}, sound.BEAT_HELP,
+            group="Repurpose", presets={"Every beat": dict(every=1), "Every 2 beats": dict(every=2),
+                                        "Every bar (4)": dict(every=4)}),
     Feature("render", "Render / Export", render.run, render.RENDER_DEFAULTS, render.RENDER_CHOICES, render.RENDER_HELP,
             presets={"4K60 HEVC": dict(width=3840, height=2160, fps=60.0, codec="hevc"),
                      "Transparent overlay (ProRes 4444)": dict(format="mov_alpha"),
@@ -88,7 +96,30 @@ for _f in [
             presets={"Talking head: tighten + zoom + captions": dict(steps=json.dumps([
                 {"feature": "silences", "params": {"preset": "paced"}}, {"feature": "repeat"},
                 {"feature": "zoom"}, {"feature": "captions"}])),
-                "Shorts factory": dict(steps=json.dumps([{"feature": "silences"}, {"feature": "viral"}]))}),
+                "Shorts factory": dict(steps=json.dumps([{"feature": "silences"}, {"feature": "viral"}])),
+                "Recipe: TikTok talking head": dict(steps=json.dumps([
+                    {"feature": "silences", "params": {"preset": "energetic"}}, {"feature": "repeat"},
+                    {"feature": "zoom", "params": {"style": "snap_in", "rhythm": "energetic"}},
+                    {"feature": "resize", "params": {"format": "9:16"}},
+                    {"feature": "captions", "params": {"animation": "pop", "words_per_line": 2}},
+                    {"feature": "sfx", "params": {"sound": "whoosh"}}])),
+                "Recipe: YouTube vlog": dict(steps=json.dumps([
+                    {"feature": "silences", "params": {"preset": "paced"}}, {"feature": "repeat"},
+                    {"feature": "zoom", "params": {"style": "smooth"}}, {"feature": "chapters"}])),
+                "Recipe: Podcast": dict(steps=json.dumps([
+                    {"feature": "enhance", "params": {"loudness": -16.0}}, {"feature": "silences", "params": {"preset": "calm"}},
+                    {"feature": "podcast"}, {"feature": "chapters"}])),
+                "Recipe: Tutorial": dict(steps=json.dumps([
+                    {"feature": "silences", "params": {"preset": "measured"}}, {"feature": "repeat"},
+                    {"feature": "captions", "params": {"animation": "fade", "lines": 2, "words_per_line": 7}},
+                    {"feature": "chapters"}])),
+                "Recipe: Instagram reel": dict(steps=json.dumps([
+                    {"feature": "silences", "params": {"preset": "energetic"}},
+                    {"feature": "resize", "params": {"format": "4:5"}},
+                    {"feature": "captions", "params": {"animation": "bounce"}}])),
+                "Recipe: Music video / event recap (set music in Beat edit)": dict(steps=json.dumps([
+                    {"feature": "beat_sync", "params": {"every": 2}}, {"feature": "sfx", "params": {"sound": "riser",
+                                                                                                    "on": "cuts", "min_gap": 8.0}}]))}),
     Feature("download", "Download (yt-dlp)", download.run, download.DOWNLOAD_DEFAULTS, download.DOWNLOAD_CHOICES,
             download.DOWNLOAD_HELP, review=True, group="Import", needs_timeline=False,
             presets={"Best MP4": dict(quality="best", container="mp4"), "1080p for editing": dict(quality="1080"),

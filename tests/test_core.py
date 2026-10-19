@@ -109,6 +109,20 @@ def test_transcript_corrections_win_and_teach_vocabulary():
     assert "hinglish" in speech.languages()["profiles"] and len(speech.languages()["codes"]) >= 99
 
 
+def test_beat_detection_and_sound_features():
+    from kerf import sound
+    click = TMP / "click120.wav"
+    media.ffmpeg("-f", "lavfi", "-i", "aevalsrc='0.8*sin(2*PI*1000*t)*lt(mod(t,0.5),0.03)':s=44100:d=20", click)
+    bt, bpm = sound.beats(str(click))
+    assert abs(bpm - 120) <= 1.5, bpm
+    assert all(abs((b - bt[0]) % 0.5) < 0.05 or abs((b - bt[0]) % 0.5 - 0.5) < 0.05 for b in bt[:20])
+    r = features.run("beat_sync", str(VIDEO), {"music": str(click)}, TMP / "out")
+    assert r["report"]["cuts"] > 20 and r["xml"]
+    r = features.run("pipeline", str(VIDEO), {"steps": json.dumps([{"feature": "silences"},
+                                                                    {"feature": "sfx", "params": {"min_gap": 1.0}}])}, TMP / "out")
+    assert r["report"]["steps"][1]["report"]["effects"] == 6  # one effect per silence cut
+
+
 def test_xmeml_keyframes_and_disabled():
     tl = Timeline(fps=30, video=[[Clip(str(VIDEO), 0, 2, 0, scale=[(0, 100), (1, 120)]),
                                   Clip(str(VIDEO), 2, 4, 2, enabled=False)]], audio=[[]])

@@ -135,7 +135,7 @@ def run(tl, p, ctx):
         thr = auto_threshold(db) if str(p["threshold_db"]).strip().lower() == "auto" else float(p["threshold_db"])
         ranges = speech_ranges(db, thr, *settings(p))
     ranges = [(a, min(b, tl.duration)) for a, b in ranges if a < tl.duration]
-    kept = sum(b - a for a, b in ranges)
+    kept = float(sum(b - a for a, b in ranges))
     report = dict(threshold_db=round(thr, 1) if thr is not None else "ai_vad", segments=len(ranges), duration_before=round(tl.duration, 2),
                   duration_after=round(kept, 2), removed=round(tl.duration - kept, 2))
     if p["preview"]:
