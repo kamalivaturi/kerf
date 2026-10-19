@@ -56,6 +56,9 @@ jobs:
       - name: Desktop installers (Tauri)
         run: npm ci && npx tauri build
         working-directory: desktop
+        env:
+          NO_STRIP: "true"                # linuxdeploy's old strip chokes on the frozen engine's modern ELF libs
+          APPIMAGE_EXTRACT_AND_RUN: "1"   # run linuxdeploy without FUSE
       - run: python scripts/build_release.py --collect-desktop ${{ matrix.name }}
       - uses: actions/upload-artifact@v4
         with:
