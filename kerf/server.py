@@ -16,7 +16,7 @@ from urllib.parse import parse_qs, urlparse
 
 from pathlib import Path
 
-from . import REPO, __version__, features, license, media, settings
+from . import REPO, __version__, captions, features, license, media, mogrt, settings, speech
 from .timeline import Timeline
 
 PORT = 7878
@@ -90,7 +90,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(200, dict(ok=True, version=__version__))
         if u.path == "/" or u.path.startswith("/app"):
             return self._static(u.path)
-        if not self._guard():
+        img = u.path == "/mogrt/media" and secrets.compare_digest(q.get("token", ""), TOKEN)  # <img> can't send headers
+        if not img and not self._guard():
             return
         routes = {
             "/features": lambda: dict(features=features.describe(), plugin_errors=features.plugin_errors),
@@ -99,7 +100,17 @@ class Handler(BaseHTTPRequestHandler):
             "/update": check_update,
             "/license": license.status,
             "/settings": settings.public,
+            "/mogrt": lambda: dict(library=mogrt.library(), catalog=mogrt.catalog(), anims=list(mogrt.ANIMS),
+                                   looks=list(mogrt.LOOKS), kinds=list(mogrt.KINDS), formats=list(mogrt.FORMATS)),
+            "/changelog": lambda: dict(text=(Path(__file__).resolve().parent.parent / "CHANGELOG.md").read_text("utf-8")),
+            "/languages": speech.languages,
         }
+        if u.path == "/mogrt/media":  # previews of library entries only (never arbitrary paths)
+            e = next((x for x in mogrt.library() if x["id"] == q.get("id")), None)
+            f = Path(e.get(q.get("kind", "gif")) or "") if e else None
+            if not f or not f.is_file():
+                return self._send(404, dict(error="no preview"))
+            return self._bytes(f.read_bytes(), mimetypes.guess_type(f.name)[0] or "application/octet-stream")
         if u.path not in routes:
             return self._send(404, dict(error="not found"))
         self._handle(routes[u.path])
@@ -117,11 +128,27 @@ class Handler(BaseHTTPRequestHandler):
                                                  b.get("render", False)),
             "/settings": lambda: settings.save(b) or settings.public(),
             "/media": lambda: dict(timeline=Timeline.from_media(b["path"], media.probe).to_dict()),
+            "/mogrt/import": lambda: mogrt.import_mogrt(b["path"]),
+            "/mogrt/studio": lambda: mogrt.studio(b["base"], b.get("overrides", {}), b["name"]),
+            "/mogrt/build": lambda: mogrt.build([s for s in mogrt.catalog() if not b.get("ids") or s["id"] in b["ids"]]),
+            "/captions/preview": lambda: captions.preview(b.get("path", ""), b.get("params", {}), float(b.get("t", 1.0)),
+                                                          b.get("aspect", "9:16"), b.get("safe", True)),
+            "/presets/export": lambda: features.export_presets(b.get("features")),
+            "/presets/import": lambda: features.import_presets(b["bundle"]),
         }
         path = urlparse(self.path).path
         if path not in routes:
             return self._send(404, dict(error="not found"))
         self._handle(routes[path])
+
+    def _bytes(self, body, ctype):
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "max-age=3600")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def _static(self, path):
         """Standalone mode: the same UI as the Premiere panel, served at http://127.0.0.1:7878/app/."""

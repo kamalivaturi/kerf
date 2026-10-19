@@ -214,6 +214,39 @@ def render_overlay(ass_path, w, h, fps, dur, out):
                  "-pix_fmt", "yuva444p10le", out.name, cwd=ass_path.parent)
 
 
+# Platform UI that covers the frame (left, right, top, bottom as fractions): keep captions out of these.
+SAFE_ZONES = {"9:16": ((1080, 1920), (0.04, 0.14, 0.12, 0.22)),  # Reels/TikTok/Shorts buttons + caption bar
+              "1:1": ((1080, 1080), (0.05, 0.05, 0.05, 0.10)),
+              "16:9": ((1920, 1080), (0.05, 0.05, 0.05, 0.05))}  # broadcast title-safe
+SAMPLE = "Kerf makes every caption look amazing on every platform".split()
+
+
+def preview(path="", params=None, t=1.0, aspect="9:16", safe=True):
+    """One rendered frame of the caption style (sample words, mid-animation at t) with safe-zone guides."""
+    import base64
+    from .features import coerce
+    s = coerce(CAPTION_DEFAULTS, params)
+    (w, h), (l, r, tp, b) = SAFE_ZONES.get(aspect, SAFE_ZONES["9:16"])
+    words = [dict(w=x, s=i * .35, e=i * .35 + .3) for i, x in enumerate(SAMPLE)]
+    fs = int(s["font_size"]) or int(h * (0.075 if h > w else 0.055))
+    pages = paginate(words, s, max(4, int(w * float(s["max_width"]) / 100 / (fs * 0.6))))
+    d = media.CACHE / "preview"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "cap.ass").write_text(write_ass(pages, s, w, h), "utf-8")
+    src = ["-f", "lavfi", "-i", f"color=c=0x2a2d34:s={w}x{h}:d=1"]
+    if path:
+        info = media.probe(path)
+        src = (["-ss", f"{min(t, max(0, info['duration'] - .1)):.2f}"] if info["duration"] > 0 else []) + ["-i", path]
+    zones = "".join(f",drawbox=x={x}:y={y}:w={bw}:h={bh}:color=0xff3355@0.22:t=fill" for x, y, bw, bh in (
+        (0, 0, "iw", f"ih*{tp}"), (0, f"ih*{1 - b}", "iw", f"ih*{b}"),
+        (0, 0, f"iw*{l}", "ih"), (f"iw*{1 - r}", 0, f"iw*{r}", "ih"))) if safe else ""
+    vf = (f"scale={w}:{h}:force_original_aspect_ratio=increase,crop={w}:{h},format=rgb24{zones},"
+          f"setpts=PTS-STARTPTS+{t}/TB,ass=cap.ass,scale=-2:640")
+    media.ffmpeg(*src, "-frames:v", "1", "-vf", vf, "cap.png", cwd=d)
+    return dict(image="data:image/png;base64," + base64.b64encode((d / "cap.png").read_bytes()).decode(),
+                aspect=aspect, safe=dict(left=l, right=r, top=tp, bottom=b))
+
+
 def translate(pages, lang):
     texts = [" ".join(w["w"] for w in pg["words"]) for pg in pages]
     out = []

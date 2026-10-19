@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api } from "./api";
+import { api, store } from "./api";
+import Graphics from "./Graphics";
 import { host, IN_UXP, RunResult, setStandaloneMedia } from "./host";
+import { LANGS, setLang, t } from "./i18n";
+
+const HELP_URL = "https://github.com/kamalivaturi/kerf#readme";
 
 type Params = Record<string, string | number | boolean>;
 type Feature = {
@@ -9,7 +13,7 @@ type Feature = {
 };
 type Theme = "auto" | "light" | "dark";
 type Item = { id: number; label: string; text?: string; editable?: boolean };
-type Prefs = { theme: Theme; accent: string; density: "compact" | "comfortable"; fontSize: number; favorites: string[]; showHelp: boolean };
+type Prefs = { theme: Theme; accent: string; density: "compact" | "comfortable"; fontSize: number; favorites: string[]; showHelp: boolean; lang: string };
 type HistoryEntry = { feature: string; title: string; at: number; notes: string[]; params: Params; ok: boolean };
 
 const GROUP_ORDER = ["★", "AI", "Import", "Cut", "Style", "Audio", "Multicam", "Repurpose", "Export"];
@@ -17,12 +21,8 @@ const HIDDEN = new Set(["preview", "items", "plan_only"]);
 const LONG = new Set(["prompt", "steps", "extra_words", "urls"]);
 const FILES = new Set(["srt_import", "mogrt", "sound", "watermark", "folder", "output"]);
 const ACCENTS = ["#ff5a36", "#3d7cff", "#13b07a", "#a64dff", "#ff3d7f", "#f5a623"];
-const DEFAULT_PREFS: Prefs = { theme: "auto", accent: ACCENTS[0], density: "comfortable", fontSize: 12, favorites: [], showHelp: true };
+const DEFAULT_PREFS: Prefs = { theme: "auto", accent: ACCENTS[0], density: "comfortable", fontSize: 12, favorites: [], showHelp: true, lang: "auto" };
 
-const store = {
-  get<T>(k: string, d: T): T { try { const v = localStorage.getItem(`kerf.${k}`); return v ? (JSON.parse(v) as T) : d; } catch { return d; } },
-  set(k: string, v: unknown) { try { localStorage.setItem(`kerf.${k}`, JSON.stringify(v)); } catch { /* storage unavailable */ } },
-};
 const label = (k: string) => k.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const rank = (g: string) => { const i = GROUP_ORDER.indexOf(g); return i < 0 ? 99 : i; };
 const ago = (t: number) => { const s = Math.round((Date.now() - t) / 1000); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)}m ago` : new Date(t).toLocaleString(); };
@@ -39,6 +39,7 @@ function usePrefs(): [Prefs, (p: Partial<Prefs>) => void] {
       root.dataset.density = prefs.density;
       root.style.setProperty("--accent", prefs.accent);
       root.style.setProperty("--fs", `${prefs.fontSize}px`);
+      setLang(prefs.lang);
     };
     apply();
     store.set("prefs", prefs);
@@ -73,7 +74,7 @@ export default function App() {
   const [started, setStarted] = useState(0);
   const [, tick] = useState(0);
   const [error, setError] = useState("");
-  const [panel, setPanel] = useState<"" | "settings" | "history">("");
+  const [panel, setPanel] = useState<"" | "settings" | "history" | "graphics" | "news">("");
   const [history, setHistory] = useState<HistoryEntry[]>(store.get("history", []));
   const [update, setUpdate] = useState<{ latest: string; url: string } | null>(null);
   const [media, setMedia] = useState(store.get("media", ""));
@@ -97,6 +98,7 @@ export default function App() {
     const h = await api.health();
     setEngine(h ? h.version : null);
     if (!h) return;
+    if (store.get("seenVersion", "") !== h.version) { setPanel("news"); store.set("seenVersion", h.version); }
     try {
       setFeatures((await api.get("/features")).features);
       api.get("/update").then((u) => u.update_available && setUpdate(u)).catch(() => {});
@@ -112,7 +114,10 @@ export default function App() {
   useEffect(() => { store.set("media", media); setStandaloneMedia(paths()); }, [media]);
   useEffect(() => { if (!busy) return; const t = setInterval(() => tick((n) => n + 1), 500); return () => clearInterval(t); }, [busy]);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") applyRef.current(); };
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") applyRef.current();
+      if (e.key === "F1") { e.preventDefault(); openHelp(); }
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
@@ -183,24 +188,30 @@ export default function App() {
         <div className="brand"><span className="logo">K</span> Kerf</div>
         <span className="status ok" title={`Engine ${engine}`}>● {engine}</span>
         <ThemePicker prefs={prefs} set={setPrefs} />
-        <button className={`ghost icon ${panel === "history" ? "on" : ""}`} onClick={() => setPanel(panel === "history" ? "" : "history")} aria-label="History" title="History">⟲</button>
-        <button className={`ghost icon ${panel === "settings" ? "on" : ""}`} onClick={() => setPanel(panel === "settings" ? "" : "settings")} aria-label="Settings" title="Settings">⚙</button>
+        {([["graphics", "▦", t("graphics")], ["news", "✦", t("whatsNew")], ["history", "⟲", t("history")], ["settings", "⚙", t("settings")]] as const).map(([k, icon, tip]) =>
+          <button key={k} className={`ghost icon ${panel === k ? "on" : ""}`} onClick={() => setPanel(panel === k ? "" : k)} aria-label={tip} title={tip}>{icon}</button>)}
+        <button className="ghost icon" onClick={openHelp} aria-label={t("help")} title={t("help")}>?</button>
       </header>
 
       {update && <div className="banner">Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></div>}
+      {panel === "graphics" && <Graphics onClose={() => setPanel("")} onCaptions={(file) => {
+        setName("captions"); setGroup(features.captions?.group || group); setPanel("");
+        setTimeout(() => setParams({ ...features.captions?.defaults, output: "mogrt", mogrt: file, mogrt_param: "Text" }), 0);
+      }} />}
+      {panel === "news" && <News onClose={() => setPanel("")} />}
       {panel === "settings" && <Settings prefs={prefs} setPrefs={setPrefs} onClose={() => setPanel("")} />}
       {panel === "history" && <History entries={history} onLoad={(h) => { setName(h.feature); setGroup(features[h.feature]?.group || group); setTimeout(() => setParams(h.params), 0); setPanel(""); }}
         onClear={() => { setHistory([]); store.set("history", []); }} onClose={() => setPanel("")} />}
 
       {!IN_UXP && f?.needs_timeline !== false && (
         <section className="card source">
-          <label htmlFor="media">Media file(s) <small>one path per line; several = batch</small></label>
+          <label htmlFor="media">{t("media")} <small>{t("mediaHint")}</small></label>
           <textarea id="media" rows={2} value={media} onChange={(e) => setMedia(e.target.value)} placeholder="C:\Videos\interview.mp4" />
         </section>
       )}
 
       <div className="search">
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search features…  (Ctrl+Enter applies)" aria-label="Search features" />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("search")} aria-label="Search features" />
       </div>
       {!query && (
         <nav className="tabs">
@@ -213,7 +224,7 @@ export default function App() {
             {fav(k) && <span className="star">★</span>}{x.title}{x.tier !== "free" && <em className="tier">{x.tier}</em>}
           </button>
         ))}
-        {!visible.length && <span className="help">No features match.</span>}
+        {!visible.length && <span className="help">{t("noMatch")}</span>}
       </div>
 
       {f && (
@@ -226,11 +237,12 @@ export default function App() {
           {prefs.showHelp && <p className="help">{f.help}</p>}
           <Presets feature={name} f={f} params={params} setParams={setParams} reload={connect} />
           <Form f={f} params={params} setParams={setParams} />
+          {name === "captions" && params.output !== "srt_only" && <CaptionPreview params={params} media={IN_UXP ? "" : paths()[0] || ""} />}
           <div className="actions">
-            <button className="ghost" onClick={() => setParams({ ...f.defaults })} title="Reset to defaults">Reset</button>
-            {f.review && <button disabled={!!busy} onClick={() => run(true)}>{name === "prompt_edit" ? "Plan" : "Analyze"}</button>}
+            <button className="ghost" onClick={() => setParams({ ...f.defaults })} title="Reset to defaults">{t("reset")}</button>
+            {f.review && <button disabled={!!busy} onClick={() => run(true)}>{name === "prompt_edit" ? t("plan") : t("analyze")}</button>}
             <button className="primary" disabled={!!busy || !f.entitled} onClick={() => run(false)}>
-              {f.entitled ? (items ? `Apply ${checked.size} selected` : name === "download" ? "Download" : "Apply") : `Requires ${f.tier}`}
+              {f.entitled ? (items ? t("applySelected", { n: checked.size }) : name === "download" ? t("download") : t("apply")) : t("requires", { tier: f.tier })}
             </button>
           </div>
           {busy && <div className="busy"><span className="spinner" /> {busy}… <span className="elapsed">{Math.round((Date.now() - started) / 1000)}s</span></div>}
@@ -283,14 +295,14 @@ function Presets({ feature, f, params, setParams, reload }: {
   return (
     <div className="presets">
       <select value={sel} onChange={(e) => load(e.target.value)} aria-label="Preset">
-        <option value="">Preset…</option>
+        <option value="">{t("preset")}</option>
         {f.presets.builtin.length > 0 && <optgroup label="Built-in">{f.presets.builtin.map((p) => <option key={p}>{p}</option>)}</optgroup>}
         {f.presets.user.length > 0 && <optgroup label="Mine">{f.presets.user.map((p) => <option key={p}>{p}</option>)}</optgroup>}
       </select>
       {f.presets.user.includes(sel) && <button className="ghost" onClick={del} title="Delete preset" aria-label="Delete preset">✕</button>}
-      <input value={saveAs} onChange={(e) => setSaveAs(e.target.value)} placeholder="Save current as…" aria-label="New preset name"
+      <input value={saveAs} onChange={(e) => setSaveAs(e.target.value)} placeholder={t("saveAs")} aria-label="New preset name"
         onKeyDown={(e) => { if (e.key === "Enter") save(); }} />
-      <button className="ghost" onClick={save} disabled={!saveAs.trim()}>Save</button>
+      <button className="ghost" onClick={save} disabled={!saveAs.trim()}>{t("save")}</button>
     </div>
   );
 }
@@ -367,18 +379,21 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
   const [s, setS] = useState<Record<string, string>>({});
   const [lic, setLic] = useState<Record<string, unknown>>({});
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<"look" | "ai" | "paths">("look");
+  const [tab, setTab] = useState<"look" | "ai" | "paths" | "share">("look");
+  const [bundle, setBundle] = useState(""), [shareMsg, setShareMsg] = useState("");
   useEffect(() => { api.get("/settings").then(setS); api.get("/license").then(setLic); }, []);
   async function save() { setS(await api.post("/settings", s)); setSaved(true); setTimeout(() => setSaved(false), 1500); }
   return (
     <section className="card settings fade">
       <h2>Settings <button className="ghost close" onClick={onClose} aria-label="Close settings">✕</button></h2>
       <nav className="tabs small">
-        {(["look", "ai", "paths"] as const).map((t) => <button key={t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
-          {t === "look" ? "Appearance" : t === "ai" ? "AI & keys" : "Folders"}</button>)}
+        {(["look", "ai", "paths", "share"] as const).map((k) => <button key={k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>
+          {k === "look" ? "Appearance" : k === "ai" ? "AI & keys" : k === "paths" ? "Folders" : t("share")}</button>)}
       </nav>
       {tab === "look" && <>
         <label className="row">Theme<ThemePicker prefs={prefs} set={setPrefs} /></label>
+        <label className="row">{t("language")}<select value={prefs.lang} onChange={(e) => setPrefs({ lang: e.target.value })}>
+          {Object.entries(LANGS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
         <div className="row">Accent<span className="swatches">
           {ACCENTS.map((c) => <button key={c} className={`swatch ${prefs.accent === c ? "on" : ""}`} style={{ background: c }} onClick={() => setPrefs({ accent: c })} aria-label={`Accent ${c}`} />)}
           <input type="text" value={prefs.accent} onChange={(e) => /^#[0-9a-f]{6}$/i.test(e.target.value) && setPrefs({ accent: e.target.value })} aria-label="Custom accent hex" />
@@ -399,6 +414,15 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
         <div className="actions"><button className="primary" onClick={save}>{saved ? "Saved ✓" : "Save settings"}</button></div>
         <p className="help">Keys stay on this computer (~/.kerf/settings.json). Edition: {String(lic.edition ?? "…")} · plan {String(lic.plan ?? "…")}</p>
       </>}
+      {tab === "share" && <>
+        <p className="help">Copy all your presets (every feature) as one block of text to share or back up; paste a block to import.</p>
+        <textarea rows={6} value={bundle} onChange={(e) => setBundle(e.target.value)} placeholder='{"kerf_presets": 1, "features": {}}' aria-label="Preset bundle" />
+        <div className="actions">
+          <button className="ghost" onClick={async () => { const b = JSON.stringify(await api.post("/presets/export", {}), null, 1); setBundle(b); navigator.clipboard?.writeText(b).catch(() => {}); setShareMsg("Copied to clipboard"); }}>{t("exportPresets")}</button>
+          <button className="primary" disabled={!bundle.trim()} onClick={async () => { try { setShareMsg(`Imported ${(await api.post("/presets/import", { bundle })).imported.length} preset(s)`); } catch (e) { setShareMsg((e as Error).message); } }}>{t("importPresets")}</button>
+        </div>
+        {shareMsg && <div className="note">{shareMsg}</div>}
+      </>}
       {tab === "paths" && <>
         <label className="row">Output folder<input defaultValue={store.get("outDir", "")} onChange={(e) => store.set("outDir", e.target.value)} placeholder="next to the project" /></label>
         {IN_UXP && <label className="row">Kerf folder<input defaultValue={store.get("kerfHome", "C:\\Kerf")} onChange={(e) => store.set("kerfHome", e.target.value)} /></label>}
@@ -416,10 +440,47 @@ function Offline({ onRetry, prefs, setPrefs }: { onRetry: () => void; prefs: Pre
         <h2>Start the Kerf engine</h2>
         <p className="help">Kerf does its work in a small local engine (Python + FFmpeg). Nothing leaves your computer unless you turn on an AI provider or download something.</p>
         {host.launchEngine
-          ? <button className="primary" onClick={() => host.launchEngine!(store.get("kerfHome", "C:\\Kerf")).then(() => setTimeout(onRetry, 3000))}>Start engine</button>
+          ? <button className="primary" onClick={() => host.launchEngine!(store.get("kerfHome", "C:\\Kerf")).then(() => setTimeout(onRetry, 3000))}>{t("startEngine")}</button>
           : <pre>python -m kerf serve</pre>}
-        <div className="actions"><button className="ghost" onClick={onRetry}>Retry</button></div>
+        <div className="actions"><button className="ghost" onClick={onRetry}>{t("retry")}</button></div>
       </main>
+    </div>
+  );
+}
+
+function openHelp() {
+  if (IN_UXP) (globalThis as any).require?.("uxp")?.shell?.openExternal(HELP_URL);
+  else window.open(HELP_URL, "_blank", "noopener");
+}
+
+function News({ onClose }: { onClose: () => void }) {
+  const [text, setText] = useState("");
+  useEffect(() => { api.get("/changelog").then((r) => setText(r.text)).catch((e) => setText((e as Error).message)); }, []);
+  return (
+    <section className="card fade">
+      <h2>{t("whatsNew")} <button className="ghost close" onClick={onClose} aria-label="Close">✕</button></h2>
+      <pre className="news">{text.replace(/^# .*\n+/, "") || "…"}</pre>
+    </section>
+  );
+}
+
+function CaptionPreview({ params, media }: { params: Params; media: string }) {
+  const [aspect, setAspect] = useState(store.get("capAspect", "9:16"));
+  const [safe, setSafe] = useState(true);
+  const [img, setImg] = useState(""), [err, setErr] = useState("");
+  useEffect(() => {
+    store.set("capAspect", aspect);
+    const id = setTimeout(() => api.post("/captions/preview", { path: media, params, t: 1.2, aspect, safe })
+      .then((r) => { setImg(r.image); setErr(""); }).catch((e) => setErr((e as Error).message)), 350); // debounce typing
+    return () => clearTimeout(id);
+  }, [JSON.stringify(params), media, aspect, safe]);
+  return (
+    <div className="cap-preview">
+      <div className="row">{t("captionPreview")}
+        <span><select value={aspect} onChange={(e) => setAspect(e.target.value)} aria-label="Aspect">{["9:16", "1:1", "16:9"].map((a) => <option key={a}>{a}</option>)}</select>
+          <label className="check"><input type="checkbox" checked={safe} onChange={(e) => setSafe(e.target.checked)} />{t("safeZones")}</label></span></div>
+      {img && <img src={img} alt="Caption preview" />}
+      {err && <div className="error">{err}</div>}
     </div>
   );
 }

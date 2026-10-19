@@ -12,9 +12,10 @@ PRESETS = {"calm": (1.0, .30, .25, .30), "measured": (.7, .25, .2, .25), "paced"
 DEFAULTS = dict(detection="loudness", threshold_db="auto", preset="custom", remove_silences_longer_than=0.3, keep_talks_longer_than=0.2,
                 margin_before=0.2, margin_after=0.2, tracks="1", mode="remove", transition="none",
                 transition_length=0.25, preview=False)
-CHOICES = dict(detection=["loudness", "ai_vad"], preset=["custom", *PRESETS], mode=["remove", "keep", "mute", "keep_spaces"],
+CHOICES = dict(detection=["loudness", "ai_vad", "hybrid"], preset=["custom", *PRESETS], mode=["remove", "keep", "mute", "keep_spaces"],
                transition=["none", "j_cut", "l_cut", "constant_power"])
 HELP = ("Detect dead air on the chosen audio tracks (1-based) and cut it. threshold_db: number or 'auto'. "
+        "detection: loudness, ai_vad (Silero speech model) or hybrid (both must agree). "
         "mode: remove (ripple), keep (cut only), mute, keep_spaces (remove without closing gaps).")
 
 
@@ -134,6 +135,9 @@ def run(tl, p, ctx):
         db = timeline_db(tl, tracks)
         thr = auto_threshold(db) if str(p["threshold_db"]).strip().lower() == "auto" else float(p["threshold_db"])
         ranges = speech_ranges(db, thr, *settings(p))
+        if p["detection"] == "hybrid":  # loud AND voiced: drops music/noise that loudness alone keeps
+            vad = vad_ranges(tl, tracks, *settings(p))
+            ranges = [(max(a, c), min(b, d)) for a, b in ranges for c, d in vad if min(b, d) > max(a, c)]
     ranges = [(a, min(b, tl.duration)) for a, b in ranges if a < tl.duration]
     kept = float(sum(b - a for a, b in ranges))
     report = dict(threshold_db=round(thr, 1) if thr is not None else "ai_vad", segments=len(ranges), duration_before=round(tl.duration, 2),

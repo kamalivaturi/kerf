@@ -202,6 +202,25 @@ def delete_preset(name, preset):
     (PRESET_DIR / name / f"{_safe(preset)}.json").unlink(missing_ok=True)
 
 
+def export_presets(names=None):
+    """Shareable bundle of the user's presets: {"kerf_presets": 1, "features": {feature: {preset: params}}}."""
+    out = {}
+    for n in names or REGISTRY:
+        d = PRESET_DIR / n
+        if n in REGISTRY and d.exists():
+            out[n] = {p.stem: json.loads(p.read_text("utf-8")) for p in sorted(d.glob("*.json"))}
+    return dict(kerf_presets=1, features={k: v for k, v in out.items() if v})
+
+
+def import_presets(bundle):
+    """Inverse of export_presets; unknown features and keys are dropped by save_preset/coerce."""
+    if isinstance(bundle, str):
+        bundle = json.loads(bundle)
+    done = [f"{n}/{p}" for n, ps in bundle.get("features", {}).items() if n in REGISTRY
+            for p, params in ps.items() if save_preset(n, p, params) is None]
+    return dict(imported=done)
+
+
 def describe():
     return {n: dict(title=f.title, group=f.group, defaults=f.defaults, choices=f.choices, help=f.help, tier=f.tier,
                     review=f.review, entitled=license.entitled(f), presets=list_presets(n),

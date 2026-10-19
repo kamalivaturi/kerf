@@ -235,7 +235,9 @@ def studio(base_id, overrides, name, previews=True):
         next((s for s in catalog() if s["id"] == base_id), None)
     if base is None:
         raise KeyError(f"no Kerf template '{base_id}' to customize")
-    o = dict(overrides)
+    num = re.compile(r"-?\d+(\.\d+)?$")  # panel form values arrive as strings
+    o = {k: float(v) if isinstance(v, str) and k not in ("text", "subtext", "font") and num.match(v) else v
+         for k, v in overrides.items()}
     anim, look, fmt = o.pop("anim", "") or base["anim_name"], o.pop("look", "") or base["look_name"], o.pop("format", "") or base["format"]
     keep = {**base["look"], **{k: base["anim"][k] for k in ANIM_KEYS if anim == base["anim_name"]},
             **{k: base[k] for k in ("text", "subtext", "size", "pos", "duration")}}

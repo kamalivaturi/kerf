@@ -18,6 +18,7 @@ export interface Host {
   apply(res: RunResult): Promise<string[]>; // returns human-readable notes
   outDir(): Promise<string | undefined>;
   readToken(): Promise<string>;
+  insertMogrt(path: string): Promise<string>; // at the playhead, on a new top track
   pickFile?(): Promise<string | undefined>;
   launchEngine?(kerfHome: string): Promise<void>;
 }
@@ -62,6 +63,16 @@ function premiere(): Host {
     return ok;
   }
 
+  // AE-authored MOGRT text params hold JSON ({"textEditValue": ...} plus style); plain strings elsewhere.
+  async function textValue(prm: any, text: string) {
+    try {
+      const cur = (await prm.getStartValue())?.value;
+      const v = typeof cur === "string" && cur.startsWith("{") ? JSON.parse(cur) : null;
+      if (v && "textEditValue" in v) return JSON.stringify({ ...v, textEditValue: text });
+    } catch { /* fall through to plain text */ }
+    return text;
+  }
+
   // One MOGRT instance per caption page; the page text goes into the template's text parameter.
   async function placeMogrt(project: Project, seq: Sequence, m: NonNullable<RunResult["mogrt"]>) {
     const editor = ppro.SequenceEditor.getEditor(seq);
@@ -79,7 +90,7 @@ function premiere(): Host {
         for (let p = 0; p < comp.getParamCount(); p++) {
           const prm = comp.getParam(p);
           if (prm.displayName === m.param) {
-            try { actions.push(prm.createSetValueAction(prm.createKeyframe(pg.text), true)); textSet++; } catch { /* not a text param */ }
+            try { actions.push(prm.createSetValueAction(prm.createKeyframe(await textValue(prm, pg.text)), true)); textSet++; } catch { /* not a text param */ }
           }
         }
       }
@@ -128,6 +139,12 @@ function premiere(): Host {
       if (res.mogrt) notes.push(await placeMogrt(project, seq, res.mogrt));
       return notes;
     },
+    async insertMogrt(path) {
+      const [, seq] = await active();
+      const at = await seq.getPlayerPosition();
+      const items = await ppro.SequenceEditor.getEditor(seq).insertMogrtFromPath(path, at, await seq.getVideoTrackCount(), 0);
+      return items?.length ? `Inserted ${path.split(/[\/]/).pop()} at the playhead (edit it in Essential Graphics)` : "Premiere did not insert the template";
+    },
     async outDir() {
       const [project] = await active();
       return project.path ? project.path.replace(/[\\/][^\\/]+$/, "") + "/Kerf" : undefined;
@@ -166,6 +183,7 @@ function standalone(): Host {
     async apply(res) {
       return [...(res.xml || []).map((x) => `Timeline XML: ${x} (import into Premiere or Resolve)`), ...(res.files || [])];
     },
+    async insertMogrt(path) { return `Drag ${path} into Premiere (Essential Graphics) - inserting needs the Premiere panel`; },
     async outDir() { return undefined; },
     async readToken() { return (window as any).KERF_TOKEN || ""; },
   };

@@ -123,6 +123,19 @@ def test_beat_detection_and_sound_features():
     assert r["report"]["steps"][1]["report"]["effects"] == 6  # one effect per silence cut
 
 
+def test_preset_share_caption_preview_and_hybrid():
+    features.save_preset("captions", "Share Me", {"font": "Impact", "outline": "3"})
+    bundle = features.export_presets(["captions"])
+    features.delete_preset("captions", "Share Me")
+    assert features.import_presets(json.dumps(bundle))["imported"] == ["captions/Share Me"]
+    assert features.get_preset("captions", "Share Me")["outline"] == 3
+    from kerf import captions
+    p = captions.preview(str(VIDEO), {"animation": "pop"}, 1.0, "16:9")
+    assert p["image"].startswith("data:image/png;base64,") and len(p["image"]) > 2000
+    r = features.run("silences", str(VIDEO), {"detection": "hybrid", "preview": True}, TMP / "out")
+    assert r["report"]["segments"] <= 7  # a pure tone is loud but not speech: hybrid can only keep less
+
+
 def test_xmeml_keyframes_and_disabled():
     tl = Timeline(fps=30, video=[[Clip(str(VIDEO), 0, 2, 0, scale=[(0, 100), (1, 120)]),
                                   Clip(str(VIDEO), 2, 4, 2, enabled=False)]], audio=[[]])
