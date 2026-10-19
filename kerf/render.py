@@ -28,7 +28,17 @@ def candidates(codec, big):
     hevc = codec == "hevc" or (codec == "auto" and big)
     pref = (["hevc_nvenc", "hevc_videotoolbox", "hevc_qsv", "hevc_amf", "libx265"] if hevc  # videotoolbox = macOS
             else ["h264_nvenc", "h264_videotoolbox", "h264_qsv", "h264_amf", "libx264"])
-    return [e for e in pref if f" {e} " in encoders()] or ["libx264"]
+    return [e for e in pref if f" {e} " in encoders() and usable(e)] or ["libx264"]
+
+
+@functools.lru_cache(maxsize=None)
+def usable(enc):
+    """Listed ≠ usable: static FFmpeg builds list NVENC/QSV/AMF even without that GPU. Try a tiny encode."""
+    if enc.startswith("lib"):
+        return True
+    r = subprocess.run(["ffmpeg", "-hide_banner", "-v", "error", "-f", "lavfi", "-i", "color=s=256x256:d=0.1",
+                        "-c:v", enc, "-f", "null", "-"], capture_output=True)
+    return r.returncode == 0
 
 
 def video_args(enc, quality, W, H, fps):

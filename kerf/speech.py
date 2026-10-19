@@ -72,28 +72,48 @@ def learn(words):
     return new
 
 
+def _load(name, **kw):
+    """WhisperModel, using the cached copy when the Hugging Face Hub can't be reached (offline, flaky network)."""
+    from faster_whisper import WhisperModel
+    try:
+        return WhisperModel(name, **kw)
+    except Exception as e:
+        try:
+            return WhisperModel(name, local_files_only=True, **kw)
+        except Exception:
+            raise e from None
+
+
 def _whisper(model=None):
     """(WhisperModel, name). 'auto' = large-v3-turbo on a CUDA GPU, small on CPU."""
     from . import settings
     import ctranslate2
-    from faster_whisper import WhisperModel
     global _NO_CUDA
     dev = settings.get("whisper_device")
     gpu = dev != "cpu" and not _NO_CUDA and ctranslate2.get_cuda_device_count() > 0
     name = model or settings.get("whisper_model")
-    if name in ("", "auto"):
+    auto = name in ("", "auto")
+    if auto:
         name = "large-v3-turbo" if gpu else "small"
     if name not in _models:
         m = None
         if gpu:  # a GPU without the CUDA 12 runtime (cuBLAS/cuDNN) only fails on first use: probe, then fall back
             try:
-                m = WhisperModel(name, device="cuda", compute_type="float16")
+                m = _load(name, device="cuda", compute_type="float16")
                 m.detect_language(np.zeros(16000, np.float32))
-            except (RuntimeError, OSError):
+            except Exception:  # missing cuBLAS/cuDNN, driver too old…
                 _NO_CUDA, m = True, None
-                if model in (None, "", "auto") and settings.get("whisper_model") in ("", "auto"):
-                    name = "small"
-        _models[name] = m or WhisperModel(name, device="cpu", compute_type="int8")
+        if m is None:  # CPU: for 'auto' prefer the fast model, else whichever one is already downloaded
+            err = None
+            for cand in dict.fromkeys(["small", name, "large-v3-turbo"] if auto else [name]):
+                try:
+                    m, name = _load(cand, device="cpu", compute_type="int8"), cand
+                    break
+                except Exception as e:
+                    err = err or e
+            if m is None:
+                raise err
+        _models[name] = m
     return _models[name], name
 
 

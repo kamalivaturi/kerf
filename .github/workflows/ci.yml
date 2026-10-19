@@ -16,7 +16,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: FedericoCarboni/setup-ffmpeg@v3
+      - name: FFmpeg
+        shell: bash
+        run: |
+          case "$RUNNER_OS" in
+            Linux) sudo apt-get update && sudo apt-get install -y ffmpeg ;;
+            macOS) brew install ffmpeg ;;
+            Windows) choco install ffmpeg -y --no-progress ;;
+          esac
+          ffmpeg -hide_banner -version | head -n 1
       - run: pip install -e ".[dev]"
       - run: python -m pytest -q tests
 
