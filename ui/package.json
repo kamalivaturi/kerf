@@ -1,0 +1,27 @@
+{
+  "name": "kerf-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:uxp && npm run build:web",
+    "build:uxp": "vite build --mode uxp",
+    "build:web": "vite build --mode web",
+    "dev:uxp": "vite build --mode uxp --watch",
+    "dev:web": "vite --mode web",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@adobe/premierepro": "^27.0.0-beta.56",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^5.0.0",
+    "sass": "^1.80.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0"
+  }
+}

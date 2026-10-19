@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerf — free AI editing for Premiere Pro & DaVinci Resolve</title>
+<meta name="description" content="Kerf is a free, open-source AI editing assistant for Premiere Pro and DaVinci Resolve: silence removal, animated captions, auto zoom, B-roll, podcast multicam, viral clips, AI prompt editing and more.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='11' fill='%23ff5a36'/%3E%3Cpath d='M14 11v26M14 24l14-13M19 20l11 17' stroke='%23fff' stroke-width='5' stroke-linecap='round' fill='none'/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#fbfbfc; --card:#fff; --line:#e4e4ea; --text:#17171b; --muted:#62626c; --accent:#e8462a; --accent-soft:#fff0ec; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg:#121214; --card:#1c1c1f; --line:#2c2c31; --text:#ededf0; --muted:#9b9ba5; --accent:#ff5a36; --accent-soft:#2a1813; } }
+  :root[data-theme="dark"] { --bg:#121214; --card:#1c1c1f; --line:#2c2c31; --text:#ededf0; --muted:#9b9ba5; --accent:#ff5a36; --accent-soft:#2a1813; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  a { color:var(--accent); }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 16px; }
+  nav { display:flex; align-items:center; gap:18px; padding:18px 0; flex-wrap:wrap; }
+  .logo { display:flex; align-items:center; gap:8px; font-weight:800; font-size:20px; color:var(--text); text-decoration:none; }
+  .logo i { width:28px; height:28px; border-radius:8px; background:var(--accent); display:inline-block; }
+  nav .sp { flex:1; }
+  nav a.l { color:var(--muted); text-decoration:none; } nav a.l:hover { color:var(--text); }
+  .tog { border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:999px; padding:6px 12px; cursor:pointer; font:inherit; font-size:14px; }
+  header.hero { padding:56px 0 40px; text-align:center; }
+  .pill { display:inline-block; padding:4px 12px; border-radius:999px; background:var(--accent-soft); color:var(--accent); font-weight:600; font-size:14px; }
+  h1 { font-size:clamp(34px,6vw,58px); line-height:1.08; margin:18px auto 14px; max-width:860px; letter-spacing:-.02em; }
+  .lead { color:var(--muted); font-size:clamp(17px,2.2vw,20px); max-width:700px; margin:0 auto 28px; }
+  .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+  .btn { display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:10px; font-weight:700; text-decoration:none; border:1px solid var(--line); color:var(--text); background:var(--card); transition:transform .15s, border-color .15s; }
+  .btn:hover { transform:translateY(-1px); border-color:var(--accent); }
+  .btn.p { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .meta { color:var(--muted); font-size:14px; margin-top:12px; }
+  section { padding:44px 0; }
+  h2 { font-size:clamp(26px,3.6vw,36px); margin:0 0 8px; letter-spacing:-.01em; }
+  .sub { color:var(--muted); margin:0 0 26px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); gap:14px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; }
+  .card h3 { margin:0 0 6px; font-size:17px; } .card p { margin:0; color:var(--muted); font-size:15px; }
+  .tag { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; } @media (max-width:760px){ .two { grid-template-columns:1fr; } }
+  ol.steps { padding-left:20px; margin:0; } ol.steps li { margin:6px 0; }
+  code, pre { font-family:ui-monospace,Consolas,monospace; font-size:14px; }
+  pre { background:var(--bg); border:1px solid var(--line); border-radius:10px; padding:12px 14px; overflow-x:auto; }
+  details { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:8px 0; } summary { cursor:pointer; font-weight:600; }
+  details p { color:var(--muted); margin:8px 0 0; }
+  footer { border-top:1px solid var(--line); padding:26px 0 40px; color:var(--muted); font-size:14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <a class="logo" href="#"><i></i>Kerf</a><span class="sp"></span>
+    <a class="l" href="#features">Features</a><a class="l" href="#install">Install</a>
+    <a class="l" href="https://github.com/kamalivaturi/kerf">GitHub</a>
+    <button class="tog" id="tog" aria-label="Toggle light or dark mode">◐ Theme</button>
+  </nav>
+
+  <header class="hero">
+    <span class="pill">Free · Open source · Runs on your computer</span>
+    <h1>The AI editing assistant for Premiere Pro &amp; DaVinci Resolve</h1>
+    <p class="lead">Cut silences and bad takes, add animated captions, punch-in zooms, B-roll, podcast camera switching and viral shorts — or just type what you want and let Claude, GPT or Gemini do the edit.</p>
+    <div class="cta">
+      <a class="btn p" href="https://github.com/kamalivaturi/kerf/releases/latest">⬇ Download Kerf</a>
+      <a class="btn" href="https://github.com/kamalivaturi/kerf">★ Source on GitHub</a>
+    </div>
+    <p class="meta">Windows &amp; macOS · Premiere Pro 25.6+ (UXP) · DaVinci Resolve 18.6+ Free &amp; Studio · MIT licence</p>
+  </header>
+
+  <section id="features">
+    <h2>Everything in one panel</h2>
+    <p class="sub">Every feature has presets, a review step and never touches your original edit — Kerf builds a new sequence.</p>
+    <div class="grid">
+      <div class="card"><div class="tag">AI</div><h3>Prompt Edit</h3><p>“Tighten pacing, yellow captions, vertical Short.” Your AI plans the steps, Kerf runs them.</p></div>
+      <div class="card"><div class="tag">Cut</div><h3>Silences</h3><p>Loudness or Silero-VAD detection, presets, margins, J/L cuts, mute or keep-spaces modes.</p></div>
+      <div class="card"><div class="tag">Cut</div><h3>Bad takes &amp; fillers</h3><p>Finds restarted sentences and “um/uh”, keeps the last take. Review before cutting.</p></div>
+      <div class="card"><div class="tag">Style</div><h3>Animated captions</h3><p>8 styles, 10 animations incl. karaoke &amp; typewriter, glow, boxes, emoji, translation, your own MOGRT.</p></div>
+      <div class="card"><div class="tag">Style</div><h3>AutoZoom</h3><p>Punch-ins on cuts, speech, emotion and emphasis words. Jump-cut, smooth or snap-in, with SFX.</p></div>
+      <div class="card"><div class="tag">Style</div><h3>B-Rolls</h3><p>Contextual stock footage from Pexels or your own library, placed above the talking head.</p></div>
+      <div class="card"><div class="tag">Multicam</div><h3>Podcast &amp; Angles</h3><p>Speaker-driven camera switching with priorities, wide and reaction shots.</p></div>
+      <div class="card"><div class="tag">Repurpose</div><h3>Viral clips</h3><p>Scores the strongest 20–60 s moments and turns each into a vertical sequence.</p></div>
+      <div class="card"><div class="tag">Repurpose</div><h3>Resize &amp; Chapters</h3><p>Face-tracked 9:16 / 4:5 / 1:1 reframing and YouTube-ready chapters with markers.</p></div>
+      <div class="card"><div class="tag">Audio</div><h3>Enhance</h3><p>ElevenLabs voice isolation or free local denoise, de-hiss and loudness normalisation.</p></div>
+      <div class="card"><div class="tag">Import</div><h3>Download</h3><p>Pull media from any yt-dlp supported site — quality, audio-only, subtitles, sections, playlists.</p></div>
+      <div class="card"><div class="tag">Export</div><h3>Render &amp; batch</h3><p>GPU MP4 up to 4K60, ProRes 4444 with alpha, whole folders at once.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="two">
+      <div class="card"><h3>Bring your own AI — or none</h3><p>Claude, OpenAI / Codex, Gemini or a local model through Ollama. Kerf works fully offline without any of them; keys never leave your machine.</p></div>
+      <div class="card"><h3>Made for every accent</h3><p>99 languages plus Hinglish, Tanglish, Hindi, Urdu, Bengali, Tamil, Telugu and more — load any fine-tuned Whisper model for best accuracy.</p></div>
+      <div class="card"><h3>Your look</h3><p>Light, dark or auto theme, accent colours, density and text size, favourites, search and run history.</p></div>
+      <div class="card"><h3>Built to extend</h3><p>Drop a Python file in <code>~/.kerf/plugins</code> and it appears in every panel. Presets for every feature.</p></div>
+    </div>
+  </section>
+
+  <section id="install">
+    <h2>Install in three steps</h2>
+    <div class="two">
+      <div class="card"><ol class="steps">
+        <li>Install <a href="https://www.python.org/downloads/">Python 3.10+</a> and <a href="https://ffmpeg.org/download.html">FFmpeg</a>.</li>
+        <li>Download and unzip <a href="https://github.com/kamalivaturi/kerf/releases/latest">the latest release</a>, then run <code>pip install -e ".[ai]"</code> in that folder.</li>
+        <li>Premiere: double-click <code>kerf-premiere-*.ccx</code>. Resolve: run <code>install\install-resolve.ps1</code>.</li>
+      </ol></div>
+      <div class="card"><p>No editor? Start the engine and open the web app:</p><pre>python -m kerf serve
+# then open http://127.0.0.1:7878/app/</pre></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Questions</h2>
+    <details><summary>Is it really free?</summary><p>Yes. MIT licensed. AI providers and stock services you choose to connect bill you directly.</p></details>
+    <details><summary>Does my footage get uploaded?</summary><p>No. Transcription, silence detection, face tracking and rendering run locally. Only the features you connect to an online service (AI prompt edits, ElevenLabs, Pexels, downloads) talk to the internet.</p></details>
+    <details><summary>Does it change my original sequence?</summary><p>Never. Each run creates a new sequence or timeline you can compare, keep or delete.</p></details>
+    <details><summary>Which editors are supported?</summary><p>Premiere Pro 25.6+ through a modern UXP plugin, DaVinci Resolve 18.6+ (Free and Studio) through its Scripts menu, and anything that imports FCP7 XML via the standalone app.</p></details>
+  </section>
+
+  <footer>Kerf is an independent open-source project, not affiliated with Adobe or Blackmagic Design. · <a href="https://github.com/kamalivaturi/kerf">GitHub</a> · <a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a></footer>
+</div>
+<script>
+  const root = document.documentElement, key = "kerf-site-theme";
+  try { const t = localStorage.getItem(key); if (t) root.dataset.theme = t; } catch (e) {}
+  document.getElementById("tog").onclick = () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem(key, root.dataset.theme); } catch (e) {}
+  };
+</script>
+</body>
+</html>
