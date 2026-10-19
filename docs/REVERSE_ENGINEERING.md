@@ -63,6 +63,28 @@ custom MOGRT captions · drop-in plugins · per-feature presets · standalone we
 - Colour emoji in captions (libass limitation).
 - "Emotion AI" is loudness-peak based, not a trained emotion model.
 
+## 360 Tool (360mediaedits.com) → Kerf Toolkit
+
+Observed from the public product page (2026-10-19): a paid After Effects panel with 13 tools in 5 tabs. No
+code or assets were copied; each tool was re-designed for Premiere, After Effects, Resolve and Kerf Studio.
+
+| 360 Tool | Kerf | Notes |
+|---|---|---|
+| Speed Graph (5 presets + custom) | Graphs tab: speed ramp presets + bezier editor (`speed_ramp`) | Premiere/Resolve: rendered ramp with ripple; AE: time-remap ease |
+| Value Graph (bezier handles) | value-curve buttons, bezier curve reused by zoom | Premiere UXP exposes only linear/bezier/hold interpolation |
+| Camera Shake (6 sliders, flash, chromatic) | `camera_shake`: 6 axes, 8 sliders, live preview | keyframes (editable) or render with flash + RGB split; AE uses expressions + sliders |
+| Warp Stabilizer (pre-comp) | `stabilize` (vidstab/deshake) · AE: pre-comp + Warp Stabilizer | |
+| Zoom In / Out | `zoom_move`: in/out × ease in/out/in-out/custom | |
+| Anchor Point (9 positions) | Premiere: anchor of selected clips with position compensation · AE: same · else `layout` | |
+| Align & Distribute (6 + 2) | `layout` + AE align/distribute | |
+| Project Sorter (6 categories) | Premiere bins / Resolve folders / AE folders (7 categories) | host-side |
+| Add Layer (Null, Null+Parent, Adj, Solid) | AE: all four · Premiere: transparent/solid/bars/vignette/guides + reuse of an existing adjustment layer | Premiere has no "create adjustment layer" API |
+| Frame Export | `frame_export` · AE `saveFrameToPng` | |
+| Beat Markers | `beat_markers` (spectral-flux tempo, every N / bars) · clear | |
+| Quick Mask (offline AI) | `quick_mask`: U²-Net ONNX, drawn region, alpha cutout or matte | model downloads once from the rembg releases |
+| FX Presets (effect stack + keyframes) | Premiere component chains / AE effect JSON incl. expressions | stored in `~/.kerf/fx` |
+| Custom Layout (toggle, reorder, per project) | Tools tab "Customize layout", saved per project | |
+
 ## Unverified assumptions (check in-app)
 
 - FCP7 XML `center` units: Kerf writes frame fractions (x of width, y of height; ±0.5 = edge, +y = down).
