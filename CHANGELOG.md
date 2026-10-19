@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.1 — 2026-10-19
+
+- Downloads from YouTube work again: Kerf now requires yt-dlp 2026.08.19 or newer (older versions got
+  HTTP 403 from YouTube). Existing installs: run `pip install -U yt-dlp`.
+
 ## 0.1.0 — 2026-10-19
 
 First release.

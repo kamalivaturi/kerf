@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "kerf"
-version = "0.1.0"
+version = "0.1.1"
 description = "Free, open-source AI editing assistant for Premiere Pro and DaVinci Resolve"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24", "faster-whisper>=1.0", "opencv-python>=4.8", "yt-dlp>=2025.1.1"]
+dependencies = ["numpy>=1.24", "faster-whisper>=1.0", "opencv-python>=4.8", "yt-dlp>=2026.8.19"]
 
 [project.optional-dependencies]
 ai = ["anthropic>=0.76", "openai>=2.0", "google-genai>=1.0"]
