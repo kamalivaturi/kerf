@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kerf Studio</title>
+<style>
+  :root { color-scheme: dark; }
+  html, body { margin: 0; height: 100%; background: radial-gradient(120% 80% at 50% -10%, #2a1a12 0%, #140f0c 55%); color: #f3ece7;
+    font: 15px/1.5 "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif; }
+  main { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 24px; }
+  .mark { font-size: 64px; font-weight: 900; font-style: italic; letter-spacing: -.04em; color: #ff6b2c; text-shadow: 0 3px 0 #b8400f, 0 10px 30px rgba(255, 107, 44, .35); }
+  .bar { width: 180px; height: 4px; margin: 22px 0 14px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+  .bar i { display: block; width: 40%; height: 100%; border-radius: 4px; background: #ff6b2c; animation: slide 1.1s ease-in-out infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+  p { color: #a59a92; margin: 0; max-width: 420px; }
+  @media (prefers-reduced-motion: reduce) { .bar i { animation: none; width: 100%; } }
+</style>
+</head>
+<body>
+<main>
+  <div class="mark">kerf</div>
+  <div class="bar"><i></i></div>
+  <p id="msg">Starting the Kerf engine…</p>
+</main>
+<script>
+  // Wait for the bundled engine (started by the app) and hand over to the full UI it serves.
+  const t0 = Date.now();
+  async function poll() {
+    try {
+      const r = await fetch("http://127.0.0.1:7878/health", { cache: "no-store" });
+      if (r.ok) { location.replace("http://127.0.0.1:7878/app/"); return; }
+    } catch (e) { /* not up yet */ }
+    if (Date.now() - t0 > 45000)
+      document.getElementById("msg").textContent = "The engine is taking a while. First launch can need a minute; if it never starts, reinstall Kerf Studio or run kerf-engine serve.";
+    setTimeout(poll, 400);
+  }
+  poll();
+</script>
+</body>
+</html>

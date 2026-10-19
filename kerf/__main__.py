@@ -8,6 +8,7 @@ from . import __version__, features, server
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="kerf", description=f"Kerf {__version__}")
+    ap.add_argument("--version", action="version", version=__version__)
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("serve", help="start the local API for the editor panels")
     s.add_argument("--port", type=int, default=server.PORT)

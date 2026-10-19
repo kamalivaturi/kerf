@@ -6,13 +6,17 @@ on:
 
 jobs:
   engine:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - uses: FedericoCarboni/setup-ffmpeg@v3
       - run: pip install -e ".[dev]"
       - run: python -m pytest -q tests
 
@@ -27,3 +31,27 @@ jobs:
         working-directory: ui
       - run: npm run typecheck && npm run build
         working-directory: ui
+
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+      - run: mkdir -p engine-dist/kerf-engine   # tauri-build checks that bundled resources exist
+        shell: bash
+      - run: cargo check
+        working-directory: desktop/src-tauri
+
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cp aftereffects/Kerf.jsx /tmp/k.js && node --check /tmp/k.js
+      - run: python3 -c "import ast; ast.parse(open('resolve/Kerf.py').read())"
+      - run: sh -n install/install.sh && sh -n start-kerf.sh && sh -n start-kerf.command

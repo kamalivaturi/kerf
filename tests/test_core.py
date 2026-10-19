@@ -167,6 +167,41 @@ def test_toolkit():
     assert "Glow" in tools.fx_list() and tools.fx_get("Glow")["components"][0]["match"] == "AE.ADBE Glow"
 
 
+def test_licence_keys_offline():
+    import time as _t
+    from kerf import license as lic
+    calls = []
+    good = {"activated": True, "instance": {"id": "i1"}, "meta": {"product_id": 7, "variant_name": "Monthly", "product_name": "Kerf Pro"},
+            "license_key": {"status": "active", "expires_at": "2027-01-01T00:00:00Z"}}
+    orig = lic._ls
+    lic._ls = lambda action, **d: calls.append(action) or good
+    try:
+        pro = features.Feature("x", "X", None, {}, tier="pro")
+        assert not lic.entitled(pro) and lic.entitled(features.REGISTRY["silences"])  # free stays free
+        os.environ["KERF_LS_PRODUCT"] = "8"
+        try:
+            lic.activate("ABCD-1234-EFGH")
+            raise AssertionError("a key for another product must be refused")
+        except PermissionError:
+            pass
+        os.environ["KERF_LS_PRODUCT"] = "7"
+        assert lic.activate("ABCD-1234-EFGH")["plan"] == "Monthly" and lic.entitled(pro)
+        data = json.loads(lic.CACHE.read_text())
+        data["checked"] = _t.time() - 10 * 86400
+        lic.CACHE.write_text(json.dumps(data))
+
+        def offline(action, **d):
+            raise OSError("no network")
+        lic._ls = offline
+        assert lic.entitled(pro)  # within the 14-day offline grace
+        lic._ls = lambda action, **d: calls.append(action) or {}
+        lic.deactivate()
+        assert not lic.entitled(pro) and calls[-1] == "deactivate"
+    finally:
+        lic._ls = orig
+        os.environ.pop("KERF_LS_PRODUCT", None)
+
+
 def test_xmeml_keyframes_and_disabled():
     tl = Timeline(fps=30, video=[[Clip(str(VIDEO), 0, 2, 0, scale=[(0, 100), (1, 120)]),
                                   Clip(str(VIDEO), 2, 4, 2, enabled=False)]], audio=[[]])

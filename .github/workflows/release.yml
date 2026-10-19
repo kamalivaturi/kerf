@@ -2,12 +2,66 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  desktop:  # Kerf Studio installers + portable engine, per OS
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, name: windows-x64 }
+          - { os: macos-latest, name: macos-arm64 }
+          - { os: macos-15-intel, name: macos-x64 }
+          - { os: ubuntu-22.04, name: linux-x64 }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev patchelf
+      - name: Build the panel / web UI
+        run: npm ci && npm run build
+        working-directory: ui
+      - name: Freeze the engine (static ffmpeg included)
+        run: |
+          python -m venv .venv
+          if [ -f .venv/Scripts/activate ]; then . .venv/Scripts/activate; else . .venv/bin/activate; fi
+          pip install -e ".[ai,dev]"
+          python scripts/build_engine.py --download
+      - name: Smoke-test the frozen engine
+        run: |
+          E=engine-dist/kerf-engine/kerf-engine; [ -f "$E.exe" ] && E="$E.exe"
+          "$E" --version
+          "$E" serve --port 7899 & PID=$!
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:7899/health && break; sleep 2; done
+          curl -sf -o /dev/null http://127.0.0.1:7899/app/
+          kill $PID || true
+      - name: Portable archive
+        run: python scripts/build_release.py --portable ${{ matrix.name }}
+      - name: Desktop installers (Tauri)
+        run: npm ci && npx tauri build
+        working-directory: desktop
+      - run: python scripts/build_release.py --collect-desktop ${{ matrix.name }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.name }}
+          path: release/*
+          if-no-files-found: error
+
+  packages:  # host plugins: .ccx, AE panel, Resolve script, source zip, wheel
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,10 +74,25 @@ jobs:
       - run: npm ci
         working-directory: ui
       - run: python scripts/build_release.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: release/*
+
+  publish:
+    needs: [desktop, packages]
+    if: ${{ !cancelled() && needs.packages.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - run: python3 scripts/build_release.py --sums
+      - name: Release notes (this version's CHANGELOG section)
+        run: awk '/^## /{n++} n==1' CHANGELOG.md > notes.md
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/*.zip
-            release/*.ccx
-            release/SHA256SUMS.txt
-          body_path: CHANGELOG.md
+          files: release/*
+          body_path: notes.md

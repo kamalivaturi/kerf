@@ -22,6 +22,7 @@ under again further once about into through during before after above below betw
 gonna wanna got get going go know think mean thing things right now way let lets because im youre dont thats its""".split())
 
 _models = {}
+_NO_CUDA = False  # set once a CUDA model fails to run (missing cuBLAS/cuDNN): stay on CPU
 
 
 def norm(w):
@@ -76,13 +77,23 @@ def _whisper(model=None):
     from . import settings
     import ctranslate2
     from faster_whisper import WhisperModel
+    global _NO_CUDA
     dev = settings.get("whisper_device")
-    gpu = dev != "cpu" and ctranslate2.get_cuda_device_count() > 0
+    gpu = dev != "cpu" and not _NO_CUDA and ctranslate2.get_cuda_device_count() > 0
     name = model or settings.get("whisper_model")
     if name in ("", "auto"):
         name = "large-v3-turbo" if gpu else "small"
     if name not in _models:
-        _models[name] = WhisperModel(name, device="cuda" if gpu else "cpu", compute_type="float16" if gpu else "int8")
+        m = None
+        if gpu:  # a GPU without the CUDA 12 runtime (cuBLAS/cuDNN) only fails on first use: probe, then fall back
+            try:
+                m = WhisperModel(name, device="cuda", compute_type="float16")
+                m.detect_language(np.zeros(16000, np.float32))
+            except (RuntimeError, OSError):
+                _NO_CUDA, m = True, None
+                if model in (None, "", "auto") and settings.get("whisper_model") in ("", "auto"):
+                    name = "small"
+        _models[name] = m or WhisperModel(name, device="cpu", compute_type="int8")
     return _models[name], name
 
 

@@ -402,7 +402,8 @@ const SETTING_FIELDS: [string, string, string[]?][] = [
 
 function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void; onClose: () => void }) {
   const [s, setS] = useState<Record<string, string>>({});
-  const [lic, setLic] = useState<Record<string, unknown>>({});
+  const [lic, setLic] = useState<Record<string, any>>({});
+  const [licKey, setLicKey] = useState(""), [licMsg, setLicMsg] = useState("");
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"look" | "ai" | "paths" | "share">("look");
   const [bundle, setBundle] = useState(""), [shareMsg, setShareMsg] = useState("");
@@ -437,7 +438,15 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
           </label>
         ))}
         <div className="actions"><button className="primary" onClick={save}>{saved ? "Saved ✓" : "Save settings"}</button></div>
-        <p className="help">Keys stay on this computer (~/.kerf/settings.json). Edition: {String(lic.edition ?? "…")} · plan {String(lic.plan ?? "…")}</p>
+        <p className="help">Keys stay on this computer (~/.kerf/settings.json).</p>
+        <h2>Licence</h2>
+        <p className="help">{String(lic.edition ?? "…")} · {String(lic.plan ?? "…")}{lic.expires ? ` · renews ${String(lic.expires).slice(0, 10)}` : ""}{lic.key ? ` · ${lic.key}` : ""}</p>
+        <div className="presets">
+          <input value={licKey} onChange={(e) => setLicKey(e.target.value)} placeholder="Licence key" aria-label="Licence key" />
+          <button className="primary" disabled={!licKey.trim()} onClick={async () => { try { setLic(await api.post("/license/activate", { key: licKey })); setLicKey(""); setLicMsg("Activated ✓"); } catch (e) { setLicMsg((e as Error).message); } }}>Activate</button>
+          {lic.key && <button className="ghost" onClick={async () => setLic(await api.post("/license/deactivate", {}))}>Deactivate</button>}
+        </div>
+        {licMsg && <div className="note">{licMsg}</div>}
       </>}
       {tab === "share" && <>
         <p className="help">Copy all your presets (every feature) as one block of text to share or back up; paste a block to import.</p>

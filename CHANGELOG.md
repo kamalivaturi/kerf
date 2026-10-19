@@ -1,7 +1,23 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — 2026-10-19
 
+- **Kerf Studio desktop app** (Rust/Tauri) for Windows, macOS and Linux: installers (.exe, .msi, .dmg,
+  .AppImage, .deb, .rpm) and portable builds with the engine and FFmpeg bundled. No Python needed.
+- **After Effects panel** (Window › Kerf.jsx): anchor, null/null+parent/adjustment/solid, beat markers, value
+  and speed curves, editable expression shakes, Warp Stabilizer, eased zoom, align & distribute, project
+  sorter, frame export, FX presets, offline AI cutout (draw a mask), captions.
+- **Toolkit** in Premiere, Resolve and Studio: speed ramps with a bezier speed/value graph, camera shake
+  (vertical, horizontal, HV, scale, all, custom; keyframes or rendered with flash + RGB split; live preview),
+  one-click stabilizer, eased zoom in/out, anchor 9-grid, align/distribute/grid, generated layers, beat markers,
+  Quick Mask (offline U²-Net cutout of a drawn region), project sorter, frame export, FX presets, per-project
+  custom layout.
+- **Premium UI**: new "ember" design with a segmented Tools / Graphs / Motion / Shakes / Edit / Graphics bar.
+- **Licences**: optional Lemon Squeezy licence keys (activate in Settings) for future paid plans; all
+  features remain free.
+- Resolve: finds Kerf Studio's engine on every OS, reads the playhead, sorts the Media Pool, places layers.
+- Transcription falls back to the CPU automatically when a GPU lacks the CUDA 12 libraries.
+- CI now tests on Windows, macOS and Linux; every tag builds all installers.
 - Graphics & MOGRTs: a 194-template Kerf pack (captions, titles, lower thirds; 14 animations × 5 looks,
   16:9 and 9:16) with live animated previews in the panel, built by After Effects into real .mogrt files
   where every control stays editable in Essential Graphics. Import any .mogrt you own.

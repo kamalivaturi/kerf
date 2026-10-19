@@ -8,3 +8,8 @@ ui/dist-uxp/
 release/
 .venv/
 mogrt/build/
+build/
+engine-dist/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/node_modules/

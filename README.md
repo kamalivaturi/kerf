@@ -1,9 +1,10 @@
 # Kerf
 
-**Free, open-source AI editing assistant for Adobe Premiere Pro and DaVinci Resolve.**
-Cut silences and bad takes, add animated captions, punch-in zooms, B-roll, multicam podcast
-switching, viral shorts, chapters, audio cleanup and reframing — from inside your editor, running
-on your own computer.
+**Free, open-source AI editing toolkit for Premiere Pro, After Effects and DaVinci Resolve,
+on Windows, macOS and Linux.**
+Cut silences and bad takes, animated captions and 194 editable MOGRT templates, speed ramps, camera
+shakes, stabilizer, offline AI cutouts, punch-in zooms, B-roll, multicam switching, viral shorts,
+music with auto-ducking, beat edits, audio cleanup and reframing. It runs on your own computer.
 
 [Download](https://github.com/kamalivaturi/kerf/releases/latest) ·
 [Website](https://kamalivaturi.github.io/kerf/) ·
@@ -12,121 +13,112 @@ on your own computer.
 
 ---
 
-## Features
+## Download
+
+| You use | Get | Then |
+|---|---|---|
+| **Windows** | `Kerf-Studio-…-windows-x64-setup.exe` (or `.msi`) | Run it. Kerf Studio starts the engine for every editor. |
+| **macOS** (Apple silicon / Intel) | `Kerf-Studio-…-macos-arm64.dmg` / `…-macos-x64.dmg` | Drag to Applications. First launch: right-click → Open (unsigned build). |
+| **Linux** | `.AppImage`, `.deb` or `.rpm` | `chmod +x` the AppImage and run it, or install the package. |
+| **Premiere Pro 25.6+** | `kerf-premiere-….ccx` | Double-click (Creative Cloud installs it) → *Window → UXP Plugins → Kerf*. |
+| **After Effects 2024+** | `kerf-aftereffects-….zip` | Run `install/install-aftereffects.ps1` (Windows) or `install/install.sh` (macOS) → *Window → Kerf.jsx*. Enable *Preferences → Scripting & Expressions → Allow Scripts to Write Files and Access Network*. |
+| **DaVinci Resolve 18.6+** (Free or Studio) | `kerf-resolve-….zip` | `install/install-resolve.ps1` (Windows) or `install/install.sh` (macOS/Linux) → *Workspace → Scripts → Kerf*. |
+| **No installer** | `kerf-studio-portable-…` (zip / tar.gz) | Unpack anywhere, run `kerf-engine/kerf-engine serve`, open <http://127.0.0.1:7878/app/>. FFmpeg included. |
+| **Python** | `pip install kerf-…whl` or `pip install -e ".[ai]"` | `kerf serve` (needs FFmpeg on PATH). |
+
+Every release lists SHA-256 checksums in `SHA256SUMS.txt`.
+
+## What's inside
+
+**Toolkit** (one-click tools, Tools / Graphs / Motion / Shakes tabs)
+
+| Tool | Premiere Pro | After Effects | Resolve & Studio |
+|---|---|---|---|
+| **Anchor** (9 positions) | moves the anchor of selected clips, picture stays put | same, multi-layer | places clips at that spot |
+| **Add layer** | Null, Adjustment (reuses yours), Solid, cinematic bars, vignette, thirds guides | Null, Null + Parent, Adjustment, Solid | generated layers on a new track |
+| **Beat markers** | detect tempo → sequence markers, every N beats, clear | comp markers | timeline markers |
+| **Curves**: value + speed graph | ease selected keyframes · speed ramps (ease in/out, speedramp, custom bezier editor) | keyframe ease · time-remap ramps | rendered speed ramps |
+| **Camera shake** | vertical, horizontal, HV, scale, all, custom · on playhead, cuts, beats or whole clip · editable keyframes or rendered with flash + RGB split · live preview | expression + sliders (stays editable), flash | same as Premiere |
+| **Stabilizer** | one-click (FFmpeg vidstab), smoothness % | pre-comp + Warp Stabilizer | one-click |
+| **Zoom in / out** | eased scale moves (in / out / in-out / your curve) | eased scale keys | same |
+| **Align & distribute** | 4 edges, distribute H/V, grid, picture-in-picture | align to comp, distribute | same |
+| **Quick mask** | offline AI cutout (U²-Net, ONNX) of a region you draw → alpha clip above | draw a mask → cutout layer | same |
+| **Project sorter** | bins: Video, Audio, Images, Graphics, Captions, Sequences, Other | folders | Media Pool folders |
+| **Frame export** | playhead frame → Desktop | comp frame → Desktop | same |
+| **FX presets** | copy a clip's effect stack (values + keyframes) and apply to other clips | effect stacks incl. expressions | — |
+| **Custom layout** | hide and reorder tool cards, saved per project | — | — |
+
+**Edit** (AI and automation features)
 
 | Group | Feature | What it does |
 |---|---|---|
-| **AI** | **Prompt Edit** | Type what you want ("tighten pacing, yellow captions, vertical Short"). Claude, OpenAI/Codex, Gemini or a local model plans a chain of Kerf features and runs it. |
-| | **Pipeline** | Your own multi-step macros (no AI needed), saved as presets. |
-| **Cut** | **Silences** | Loudness or Silero-VAD ("AI") detection · presets Calm→Jumpy · margins · remove / keep / mute / keep-spaces · J-cut, L-cut, constant-power. |
-| | **Repeat** | Finds restarted sentences (bad takes) and filler words, keeps the last take. Review before cutting. |
-| | **Profanity Filter** | Beep, mute or cut swear words · custom sound · personal word library. |
-| **Style** | **Captions** | Word-by-word animated captions: 8 built-in styles, 10 animations (pop, bounce, karaoke, typewriter…), cycling highlight colours, glow, box, outline, emoji, translation · **your own MOGRT** in Premiere · SRT always written. |
-| | **AutoZoom** | Punch-ins on cuts / speech / emotion / emphasis words · Jump-cut, Smooth, Snap-in · anchor point · handheld drift · whoosh SFX. |
-| | **B-Rolls** | Picks moments from the transcript, finds footage on Pexels (free key) or in your own folder. |
-| **Audio** | **Enhance** | ElevenLabs Voice Isolator (your key) or free local denoise / de-hiss / de-click + loudness to -14/-16 LUFS. |
-| **Multicam** | **Podcast** | Per-mic speaker detection, speaker priority, wide shots, reaction shots, min/max shot length. |
-| | **Angles** | One voice, several cameras: switches on cuts, pauses, energy peaks and sentences. |
-| **Repurpose** | **Viral** | Ranks 20–60 s moments (hooks, energy, pace, optional AI rerank) with a 0–100 score; each becomes a vertical sequence. |
-| | **Resize** | 9:16, 4:5, 1:1, 16:9 or custom with face tracking, watermark, section ranges. |
-| | **Chapters** | YouTube-ready timestamps + chapter markers on the timeline. |
-| **Import** | **Download** | Any yt-dlp supported site: quality cap, container, audio-only, subtitles (embed), playlists & item ranges, section clips, SponsorBlock, metadata/thumbnail, rate limit, proxy, browser cookies · lands in your project bin · optionally runs another feature on it. |
-| **Export** | **Render** | MP4 up to 4K60 on NVENC / QuickSync / AMF (auto-detected) or ProRes 4444 with alpha · **batch** whole folders. |
+| **AI** | **Prompt Edit** | Type what you want; Claude, OpenAI/Codex, Gemini or a local model plans a chain of Kerf features and runs it. |
+| | **Pipeline / recipes** | Multi-step macros: TikTok talking head, YouTube vlog, podcast, tutorial, Instagram reel, music video. |
+| **Cut** | **Silences** | Loudness, Silero speech model, or hybrid (both agree) · presets Calm→Jumpy · J/L cuts · review before cutting. |
+| | **Transcript & language** | large-v3-turbo on GPU, auto language detection, 21 mixed-language profiles (Hinglish, Tanglish, Spanglish…), an editable transcript, and a vocabulary that learns from your fixes. |
+| | **Repeat · Profanity** | Keep the last take, cut filler words · beep/mute/cut swearing. |
+| **Style** | **Captions** | 8 styles, 10 animations, live preview with platform safe zones (9:16, 1:1, 16:9), MOGRT output, translation. |
+| | **AutoZoom · B-roll** | Punch-ins on cuts, speech, emphasis · stock or your own footage from the transcript. |
+| **Graphics** | **MOGRT library + Studio** | 194 templates (captions, titles, lower thirds; 14 animations × 5 looks) built by After Effects, every control editable in Essential Graphics · live animated previews · Studio: animation, speed, font, size, colours, spacing, kerning, alignment, box, shadow, glow → your own MOGRT · import any .mogrt. |
+| **Audio** | **Enhance · Music · SFX · Dub** | ElevenLabs or local cleanup · music with auto-ducking · SFX pack on cuts · translate & dub. |
+| **Multicam** | **Podcast · Angles** | Speaker detection with hysteresis · switch angles on cuts, pauses, energy. |
+| **Repurpose** | **Viral · Resize · Chapters · Beat edit** | 0–100 scored shorts · face-tracked reframing · YouTube chapters · music-video cuts on the beat. |
+| **Import / Export** | **Download · Render** | yt-dlp with every option · MP4 up to 4K60 (NVENC, QuickSync, AMF, VideoToolbox) or ProRes 4444 alpha · batch folders. |
 
-**The panel is yours to shape:** light / dark / auto theme, accent colour, compact or comfortable
-density, text size, favourites (★ tab), feature search, run history with one-click "load settings",
-Ctrl/⌘+Enter to apply, and a changed-setting marker so you always see what differs from defaults.
-
-Every feature has **presets** (built-in + your own), a **review step** where it makes sense, and runs
-**non-destructively**: Kerf creates a new sequence/timeline and never touches your original edit or media.
-
-**Languages:** 99 via Whisper, plus South Asian profiles — `hinglish`, `tanglish` (Roman-script
-output), `hindi`, `urdu`, `bengali`, `tamil`, `telugu`, `punjabi`, `marathi`, `gujarati`, `kannada`,
-`malayalam`, `nepali`, `sinhala`. Point *Settings → Whisper model* at `large-v3` or any fine-tuned
-faster-whisper model (Hugging Face id or local folder) for best accuracy.
-
-## Install
-
-**1. Engine** (Python 3.10+ and FFmpeg on PATH)
-
-```bash
-pip install -e ".[ai]"
-```
-
-```bash
-python -m kerf serve
-```
-
-The Premiere panel can also start it for you (`start-kerf.cmd` / `start-kerf.command`).
-
-**2a. Premiere Pro 25.6+ (UXP)** — run `install\install-premiere.ps1` (opens `release/kerf-premiere-*.ccx`
-in Creative Cloud), then *Window → UXP Plugins → Kerf*. Developers: load `ui/dist-uxp/manifest.json`
-in the **UXP Developer Tool**.
-
-**2b. DaVinci Resolve 18.6+ (Free or Studio)** — run `install\install-resolve.ps1`, then
-*Workspace → Scripts → Kerf*.
-
-**2c. No editor?** Open <http://127.0.0.1:7878/app/> — the same UI works on media files and writes
-XML you can import anywhere, or renders finished MP4s.
+**The panel is yours to shape:** premium dark "ember" or light theme, accent colour, density, text size, 10 languages
+(follows your system, Arabic right-to-left), favourites, search, history, presets you can share, What's new, F1 help.
+Edits are **non-destructive**: Kerf builds a new sequence and never touches your original edit or media.
 
 ## AI providers (optional)
 
-Kerf works fully offline. Add keys in the panel's ⚙ Settings (stored only in `~/.kerf/settings.json`):
+Kerf works fully offline. Add keys in ⚙ Settings (stored only in `~/.kerf/settings.json`):
 
 | Provider | Used for | Default model |
 |---|---|---|
 | Claude (Anthropic) | Prompt Edit, chapter titles, viral rerank, translation, B-roll queries | `claude-opus-5-5` |
-| OpenAI / Codex | same | `gpt-5` (any model id) |
-| Google Gemini | same | `gemini-2.5-pro` |
-| Local (Ollama, LM Studio…) | same, private | `llama3.1` |
-| ElevenLabs | Studio voice isolation | — |
-| Pexels | Stock B-roll | — |
+| OpenAI / Codex | same | any model id |
+| Google Gemini | same | any model id |
+| Local (Ollama, LM Studio…) | same, private | any model id |
+| ElevenLabs | voice isolation, dubbing | — |
+| Pexels | stock B-roll | — |
 
 ## Command line
 
 ```bash
-python -m kerf run silences --media talk.mp4 --preset Paced
+kerf run silences --media talk.mp4 --preset Paced
 ```
 
 ```bash
-python -m kerf batch captions D:\Shorts --preset "Bold Yellow" --render
+kerf batch captions D:\Shorts --preset "Bold Yellow" --render
 ```
 
 ```bash
-python -m kerf features
+kerf run camera_shake --media clip.mp4 --set on=whole --set axis=hv --set output=render
 ```
-
-## Extending Kerf
-
-Drop a Python file in `~/.kerf/plugins/` — it appears in every panel automatically:
-
-```python
-def run(tl, params, ctx):          # tl: kerf.timeline.Timeline
-    ...                            # cut, keyframe, add tracks…
-    return {"timeline": tl, "report": {"done": True}}
-
-FEATURES = [dict(name="myfx", title="My Effect", run=run, defaults={"strength": 1.0},
-                 help="What it does", group="Style")]
-```
-
-Monetization hooks (paid tiers, licence checks, update channel) are described in
-[docs/MONETIZATION.md](docs/MONETIZATION.md).
 
 ## How it works
 
 ```
-Premiere UXP panel (React + TS) ┐                      ┌ FFmpeg · faster-whisper · Silero VAD
-Resolve script (Fusion UI)      ├─ 127.0.0.1:7878 ─────┤ OpenCV YuNet · NumPy
-Standalone web app              ┘   token-protected    └ Claude / OpenAI / Gemini / Ollama (opt-in)
-     reads the timeline  →  engine builds the new edit  →  FCP7 XML  →  editor imports it
+Premiere UXP panel (React + TS) ┐                         ┌ FFmpeg · faster-whisper · Silero VAD
+After Effects panel (ScriptUI)  │                         │ U²-Net (ONNX) · OpenCV YuNet · NumPy
+Resolve script (Fusion UI)      ├── 127.0.0.1:7878 ───────┤ yt-dlp · beat tracking · vidstab
+Kerf Studio (Tauri / Rust)      ┘    token-protected      └ Claude / OpenAI / Gemini / Ollama (opt-in)
+   reads the timeline → engine builds the new edit → FCP7 XML / clips / markers → the editor applies it
 ```
 
 ```
-kerf/        engine (Python): timeline model + XML, one module per feature, server, CLI
-ui/          React + TypeScript + SCSS, built with Vite → dist-uxp/ (Premiere) and dist/ (web app)
-resolve/     DaVinci Resolve script
-install/     installers · scripts/ release builder · tests/ · docs/ website + teardown
+kerf/          engine (Python): timeline model + XML, one module per feature, server, CLI, licensing
+ui/            React + TypeScript + SCSS (Vite) → dist-uxp/ (Premiere) and dist/ (Studio + web)
+aftereffects/  After Effects panel (ExtendScript)     resolve/  DaVinci Resolve script
+desktop/       Kerf Studio (Tauri 2, Rust): bundles the frozen engine → .exe .msi .dmg .AppImage .deb .rpm
+mogrt/         After Effects MOGRT builder            scripts/  engine freezer + release builder
 ```
+
+## Extending and selling
+
+Drop a Python file in `~/.kerf/plugins/` and it appears in every panel. Paid plans: mark features
+`tier="pro"`, set your Lemon Squeezy product (`KERF_LS_PRODUCT`) and users activate a licence key in
+Settings; or plug in your own provider. See [docs/MONETIZATION.md](docs/MONETIZATION.md).
 
 ## Develop
 
@@ -138,13 +130,17 @@ python tests/test_core.py
 cd ui && npm install && npm run build
 ```
 
-`npm run dev:uxp` rebuilds on save for the UXP Developer Tool; `npm run dev:web` serves the web app.
+```bash
+python scripts/build_engine.py && cd desktop && npm install && npx tauri build
+```
+
+CI tests the engine on Windows, macOS and Linux, and every `v*` tag builds all installers.
 
 ## Known limits
 
-- Animated zoom/resize keyframes are written to the XML; the built-in renderer uses each clip's first keyframe.
-- MOGRT captions are Premiere-only (Resolve gets the animated overlay clip + SRT).
-- XML motion units are verified on synthetic tests, not yet in every NLE version — see the teardown doc.
+- macOS and Windows builds are not code-signed yet (Gatekeeper / SmartScreen will ask once).
+- Premiere's scripting has no "create adjustment layer" call: make one once and Kerf reuses it.
+- XML motion units are verified on synthetic tests, not yet in every NLE version (see the teardown doc).
 
 ## License
 

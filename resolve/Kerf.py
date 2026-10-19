@@ -37,11 +37,22 @@ def alive():
         return False
 
 
+def engine_command():
+    """Kerf Studio's bundled engine if installed (Windows, macOS, Linux), a portable build, else Python + source."""
+    exe = "kerf-engine.exe" if os.name == "nt" else "kerf-engine"
+    for d in (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kerf Studio", "engine"),
+              "/Applications/Kerf Studio.app/Contents/Resources/engine", os.path.expanduser("~/Applications/Kerf Studio.app/Contents/Resources/engine"),
+              "/usr/lib/kerf-studio/engine", "/usr/lib/Kerf Studio/engine", os.path.join(KERF_HOME, "kerf-engine"), KERF_HOME):
+        if os.path.isfile(os.path.join(d, exe)):
+            return [os.path.join(d, exe), "serve"], d
+    return ["python" if os.name == "nt" else "python3", "-m", "kerf", "serve"], KERF_HOME
+
+
 def ensure_engine():
     if alive():
         return True
-    subprocess.Popen(["python", "-m", "kerf", "serve"], cwd=KERF_HOME,
-                     creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    cmd, cwd = engine_command()
+    subprocess.Popen(cmd, cwd=cwd, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     for _ in range(40):
         time.sleep(0.5)
         if alive():
@@ -76,12 +87,55 @@ def read_timeline():
                 clips.append(dict(path=path, start=(it.GetStart() - t0) / fps, src_in=src_in,
                                   src_out=src_in + it.GetDuration() / fps, enabled=bool(enabled)))
             out[kind].append(clips)
+    try:  # playhead (timecode → seconds from the timeline start) for the Toolkit tools
+        h, m, sec, fr = (int(x) for x in tl.GetCurrentTimecode().replace(";", ":").split(":"))
+        start = tl.GetStartTimecode().replace(";", ":").split(":")
+        out["playhead"] = max(0.0, (h * 3600 + m * 60 + sec + fr / fps) - (int(start[0]) * 3600 + int(start[1]) * 60 + int(start[2]) + int(start[3]) / fps))
+    except Exception:
+        out["playhead"] = 0.0
     return out
+
+
+def sort_media_pool(mp, s):
+    root = mp.GetRootFolder()
+    folders = {f.GetName(): f for f in root.GetSubFolderList()}
+    moves = {}
+    for clip in root.GetClipList():
+        if clip.GetClipProperty("Type") == "Timeline":
+            name = s["sequences"]
+        else:
+            ext = os.path.splitext(clip.GetClipProperty("File Path") or "")[1].lower()
+            name = next((b for b, exts in s["bins"].items() if ext in exts), s["other"])
+        moves.setdefault(name, []).append(clip)
+    for name, clips in moves.items():
+        folder = folders.get(name) or mp.AddSubFolder(root, name)
+        mp.MoveClips(clips, folder)
+    mp.SetCurrentFolder(root)
+    return f"Sorted {sum(len(c) for c in moves.values())} item(s) into {len(moves)} folder(s)"
+
+
+def insert_layer(proj, mp, ins):
+    """Generated layer (solid, bars…) onto a new top video track at the playhead of the open timeline."""
+    tl = proj.GetCurrentTimeline()
+    items = mp.ImportMedia([ins["path"]]) if tl else None
+    if not items:
+        return None
+    fps = float(tl.GetSetting("timelineFrameRate"))
+    tl.AddTrack("video")
+    ok = mp.AppendToTimeline([{"mediaPoolItem": items[0], "startFrame": 0, "endFrame": int(ins["duration"] * fps) - 1,
+                               "trackIndex": tl.GetTrackCount("video"), "recordFrame": tl.GetStartFrame() + int(ins["at"] * fps)}])
+    return "Added the layer at the playhead" if ok else None
 
 
 def apply(res):
     proj, notes = project(), []
     mp = proj.GetMediaPool()
+    if res.get("sort"):
+        return [sort_media_pool(mp, res["sort"])]
+    if res.get("insert"):
+        done = insert_layer(proj, mp, res["insert"])
+        if done:
+            return [done]
     if res.get("imports"):  # downloads etc. go straight into the Media Pool
         mp.ImportMedia(res["imports"])
         notes.append(f"Imported {len(res['imports'])} file(s) into the Media Pool")
