@@ -205,7 +205,7 @@ export default function App() {
         <span className="pill status ok" title={`Engine ${engine}`}><i />{IN_UXP ? "Premiere" : "Studio"}</span>
         {([["news", "✦", t("whatsNew")], ["history", "⟲", t("history")], ["settings", "⚙", t("settings")]] as const).map(([k, icon, tip]) =>
           <button key={k} className={`pill icon ${panel === k ? "on" : ""}`} onClick={() => setPanel(panel === k ? "" : k)} aria-label={tip} title={tip}>{icon}</button>)}
-        <button className="pill icon" onClick={openHelp} aria-label={t("help")} title={t("help")}>?</button>
+        <button className="pill icon" onClick={() => openHelp()} aria-label={t("help")} title={t("help")}>?</button>
         <span className="pill ver">v{engine}</span>
       </header>
 
@@ -448,6 +448,7 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
         </div>
         {licMsg && <div className="note">{licMsg}</div>}
       </>}
+      <div className="actions"><button className="ghost" onClick={() => reportBug().catch((e) => alert((e as Error).message))}>Report a bug</button></div>
       {tab === "share" && <>
         <p className="help">Copy all your presets (every feature) as one block of text to share or back up; paste a block to import.</p>
         <textarea rows={6} value={bundle} onChange={(e) => setBundle(e.target.value)} placeholder='{"kerf_presets": 1, "features": {}}' aria-label="Preset bundle" />
@@ -482,9 +483,34 @@ function Offline({ onRetry, prefs, setPrefs }: { onRetry: () => void; prefs: Pre
   );
 }
 
-function openHelp() {
-  if (IN_UXP) (globalThis as any).require?.("uxp")?.shell?.openExternal(HELP_URL);
-  else window.open(HELP_URL, "_blank", "noopener");
+function openHelp(url = HELP_URL) {
+  if (IN_UXP) (globalThis as any).require?.("uxp")?.shell?.openExternal(url);
+  else window.open(url, "_blank", "noopener");
+}
+
+// Prefilled GitHub issue with version, OS, encoders and the last engine errors (home folder already redacted).
+async function reportBug() {
+  const d = await api.get("/diagnostics");
+  const errs = (d.errors || []).slice(-3).map((e: any) => `${e.t} ${e.route} ${e.error}
+${e.trace}`).join(String.fromCharCode(10)).slice(-3500);
+  const body = `**What happened?**
+
+
+**Steps to reproduce**
+1. 
+
+---
+Kerf ${d.version} · ${host.name} · ${d.os}
+FFmpeg: ${d.ffmpeg}
+Encoders: ${(d.encoders || []).join(", ")}
+
+<details><summary>Recent engine errors</summary>
+
+\`\`\`
+${errs || "none"}
+\`\`\`
+</details>`;
+  openHelp(`https://github.com/kamalivaturi/kerf/issues/new?title=${encodeURIComponent("Bug: ")}&body=${encodeURIComponent(body)}`);
 }
 
 function News({ onClose }: { onClose: () => void }) {

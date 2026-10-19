@@ -202,6 +202,16 @@ def test_licence_keys_offline():
         os.environ.pop("KERF_LS_PRODUCT", None)
 
 
+def test_error_log_redacts_home():
+    from kerf import server
+    try:
+        raise RuntimeError(f"failed on {Path.home() / 'secret.mp4'}")
+    except RuntimeError as e:
+        server.log_error("/run?token=x", e)
+    last = server.diagnostics()["errors"][-1]
+    assert str(Path.home()) not in last["error"] + last["trace"] and last["route"] == "/run"
+
+
 def test_xmeml_keyframes_and_disabled():
     tl = Timeline(fps=30, video=[[Clip(str(VIDEO), 0, 2, 0, scale=[(0, 100), (1, 120)]),
                                   Clip(str(VIDEO), 2, 4, 2, enabled=False)]], audio=[[]])

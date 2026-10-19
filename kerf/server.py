@@ -8,7 +8,9 @@ from __future__ import annotations
 import json
 import mimetypes
 import secrets
+import subprocess
 import sys
+import time
 import traceback
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -50,6 +52,31 @@ def check_update():
         return dict(current=__version__, update_available=False, error=str(e))
 
 
+ERRORS = media.HOME / "logs" / "errors.jsonl"
+
+
+def _redact(text):
+    return str(text).replace(str(Path.home()), "~")
+
+
+def log_error(path, e):
+    """Unexpected engine errors, kept locally (home folder redacted) for Settings → Report a bug."""
+    ERRORS.parent.mkdir(parents=True, exist_ok=True)
+    rows = ERRORS.read_text("utf-8").splitlines()[-49:] if ERRORS.exists() else []
+    rows.append(json.dumps(dict(t=time.strftime("%Y-%m-%d %H:%M:%S"), route=path.split("?")[0], version=__version__,
+                                error=_redact(f"{type(e).__name__}: {e}"), trace=_redact(traceback.format_exc(limit=8)))))
+    ERRORS.write_text("".join(r + "\n" for r in rows), "utf-8")
+
+
+def diagnostics():
+    import platform
+    from . import render
+    ff = (subprocess.run(["ffmpeg", "-hide_banner", "-version"], capture_output=True, text=True).stdout.splitlines() or [""])[0]
+    errs = [json.loads(r) for r in ERRORS.read_text("utf-8").splitlines()[-10:]] if ERRORS.exists() else []
+    return dict(version=__version__, os=platform.platform(), python=platform.python_version(), frozen=bool(getattr(sys, "frozen", False)),
+                ffmpeg=ff, encoders=render.candidates("h264", False), errors=errs)
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, code, obj):
         body = json.dumps(obj, default=str).encode()
@@ -81,6 +108,7 @@ class Handler(BaseHTTPRequestHandler):
         except (KeyError, ValueError, FileNotFoundError) as e:
             self._send(400, dict(error=str(e), trace=traceback.format_exc(limit=4)))
         except Exception as e:
+            log_error(self.path, e)
             self._send(500, dict(error=f"{type(e).__name__}: {e}", trace=traceback.format_exc(limit=6)))
 
     def do_GET(self):
@@ -105,6 +133,7 @@ class Handler(BaseHTTPRequestHandler):
             "/changelog": lambda: dict(text=(Path(__file__).resolve().parent.parent / "CHANGELOG.md").read_text("utf-8")),
             "/languages": speech.languages,
             "/fx": lambda: dict(presets=tools.fx_list()),
+            "/diagnostics": diagnostics,
         }
         if u.path == "/mogrt/media":  # previews of library entries only (never arbitrary paths)
             e = next((x for x in mogrt.library() if x["id"] == q.get("id")), None)
