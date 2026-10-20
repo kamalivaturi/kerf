@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.2.2 — 2026-10-20
+
+- **Live editors:** Kerf sees which of Premiere Pro, After Effects and DaVinci Resolve are running and shows
+  the open project, sequence/composition/timeline and playhead live in the header (hover a chip for size and fps).
+  The Premiere panel updates every second, the After Effects panel every 2 s, the Resolve window while it is open.
+- **Kerf runs only alongside an editor:** the engine and Kerf Studio close about a minute after the last editor
+  closes; opened without one, Studio says so and counts down. Switch off in Settings → "Run only while … is open".
+- **Effects adapt to the timeline:** rendered effects (speed ramps, rendered shakes, stabilizer) come out at the
+  timeline's frame rate; shake strength and RGB split scale with the frame size (same look at 720p, 4K or 9:16);
+  the caption preview and the MOGRT library default to the timeline's aspect ratio; and Kerf Studio builds its
+  edits at the open editor sequence's resolution, fps and aspect (shown under the media field).
+- The After Effects and Premiere panels start Kerf Studio when the engine isn't running.
+- **XML motion fixed for Premiere and Resolve:** positions and scale were measured in both apps. Premiere now
+  gets source-relative positions (9:16 reframes and picture-in-picture land where intended) and Resolve gets
+  scale that accounts for its fit-to-frame, so zooms and resizes match in both.
+
 ## 0.2.1 — 2026-10-20
 
 - **Automatic updates** in Kerf Studio: checks GitHub at launch and every 6 hours, downloads new versions in the

@@ -259,8 +259,8 @@ def describe():
 
 # ---------------------------------------------------------------- run
 
-def run(name, timeline, params=None, out_dir=None):
-    """timeline: dict (from an NLE panel) or a media file path."""
+def run(name, timeline, params=None, out_dir=None, host=None):
+    """timeline: dict (from an NLE panel) or a media file path. host: "resolve" or "premiere" (XML flavour)."""
     if name not in REGISTRY:
         raise KeyError(f"unknown feature '{name}'. Available: {', '.join(REGISTRY)}")
     f = REGISTRY[name]
@@ -283,7 +283,7 @@ def run(name, timeline, params=None, out_dir=None):
     res["xml"] = []
     for i, t in enumerate(tls):
         path = out / f"{_safe(t.name)} {stamp}{f'-{i + 1}' if len(tls) > 1 else ''}.xml"
-        path.write_text(to_xmeml(t, media.probe), "utf-8")
+        path.write_text(to_xmeml(t, media.probe, host or "premiere"), "utf-8")
         res["xml"].append(str(path))
     res["feature"] = name
     res["sequence_names"] = [t.name for t in tls]

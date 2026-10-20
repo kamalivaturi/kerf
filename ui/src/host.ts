@@ -4,6 +4,14 @@ import type { premierepro, Sequence, Project } from "@adobe/premierepro";
 
 export type Clip = { path: string; src_in: number; src_out: number; start: number; enabled: boolean };
 export type TimelineDict = { fps: number; width: number; height: number; name: string; video: Clip[][]; audio: Clip[][]; playhead?: number };
+export type Live = { project?: string; sequence?: string; timecode?: string; playhead?: number; fps?: number; width?: number; height?: number };
+export const timecode = (s: number, fps: number) => {
+  const r = Math.round(fps) || 30, f = Math.round(s * fps), p = (n: number) => String(n).padStart(2, "0");
+  return `${p(Math.floor(f / r / 3600))}:${p(Math.floor(f / r / 60) % 60)}:${p(Math.floor(f / r) % 60)}:${p(f % r)}`;
+};
+/** The open editor sequence/comp/timeline with a known frame size, if any editor reports one. */
+export const liveSequence = (live?: Record<string, Live>) =>
+  Object.entries(live || {}).map(([host, s]) => ({ host, ...s })).find((s) => s.width && s.height && s.fps);
 export type RunResult = {
   xml?: string[]; sequence_names?: string[]; files?: string[]; imports?: string[]; srt?: string; text?: string;
   markers?: { t: number; name: string }[]; report?: Record<string, unknown>;
@@ -26,6 +34,7 @@ export interface Host {
   pickFile?(): Promise<string | undefined>;
   onFileDrop?(cb: (paths: string[]) => void): void; // files dropped on the window (Kerf Studio)
   launchEngine?(kerfHome: string): Promise<void>;
+  live?(): Promise<Live>; // project / sequence / playhead right now (Premiere), sent to the engine as a heartbeat
 }
 
 export interface HostTools {
@@ -279,6 +288,16 @@ function premiere(): Host {
     name: "premiere",
     tools,
     async projectKey() { return (await ppro.Project.getActiveProject())?.path || "untitled"; },
+    async live() {
+      const project = await ppro.Project.getActiveProject();
+      const seq = project && (await project.getActiveSequence());
+      if (!seq) return { project: project?.name };
+      const fps = TICKS / Number(await seq.getTimebase());
+      const playhead = (await seq.getPlayerPosition()).seconds;
+      const rect = await (await seq.getSettings()).getVideoFrameRect();
+      return { project: project.name, sequence: seq.name, playhead, fps, width: Math.round(rect.width), height: Math.round(rect.height),
+               timecode: timecode(playhead, fps) };
+    },
     async readTimeline() {
       const [, seq] = await active();
       const fps = TICKS / Number(await seq.getTimebase());
@@ -346,9 +365,11 @@ function premiere(): Host {
       return f?.nativePath;
     },
     async launchEngine(kerfHome) {
-      const os = req!("os");
-      const script = os.platform?.() === "win32" ? `${kerfHome}\\start-kerf.cmd` : `${kerfHome}/start-kerf.command`;
-      await uxp.shell.openPath(script);
+      const os = req!("os"), win = os.platform?.() === "win32";
+      // Kerf Studio if installed (it starts the bundled engine), else the source checkout's start script
+      const studio = win ? `${os.homedir()}\\AppData\\Local\\Kerf Studio\\kerf-studio.exe` : "/Applications/Kerf Studio.app";
+      if (await uxp.shell.openPath(studio).then((r: unknown) => !r, () => false)) return;
+      await uxp.shell.openPath(win ? `${kerfHome}\\start-kerf.cmd` : `${kerfHome}/start-kerf.command`);
     },
   };
 }
@@ -380,7 +401,9 @@ function standalone(): Host {
     async readTimeline() {
       if (!mediaPaths[0]) throw new Error(NO_MEDIA);
       const { api } = await import("./api");
-      return (await api.post("/media", { path: mediaPaths[0] })).timeline;
+      const tl: TimelineDict = (await api.post("/media", { path: mediaPaths[0] })).timeline;
+      const seq = liveSequence((await api.get("/host").catch(() => null))?.live);
+      return seq ? { ...tl, width: seq.width!, height: seq.height!, fps: seq.fps! } : tl;
     },
     async apply(res) {
       return [...(res.xml || []).map((x) => `Timeline XML: ${x} (import into Premiere or Resolve)`), ...(res.files || [])];

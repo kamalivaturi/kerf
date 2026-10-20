@@ -12,6 +12,8 @@ def main(argv=None):
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("serve", help="start the local API for the editor panels")
     s.add_argument("--port", type=int, default=server.PORT)
+    s.add_argument("--follow-editors", action="store_true",
+                   help="stop a minute after the last Premiere Pro / After Effects / Resolve closes")
     sub.add_parser("features", help="list features and their default settings")
     r = sub.add_parser("run", help="run a feature on a media file or timeline JSON")
     r.add_argument("feature")
@@ -31,7 +33,7 @@ def main(argv=None):
     a = ap.parse_args(argv)
 
     if a.cmd == "serve":
-        server.serve(a.port)
+        server.serve(a.port, a.follow_editors)
     elif a.cmd == "batch":
         from pathlib import Path
         exts = {".mp4", ".mov", ".mkv", ".m4v", ".avi", ".webm", ".wav", ".mp3", ".m4a", ".mxf"}

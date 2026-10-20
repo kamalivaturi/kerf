@@ -99,7 +99,7 @@ fn start_engine(dir: PathBuf) -> std::io::Result<Child> {
         let _ = std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755));
     }
     let mut cmd = Command::new(&exe);
-    cmd.arg("serve").current_dir(&dir).env("KERF_STUDIO", "1"); // the engine tells the UI that Studio self-updates
+    cmd.args(["serve", "--follow-editors"]).current_dir(&dir).env("KERF_STUDIO", "1"); // the engine tells the UI that Studio self-updates
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -117,6 +117,24 @@ fn main() {
         .manage(Staged(Mutex::new(None)))
         .setup(move |app| {
             tauri::async_runtime::spawn(update_loop(app.handle().clone()));
+            // Kerf runs alongside an editor: the engine stops ~1 min after the last one closes (unless
+            // switched off in Settings), and once the engine is gone Studio closes too.
+            let handle = app.handle().clone();
+            std::thread::spawn(move || {
+                let (mut seen, mut misses) = (false, 0);
+                loop {
+                    std::thread::sleep(Duration::from_secs(3));
+                    if engine_up() {
+                        (seen, misses) = (true, 0);
+                    } else if seen {
+                        misses += 1;
+                        if misses >= 2 {
+                            handle.exit(0);
+                            return;
+                        }
+                    }
+                }
+            });
             if !engine_up() {
                 let res = app.path().resource_dir().map_err(io_err)?;
                 let data = app.path().app_local_data_dir().map_err(io_err)?;

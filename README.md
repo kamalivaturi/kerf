@@ -30,6 +30,8 @@ Every release lists SHA-256 checksums in `SHA256SUMS.txt`.
 
 Kerf Studio updates itself: new releases download in the background and install when you quit (Settings → Automatic updates).
 
+Kerf runs alongside your editor: it shows the open project, sequence or composition and the playhead live, and closes about a minute after the last of Premiere Pro, After Effects or Resolve closes (Settings → Run only while … is open).
+
 ## What's inside
 
 **Toolkit** (one-click tools, Tools / Graphs / Motion / Shakes tabs)
@@ -142,7 +144,7 @@ CI tests the engine on Windows, macOS and Linux, and every `v*` tag builds all i
 
 - macOS and Windows builds are not code-signed yet (Gatekeeper / SmartScreen will ask once).
 - Premiere's scripting has no "create adjustment layer" call: make one once and Kerf reuses it.
-- XML motion units are verified on synthetic tests, not yet in every NLE version (see the teardown doc).
+- Kerf Studio writes timeline XML in Premiere's motion units; for Resolve, run features from the Resolve script (it sends Resolve units).
 
 ## License
 

@@ -243,6 +243,40 @@ def test_xmeml_keyframes_and_disabled():
     assert [c.findtext("enabled") for c in root.iter("clipitem")] == ["TRUE", "FALSE"]
 
 
+def test_xmeml_motion_units_per_host():
+    # 640x360 source on a 1080x1920 sequence; units measured in Premiere 25 / Resolve 21 (scripts/calibrate_xml.py)
+    tl = Timeline(fps=30, width=1080, height=1920,
+                  video=[[Clip(str(VIDEO), 0, 2, 0, scale=[(0, 177.78)], center=[(0, 0.2, 0.1)])]], audio=[[]])
+    def motion(host):
+        root = ET.fromstring(to_xmeml(tl, media.probe, host))
+        p = {e.findtext("parameterid"): e for e in root.iter("parameter")}
+        return float(p["scale"].findtext("value")), float(p["center"].findtext("value/horiz")), \
+            float(p["center"].findtext("value/vert"))
+    assert motion("premiere") == (177.78, 0.3375, 0.53333)   # center: fraction of source size
+    assert motion("resolve") == (105.351, 0.2, 0.1)          # scale over fit-to-frame (1.6875)
+
+
+def test_effects_follow_timeline():
+    from kerf import captions, tools
+    baked = tools._bake(Clip(str(VIDEO), 0, 1, 0), "null", TMP / "baked.mp4", Timeline(fps=25, width=1080, height=1920))
+    assert abs(media.probe(baked.path)["fps"] - 25) < 0.01
+    assert [captions.aspect_of(*s) for s in ((1080, 1920), (1080, 1350), (1920, 1080), (3840, 1600))] == ["9:16", "1:1", "16:9", "16:9"]
+
+
+def test_editor_detection_and_heartbeat():
+    from kerf import hosts
+    names = {"Adobe Premiere Pro.exe": "premiere", "AfterFX.exe": "aftereffects", "Resolve.exe": "resolve",
+             "/Applications/Adobe Premiere Pro 2026/Adobe Premiere Pro 2026.app/Contents/MacOS/Adobe Premiere Pro 2026": "premiere",
+             "/Applications/Adobe After Effects 2026/Adobe After Effects 2026.app/Contents/MacOS/After Effects": "aftereffects",
+             "/Applications/DaVinci Resolve/DaVinci Resolve.app/Contents/MacOS/Resolve": "resolve", "/opt/resolve/bin/resolve": "resolve",
+             "Adobe Premiere Pro (Beta).exe": "premiere", "Adobe Media Encoder.exe": None, "explorer.exe": None}
+    assert {k: hosts.editor_of(k) for k in names} == names
+    hosts.running()  # the real process list must be readable on every OS
+    hosts.beat("premiere", dict(project="P", sequence="S", playhead=1.5))
+    s = hosts.status()
+    assert "premiere" in s["running"] and s["live"]["premiere"]["sequence"] == "S" and s["exit_in"] is None
+
+
 if __name__ == "__main__":
     setup_module()
     tests = [v for k, v in dict(globals()).items() if k.startswith("test_")]

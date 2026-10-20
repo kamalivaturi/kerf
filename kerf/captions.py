@@ -222,12 +222,23 @@ SAFE_ZONES = {"9:16": ((1080, 1920), (0.04, 0.14, 0.12, 0.22)),  # Reels/TikTok/
 SAMPLE = "Kerf makes every caption look amazing on every platform".split()
 
 
-def preview(path="", params=None, t=1.0, aspect="9:16", safe=True):
+def aspect_of(w, h):
+    """Nearest safe-zone preset ("9:16", "1:1", "16:9") for a frame size."""
+    return min(SAFE_ZONES, key=lambda k: abs(math.log(w / h * SAFE_ZONES[k][0][1] / SAFE_ZONES[k][0][0])))
+
+
+def preview(path="", params=None, t=1.0, aspect="auto", safe=True, size=None):
     """One rendered frame of the caption style (sample words, mid-animation at t) with safe-zone guides."""
     import base64
     from .features import coerce
     s = coerce(CAPTION_DEFAULTS, params)
-    (w, h), (l, r, tp, b) = SAFE_ZONES.get(aspect, SAFE_ZONES["9:16"])
+    if aspect in SAFE_ZONES:
+        (w, h), (l, r, tp, b) = SAFE_ZONES[aspect]
+    else:  # auto: the timeline's frame (sequence size from the editor, else the video's own)
+        info = media.probe(path) if path else {}
+        w0, h0 = (size or [info.get("width"), info.get("height")]) if (size or info.get("width")) else (1080, 1920)
+        aspect, k = aspect_of(w0, h0), 1920 / max(w0, h0)
+        w, h, (l, r, tp, b) = int(w0 * k) // 2 * 2, int(h0 * k) // 2 * 2, SAFE_ZONES[aspect][1]
     words = [dict(w=x, s=i * .35, e=i * .35 + .3) for i, x in enumerate(SAMPLE)]
     fs = int(s["font_size"]) or int(h * (0.075 if h > w else 0.055))
     pages = paginate(words, s, max(4, int(w * float(s["max_width"]) / 100 / (fs * 0.6))))

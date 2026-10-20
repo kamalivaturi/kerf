@@ -48,9 +48,9 @@
         f.open("r"); var t = f.read(); f.close();
         return t.replace(/\s+/g, "");
     }
-    function http(method, path, body) {
+    function http(method, path, body, timeout) {
         var s = new Socket(), payload = body === undefined ? "" : json(body), raw = "", i;
-        s.timeout = 3600;
+        s.timeout = timeout || 3600;
         if (!s.open(ENGINE, "BINARY")) { throw new Error("Can't reach the Kerf engine: start Kerf Studio (or start-kerf), and enable Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network."); }
         s.write(method + " " + path + " HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nX-Kerf-Token: " + token() +
                 "\r\nContent-Length: " + payload.length + "\r\n\r\n" + payload);
@@ -374,6 +374,27 @@
         return "Kerf Studio opened in your browser";
     }
 
+    // ------------------------------------------------------------ live: tell Kerf which project / comp / time is open
+    var live;
+    function startStudio() {  // bring up Kerf Studio (and its engine) when the engine isn't running
+        var win = $.os.indexOf("Windows") >= 0;
+        var f = win ? new File($.getenv("LOCALAPPDATA") + "/Kerf Studio/kerf-studio.exe") : new Folder("/Applications/Kerf Studio.app");
+        if (!f.exists) { return false; }
+        system.callSystem(win ? 'cmd /c start "" "' + f.fsName + '"' : 'open "' + f.fsName + '"');
+        return true;
+    }
+    $.global.kerfBeat = function () {
+        try {
+            var c = app.project.activeItem, st = { project: app.project.file ? app.project.file.displayName : "Untitled project" };
+            if (c instanceof CompItem) {
+                st.sequence = c.name; st.playhead = c.time; st.fps = c.frameRate; st.width = c.width; st.height = c.height;
+                st.timecode = timeToCurrentFormat(c.time, c.frameRate);
+            }
+            http("POST", "/host/heartbeat", { host: "aftereffects", state: st }, 2);
+            if (live) { live.text = "\u25CF " + st.project + (st.sequence ? "  \u00B7  " + st.sequence + "  \u00B7  " + st.timecode : ""); }
+        } catch (e) { try { if (live) { live.text = "\u25CB Kerf engine not running"; } } catch (e2) { /* panel closed */ } }
+    };
+
     // ------------------------------------------------------------ UI
     function btn(parent, label, fn, help) { var b = parent.add("button", undefined, label); b.onClick = fn; if (help) { b.helpTip = help; } return b; }
     function group(parent, title, orient) {
@@ -468,10 +489,14 @@
         btn(pai, "CHECK ENGINE", function () { try { http("GET", "/settings"); say("Engine OK"); } catch (e) { say(e.message); } });
 
         status = win.add("statictext", undefined, "Ready", { truncate: "end" });
+        live = win.add("statictext", undefined, "", { truncate: "end" });
         tabs.selection = tMain;
         win.layout.layout(true);
         win.onResizing = win.onResize = function () { this.layout.resize(); };
         if (win instanceof Window) { win.center(); win.show(); }
     }
     build(thisObj);
+    try { http("GET", "/settings", undefined, 2); } catch (e) { if (startStudio()) { say("Starting Kerf Studio\u2026"); } }
+    if ($.global.kerfBeatTask) { app.cancelTask($.global.kerfBeatTask); }
+    $.global.kerfBeatTask = app.scheduleTask("kerfBeat()", 2000, true);
 })(this);

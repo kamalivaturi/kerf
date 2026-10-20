@@ -54,16 +54,18 @@ def _clips(tl, p, track):
     return [c for i, c in enumerate(tr) if i in idx]
 
 
-def _encode(out, alpha=False):
+def _encode(out, alpha=False, tl=None):
     if alpha:
         return ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", str(out)]
     enc = render.candidates("h264", False)[0]
-    return [*render.video_args(enc, "high", 1920, 1080, 30), str(out)]
+    if tl is None:
+        return [*render.video_args(enc, "high", 1920, 1080, 30), str(out)]
+    return [*render.video_args(enc, "high", tl.width, tl.height, tl.fps), "-r", f"{tl.fps:.3f}", str(out)]
 
 
-def _bake(c, vf, out, cwd=None):
-    """Render the clip's source range through `vf` (video only; audio stays on its own tracks)."""
-    media.ffmpeg("-ss", f"{c.src_in:.3f}", "-t", f"{c.dur:.3f}", "-i", c.path, "-vf", vf, "-an", *_encode(out), cwd=cwd)
+def _bake(c, vf, out, tl, cwd=None):
+    """Render the clip's source range through `vf` at the timeline's frame rate (video only; audio stays put)."""
+    media.ffmpeg("-ss", f"{c.src_in:.3f}", "-t", f"{c.dur:.3f}", "-i", c.path, "-vf", vf, "-an", *_encode(out, tl=tl), cwd=cwd)
     return Clip(str(out), 0.0, media.probe(str(out))["duration"] or c.dur, c.start)
 
 
@@ -129,7 +131,7 @@ def speed_ramp(tl, p, ctx):
         expr, _ = ramp_expr(c.dur, speed)
         smooth = f",minterpolate=fps={tl.fps:.3f}:mi_mode=blend" if p["frame_blend"] else ""
         vf = f"setpts=PTS-STARTPTS,setpts='({expr})/TB',fps={tl.fps:.3f}{smooth}"
-        new = _bake(c, vf, _out(ctx, c, "ramp"))
+        new = _bake(c, vf, _out(ctx, c, "ramp"), tl)
         end = c.end
         _replace(out, track, c, new)
         _shift_after(out, end, new.dur - c.dur)
@@ -145,7 +147,7 @@ SHAKE_DEFAULTS = dict(axis="hv", on="cuts", times="", music="", every=1, track="
 SHAKE_CHOICES = dict(axis=["vertical", "horizontal", "hv", "scale", "all", "custom"], on=["cuts", "beats", "times", "playhead", "whole"], output=["keyframes", "render"])
 SHAKE_HELP = ("axis: vertical, horizontal, hv (both), scale (zoom pulse), all (position + rotation + scale), "
               "custom (your amplitude/rotation mix). Camera shake on cuts, music beats (`music` file, every N), given `times` (s, comma list), at the "
-              "playhead, or the whole clip. amplitude px, rotation °, frequency Hz, duration s, decay 0-1, zoom % "
+              "playhead, or the whole clip. amplitude px (at 1080p; scaled to your frame size), rotation °, frequency Hz, duration s, decay 0-1, zoom % "
               "overscan. output=keyframes keeps it editable (Basic Motion); output=render bakes it with flash "
               "(0-100) and chromatic shift (px).")
 
@@ -197,6 +199,7 @@ def camera_shake(tl, p, ctx):
     phases = [[rnd.uniform(0, 6.28) for _ in range(8)] for _ in evs]
     out = copy.deepcopy(tl)
     W, H, z = tl.width, tl.height, float(p["zoom"])
+    k = min(W, H) / 1080  # amplitude / chromatic are px at 1080p: the same look at 720p, 4K or 9:16
     if p["output"] == "keyframes":
         step = max(1 / tl.fps, 1 / (2 * float(p["frequency"])))
         f1 = 1 / tl.fps
@@ -209,7 +212,7 @@ def camera_shake(tl, p, ctx):
             for t in np.arange(a, b + step / 2, step):
                 dx, dy, r = shake_offsets(float(t), a, b, p, ph)
                 sk.append((float(t), shake_scale(float(t), a, b, p, ph, z)))
-                ck.append((float(t), dx / W, dy / H))
+                ck.append((float(t), dx * k / W, dy * k / H))
                 rk.append((float(t), r))
             ck.append((b + f1, 0.0, 0.0))
             rk.append((b + f1, 0.0))
@@ -221,6 +224,8 @@ def camera_shake(tl, p, ctx):
             if not local or not c.enabled:
                 continue
             f = float(p["frequency"])
+            info = media.probe(c.path)
+            ks = min(info["width"] or W, info["height"] or H) / 1080  # source pixels
             ax = p.get("axis", "custom")
             mx = 0 if ax in ("vertical", "scale") else 1
             my = 0 if ax in ("horizontal", "scale") else 1
@@ -232,9 +237,8 @@ def camera_shake(tl, p, ctx):
             vf = (f"scale=trunc(iw*{z / 100:.3f}/2)*2:trunc(ih*{z / 100:.3f}/2)*2,"
                   f"rotate='({wob(2, float(p['rotation']) * mr)})*PI/180',"
                   f"crop=trunc(in_w*{100 / z:.4f}/2)*2:trunc(in_h*{100 / z:.4f}/2)*2:"
-                  f"'(in_w-out_w)/2+{wob(0, float(p['amplitude']) * mx)}':'(in_h-out_h)/2+{wob(1, float(p['amplitude']) * my)}'")
+                  f"'(in_w-out_w)/2+{wob(0, float(p['amplitude']) * ks * mx)}':'(in_h-out_h)/2+{wob(1, float(p['amplitude']) * ks * my)}'")
             if ax in ("scale", "all"):  # zoom pulse via zoompan (per-frame zoom at a fixed output size)
-                info = media.probe(c.path)
                 pulse = re.sub(r"\bt\b", "it", wob(4, float(p["amplitude"]) / 400))
                 vf += (f",zoompan=z='1+abs({pulse})':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2':d=1:"
                        f"s={info['width'] // 2 * 2}x{info['height'] // 2 * 2}:fps={info['fps'] or tl.fps:.3f}")
@@ -242,9 +246,9 @@ def camera_shake(tl, p, ctx):
                 fl = "+".join(f"between(t,{a:.3f},{a + .12:.3f})*(1-(t-{a:.3f})/0.12)" for a, _, _ in local)
                 vf += f",eq=brightness='{float(p['flash']) / 100:.2f}*({fl})':eval=frame"
             if float(p["chromatic"]) > 0:
-                cpx = int(float(p["chromatic"]))
+                cpx = max(1, round(float(p["chromatic"]) * ks))
                 vf += f",rgbashift=rh={cpx}:bh={-cpx}:enable='gt({env},0.05)'"
-            _replace(out, track, c, _bake(c, vf, _out(ctx, c, "shake")))
+            _replace(out, track, c, _bake(c, vf, _out(ctx, c, "shake"), tl))
     out.name = f"{tl.name} - Shake"
     return dict(timeline=out, report=dict(shakes=len(evs), output=p["output"]))
 
@@ -274,9 +278,9 @@ def stabilize(tl, p, ctx):
             zoom = f"optzoom=0:zoom={float(p['zoom'])}" if float(p["zoom"]) else "optzoom=1"
             vf = (f"vidstabtransform=input={trf}:smoothing={int(p['smoothing'])}:{zoom}:"
                   f"crop={'black' if p['crop_black'] else 'keep'},unsharp=5:5:0.6:3:3:0.3")
-            new = _bake(c, vf, dest, cwd=ctx.out_dir)
+            new = _bake(c, vf, dest, tl, cwd=ctx.out_dir)
         else:
-            new = _bake(c, f"deshake=rx=64:ry=64:edge={'blank' if p['crop_black'] else 'mirror'}", dest)
+            new = _bake(c, f"deshake=rx=64:ry=64:edge={'blank' if p['crop_black'] else 'mirror'}", dest, tl)
         _replace(out, track, c, new)
         n += 1
     out.name = f"{tl.name} - Stabilized"

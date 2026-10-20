@@ -135,9 +135,10 @@ function applyOverrides(base: Spec, o: Record<string, any>, info: Info): Spec {
   return s;
 }
 
-export default function Graphics({ onCaptions, onClose }: { onCaptions: (file: string) => void; onClose: () => void }) {
+export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions: (file: string) => void; onClose: () => void; vertical?: boolean }) {
   const [info, setInfo] = useState<Info | null>(null);
-  const [q, setQ] = useState(""), [kind, setKind] = useState("caption"), [fmt, setFmt] = useState("16x9");
+  const [q, setQ] = useState(""), [kind, setKind] = useState("caption"), [fmt, setFmt] = useState(vertical ? "9x16" : "16x9");
+  useEffect(() => { if (vertical !== undefined) setFmt(vertical ? "9x16" : "16x9"); }, [vertical]); // follow the open sequence
   const [hover, setHover] = useState(""), [sel, setSel] = useState<Spec | null>(null);
   const [o, setO] = useState<Record<string, any>>({}), [saveName, setSaveName] = useState("");
   const [msg, setMsg] = useState(""), [busy, setBusy] = useState(false), [imp, setImp] = useState("");

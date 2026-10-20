@@ -185,6 +185,13 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
   border: 1px solid var(--line); background: rgba(255, 255, 255, .04); color: var(--text); box-shadow: none;
   &.status i { width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
   &.icon { padding: 6px 10px; } &.on { color: var(--accent); border-color: rgba(255, 107, 44, .5); } &.ver { color: var(--muted); } }
+.pill.live { min-width: 0; max-width: 48%;
+  small { margin-left: 6px; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-variant-numeric: tabular-nums; } }
+.source .match { display: block; margin: 2px 0 6px; color: var(--muted); }
+.pill.status.idle i { background: var(--muted); box-shadow: none; }
+.banner.wait { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .05); color: var(--text);
+  border: 1px solid var(--line); button { margin-left: auto; flex: none; } }
 
 // main segmented nav
 .mainnav { display: flex; padding: 6px; margin-bottom: 14px; border-radius: 26px; background: rgba(0, 0, 0, .35);

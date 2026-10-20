@@ -85,9 +85,16 @@ code or assets were copied; each tool was re-designed for Premiere, After Effect
 | FX Presets (effect stack + keyframes) | Premiere component chains / AE effect JSON incl. expressions | stored in `~/.kerf/fx` |
 | Custom Layout (toggle, reorder, per project) | Tools tab "Customize layout", saved per project | |
 
+## XML motion units (measured)
+
+Measured by importing `scripts/calibrate_xml.py` output into Premiere Pro 25 and Resolve Studio 21:
+
+- Premiere reads Basic Motion `center` as a fraction of the **source** clip's size; Resolve reads it as a fraction
+  of the **timeline** size. Kerf writes per host (`to_xmeml(..., host=)`; the Resolve script sends `host="resolve"`).
+- Scale: Premiere 100 = native source pixels; Resolve applies the XML scale on top of its fit-to-frame input
+  scaling, so Kerf divides by `min(W/sw, H/sh)` for Resolve.
+- Keyframe `<when>` is media-start based (in-point + offset) in both.
+
 ## Unverified assumptions (check in-app)
 
-- FCP7 XML `center` units: Kerf writes frame fractions (x of width, y of height; ±0.5 = edge, +y = down).
-  Constant `CENTER_UNIT` in `kerf/timeline.py`.
-- Keyframe `<when>` measured from media start (in-point + offset).
 - Premiere maps FCP "Cross Fade (+3dB)" to Constant Power on import.

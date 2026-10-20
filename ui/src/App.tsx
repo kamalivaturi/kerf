@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, store } from "./api";
 import Graphics from "./Graphics";
 import Toolkit, { ToolTab } from "./Toolkit";
-import { host, IN_UXP, RunResult, setStandaloneMedia } from "./host";
+import { host, IN_UXP, Live, liveSequence, RunResult, setStandaloneMedia } from "./host";
 import { LANGS, setLang, t } from "./i18n";
 
 const HELP_URL = "https://github.com/kamalivaturi/kerf#readme";
@@ -83,6 +83,8 @@ export default function App() {
   const [history, setHistory] = useState<HistoryEntry[]>(store.get("history", []));
   const [update, setUpdate] = useState<{ latest: string; url: string; auto?: boolean } | null>(null);
   const [media, setMedia] = useState(store.get("media", ""));
+  const [live, setLive] = useState<HostStatus | null>(null);
+  const seq = liveSequence(live?.live); // effects follow this frame size / fps / aspect
   const applyRef = useRef<() => void>(() => {});
 
   const f = features[name];
@@ -113,6 +115,18 @@ export default function App() {
   useEffect(() => {
     connect();
     const t = setInterval(() => { if (!engine) connect(); }, 4000);
+    return () => clearInterval(t);
+  }, [engine]);
+  useEffect(() => { // live editors: Premiere sends its project/sequence/playhead; every host shows what's open
+    if (!engine) return;
+    const beat = async () => {
+      try {
+        if (host.live) await api.post("/host/heartbeat", { host: host.name, state: await host.live() });
+        setLive(await api.get("/host"));
+      } catch { /* engine restarting or no project open */ }
+    };
+    beat();
+    const t = setInterval(beat, 1000);
     return () => clearInterval(t);
   }, [engine]);
   useEffect(() => { if (f) { setParams({ ...f.defaults }); reset(); } store.set("feature", name); }, [name, !!f]);
@@ -208,7 +222,7 @@ export default function App() {
     <div className="app">
       <header className="top">
         <div className="brand"><span className="wordmark">kerf</span></div>
-        <span className="pill status ok" title={`Engine ${engine}`}><i />{IN_UXP ? "Premiere" : "Studio"}</span>
+        <LiveChips live={live} engine={engine} />
         {([["news", "✦", t("whatsNew")], ["history", "⟲", t("history")], ["settings", "⚙", t("settings")]] as const).map(([k, icon, tip]) =>
           <button key={k} className={`pill icon ${panel === k ? "on" : ""}`} onClick={() => setPanel(panel === k ? "" : k)} aria-label={tip} title={tip}>{icon}</button>)}
         <button className="pill icon" onClick={() => openHelp()} aria-label={t("help")} title={t("help")}>?</button>
@@ -223,6 +237,9 @@ export default function App() {
       {update && <div className="banner">{update.auto
         ? <>Kerf {update.latest} is downloading in the background and installs when you quit Kerf Studio. <a href={update.url} target="_blank" rel="noreferrer">What's new</a></>
         : <>Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></>}</div>}
+      {live && !live.running.length && live.exit_in != null && <div className="banner wait" role="status">
+        <span>Kerf runs alongside Premiere Pro, After Effects or DaVinci Resolve. Open one, or Kerf closes in {live.exit_in}s.</span>
+        <button className="ghost" onClick={() => api.post("/settings", { follow_editors: "off" })}>Keep Kerf open</button></div>}
       {panel === "news" && <News onClose={() => setPanel("")} />}
       {panel === "settings" && <Settings prefs={prefs} setPrefs={setPrefs} onClose={() => setPanel("")} />}
       {panel === "history" && <History entries={history} onLoad={(h) => { goView("edit"); setName(h.feature); setGroup(features[h.feature]?.group || group); setTimeout(() => setParams(h.params), 0); setPanel(""); }}
@@ -231,6 +248,7 @@ export default function App() {
       {needsMedia && (
         <section className="card source">
           <label htmlFor="media">{t("media")} <small>{t("mediaHint")}</small></label>
+          {seq && <small className="match">Effects match {EDITORS[seq.host]} “{seq.sequence}”: {seq.width}×{seq.height} · {+seq.fps!.toFixed(3)} fps</small>}
           <div className="mediarow">
             <textarea id="media" rows={1} value={media} onChange={(e) => setMedia(e.target.value)} placeholder="C:\Videos\interview.mp4" />
             {host.pickFile && <button className="primary" onClick={pickMedia}>Choose video…</button>}
@@ -240,7 +258,7 @@ export default function App() {
         </section>
       )}
 
-      {view === "graphics" && <Graphics onClose={() => goView("tools")} onCaptions={(file) => {
+      {view === "graphics" && <Graphics vertical={seq ? seq.height! > seq.width! : undefined} onClose={() => goView("tools")} onCaptions={(file) => {
         goView("edit"); setName("captions"); setGroup(features.captions?.group || group);
         setTimeout(() => setParams({ ...features.captions?.defaults, output: "mogrt", mogrt: file, mogrt_param: "Text" }), 0);
       }} />}
@@ -275,7 +293,7 @@ export default function App() {
             {prefs.showHelp && <p className="help">{f.help}</p>}
             <Presets feature={name} f={f} params={params} setParams={setParams} reload={connect} />
             <Form f={f} params={params} setParams={setParams} />
-            {name === "captions" && params.output !== "srt_only" && <CaptionPreview params={params} media={IN_UXP ? "" : paths()[0] || ""} />}
+            {name === "captions" && params.output !== "srt_only" && <CaptionPreview params={params} media={IN_UXP ? "" : paths()[0] || ""} size={seq ? [seq.width!, seq.height!] : undefined} />}
             <div className="actions">
               <button className="ghost" onClick={() => setParams({ ...f.defaults })} title="Reset to defaults">{t("reset")}</button>
               {f.review && <button disabled={!!busy} onClick={() => run(true)}>{name === "prompt_edit" ? t("plan") : t("analyze")}</button>}
@@ -404,6 +422,20 @@ function History({ entries, onLoad, onClear, onClose }: {
   );
 }
 
+type HostStatus = { running: string[]; live: Record<string, Live>; follow: boolean; exit_in: number | null };
+const EDITORS: Record<string, string> = { premiere: "Premiere Pro", aftereffects: "After Effects", resolve: "Resolve" };
+
+function LiveChips({ live, engine }: { live: HostStatus | null; engine: string }) {
+  const run = live?.running || [];
+  if (!run.length) return <span className="pill status idle" title={`Engine ${engine} · no editor open`}><i />{IN_UXP ? "Premiere" : "Studio"}</span>;
+  return <>{run.map((h) => {
+    const s = live!.live[h];
+    const what = s?.sequence ? `${s.sequence} · ${s.timecode ?? ""}` : s?.project || "";
+    const tip = [EDITORS[h], s?.project, s?.sequence, s?.width && `${s.width}×${s.height}`, s?.fps && `${+s.fps.toFixed(3)} fps`, s?.timecode].filter(Boolean).join(" · ");
+    return <span key={h} className="pill status ok live" title={tip}><i />{EDITORS[h] || h}{what && <small>{what}</small>}</span>;
+  })}</>;
+}
+
 const SETTING_FIELDS: [string, string, string[]?][] = [
   ["ai_provider", "AI provider", ["claude", "openai", "gemini", "local"]],
   ["claude_model", "Claude model"], ["anthropic_api_key", "Anthropic API key"],
@@ -413,6 +445,7 @@ const SETTING_FIELDS: [string, string, string[]?][] = [
   ["elevenlabs_api_key", "ElevenLabs API key"], ["pexels_api_key", "Pexels API key"],
   ["whisper_model", "Whisper model or fine-tuned path"], ["whisper_device", "Whisper device", ["auto", "cuda", "cpu"]],
   ["auto_update", "Automatic updates (Kerf Studio)", ["on", "off"]],
+  ["follow_editors", "Run only while Premiere, After Effects or Resolve is open", ["on", "off"]],
 ];
 
 function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void; onClose: () => void }) {
@@ -539,20 +572,20 @@ function News({ onClose }: { onClose: () => void }) {
   );
 }
 
-function CaptionPreview({ params, media }: { params: Params; media: string }) {
-  const [aspect, setAspect] = useState(store.get("capAspect", "9:16"));
+function CaptionPreview({ params, media, size }: { params: Params; media: string; size?: [number, number] }) {
+  const [aspect, setAspect] = useState(store.get("capAspect2", "auto")); // auto = the timeline's own frame
   const [safe, setSafe] = useState(true);
   const [img, setImg] = useState(""), [err, setErr] = useState("");
   useEffect(() => {
-    store.set("capAspect", aspect);
-    const id = setTimeout(() => api.post("/captions/preview", { path: media, params, t: 1.2, aspect, safe })
+    store.set("capAspect2", aspect);
+    const id = setTimeout(() => api.post("/captions/preview", { path: media, params, t: 1.2, aspect, safe, size })
       .then((r) => { setImg(r.image); setErr(""); }).catch((e) => setErr((e as Error).message)), 350); // debounce typing
     return () => clearTimeout(id);
-  }, [JSON.stringify(params), media, aspect, safe]);
+  }, [JSON.stringify(params), media, aspect, safe, size?.join("x")]);
   return (
     <div className="cap-preview">
       <div className="row">{t("captionPreview")}
-        <span><select value={aspect} onChange={(e) => setAspect(e.target.value)} aria-label="Aspect">{["9:16", "1:1", "16:9"].map((a) => <option key={a}>{a}</option>)}</select>
+        <span><select value={aspect} onChange={(e) => setAspect(e.target.value)} aria-label="Aspect">{["auto", "9:16", "1:1", "16:9"].map((a) => <option key={a} value={a}>{a === "auto" ? "Timeline" : a}</option>)}</select>
           <label className="check"><input type="checkbox" checked={safe} onChange={(e) => setSafe(e.target.checked)} />{t("safeZones")}</label></span></div>
       {img && <img src={img} alt="Caption preview" />}
       {err && <div className="error">{err}</div>}

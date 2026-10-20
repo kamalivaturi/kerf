@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 from pathlib import Path
 
-from . import REPO, __version__, captions, features, license, media, mogrt, settings, speech, tools
+from . import REPO, __version__, captions, features, hosts, license, media, mogrt, settings, speech, tools
 from .timeline import Timeline
 
 PORT = 7878
@@ -137,6 +137,7 @@ class Handler(BaseHTTPRequestHandler):
             "/languages": speech.languages,
             "/fx": lambda: dict(presets=tools.fx_list()),
             "/diagnostics": diagnostics,
+            "/host": hosts.status,
         }
         if u.path == "/mogrt/media":  # previews of library entries only (never arbitrary paths)
             e = next((x for x in mogrt.library() if x["id"] == q.get("id")), None)
@@ -154,7 +155,7 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         b = json.loads(self.rfile.read(n) or b"{}")
         routes = {
-            "/run": lambda: features.run(b["feature"], b["timeline"], b.get("params"), b.get("out_dir")),
+            "/run": lambda: features.run(b["feature"], b["timeline"], b.get("params"), b.get("out_dir"), b.get("host")),
             "/presets": lambda: features.save_preset(b["feature"], b["name"], b["params"]) or dict(ok=True),
             "/presets/delete": lambda: features.delete_preset(b["feature"], b["name"]) or dict(ok=True),
             "/batch": lambda: features.run_batch(b["feature"], b["paths"], b.get("params"), b.get("out_dir"),
@@ -166,7 +167,7 @@ class Handler(BaseHTTPRequestHandler):
             "/mogrt/studio": lambda: mogrt.studio(b["base"], b.get("overrides", {}), b["name"]),
             "/mogrt/build": lambda: mogrt.build([s for s in mogrt.catalog() if not b.get("ids") or s["id"] in b["ids"]]),
             "/captions/preview": lambda: captions.preview(b.get("path", ""), b.get("params", {}), float(b.get("t", 1.0)),
-                                                          b.get("aspect", "9:16"), b.get("safe", True)),
+                                                          b.get("aspect", "auto"), b.get("safe", True), b.get("size")),
             "/license/activate": lambda: license.activate(b["key"]),
             "/license/deactivate": license.deactivate,
             "/fx/save": lambda: tools.fx_save(b["name"], b["chain"]),
@@ -176,6 +177,7 @@ class Handler(BaseHTTPRequestHandler):
                                                 else Timeline.from_media(b["timeline"], media.probe), b.get("t")),
             "/presets/export": lambda: features.export_presets(b.get("features")),
             "/presets/import": lambda: features.import_presets(b["bundle"]),
+            "/host/heartbeat": lambda: hosts.beat(b["host"], b.get("state") or {}),
         }
         path = urlparse(self.path).path
         if path not in routes:
@@ -212,8 +214,10 @@ class Handler(BaseHTTPRequestHandler):
         sys.stderr.write("kerf: " + fmt % args + "\n")
 
 
-def serve(port=PORT):
+def serve(port=PORT, follow=False):
     global TOKEN
     TOKEN = token()
     print(f"Kerf {__version__} listening on http://127.0.0.1:{port}  (token in {TOKEN_FILE})", flush=True)
+    if follow:
+        hosts.follow()  # Kerf only runs alongside Premiere Pro, After Effects or Resolve
     ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()

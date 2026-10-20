@@ -12,9 +12,11 @@ from dataclasses import dataclass, field
 from urllib.parse import quote
 from xml.sax.saxutils import escape
 
-# ponytail: xmeml Basic Motion `center` written as frame fractions (x of width, y of height; ±0.5 = edge, +y down).
-# Unverified against Premiere/Resolve importers; if positions land wrong, rescale here only.
-CENTER_UNIT = 1.0
+# Basic Motion units, measured by importing scripts/calibrate_xml.py output (Premiere 25, Resolve 21):
+# Clip.center is a fraction of the sequence frame (±0.5 = edge, +y down) and Clip.scale is % of native source pixels.
+# Premiere reads `center` as a fraction of the *source* size and scale as % of native pixels.
+# Resolve reads `center` as a fraction of the *timeline* size and applies scale on top of its fit-to-frame.
+# Keyframe <when> is media-start based (F(src_in) + F(t)) in both.
 EPS = 1e-4
 
 
@@ -232,7 +234,7 @@ def _pathurl(path):
     return "file://localhost/" + quote(p.lstrip("/"), safe="/:")
 
 
-def to_xmeml(tl, probe):
+def to_xmeml(tl, probe, host="premiere"):
     F = lambda s: int(round(s * tl.fps))
     rate = _rate(tl.fps)
     files, n = {}, [0]
@@ -257,18 +259,25 @@ def to_xmeml(tl, probe):
         if not c.scale and not c.center and not c.rotation:
             return ""
         base = F(c.src_in)
+        info = probe(c.path)
+        sw, sh = info["width"] or tl.width, info["height"] or tl.height
+        if host == "resolve":
+            fit = min(tl.width / sw, tl.height / sh)
+            kx = ky = 1.0
+        else:
+            fit, kx, ky = 1.0, tl.width / sw, tl.height / sh
 
         def param(pid, name, kf, fmt):
             if not kf:
                 return ""
             body = f"<value>{fmt(kf[0][1:])}</value>"
-            if len(kf) > 1:  # keyframe <when> measured from media start (unverified, see docs)
+            if len(kf) > 1:
                 body += "".join(f"<keyframe><when>{base + F(t)}</when><value>{fmt(v)}</value></keyframe>" for t, *v in kf)
             return f"<parameter><parameterid>{pid}</parameterid><name>{name}</name>{body}</parameter>"
 
-        sc = param("scale", "Scale", c.scale, lambda v: f"{v[0]:.3f}")
+        sc = param("scale", "Scale", c.scale, lambda v: f"{v[0] / fit:.3f}")
         ce = param("center", "Center", c.center,
-                   lambda v: f"<horiz>{v[0] * CENTER_UNIT:.5f}</horiz><vert>{v[1] * CENTER_UNIT:.5f}</vert>")
+                   lambda v: f"<horiz>{v[0] * kx:.5f}</horiz><vert>{v[1] * ky:.5f}</vert>")
         ro = param("rotation", "Rotation", c.rotation, lambda v: f"{v[0]:.3f}")
         return ("<filter><effect><name>Basic Motion</name><effectid>basic</effectid><effectcategory>motion</effectcategory>"
                 f"<effecttype>motion</effecttype><mediatype>video</mediatype>{sc}{ro}{ce}</effect></filter>")

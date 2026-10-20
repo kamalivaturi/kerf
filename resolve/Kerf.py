@@ -44,8 +44,8 @@ def engine_command():
               "/Applications/Kerf Studio.app/Contents/Resources/engine", os.path.expanduser("~/Applications/Kerf Studio.app/Contents/Resources/engine"),
               "/usr/lib/kerf-studio/engine", "/usr/lib/Kerf Studio/engine", os.path.join(KERF_HOME, "kerf-engine"), KERF_HOME):
         if os.path.isfile(os.path.join(d, exe)):
-            return [os.path.join(d, exe), "serve"], d
-    return ["python" if os.name == "nt" else "python3", "-m", "kerf", "serve"], KERF_HOME
+            return [os.path.join(d, exe), "serve", "--follow-editors"], d
+    return ["python" if os.name == "nt" else "python3", "-m", "kerf", "serve", "--follow-editors"], KERF_HOME
 
 
 def ensure_engine():
@@ -94,6 +94,21 @@ def read_timeline():
     except Exception:
         out["playhead"] = 0.0
     return out
+
+
+def heartbeat():
+    """Tell the engine which project, timeline and playhead are open (shown live in Kerf Studio)."""
+    try:
+        p = project()
+        tl = p.GetCurrentTimeline() if p else None
+        st = dict(project=p.GetName() if p else "")
+        if tl:
+            st.update(sequence=tl.GetName(), timecode=tl.GetCurrentTimecode(), fps=float(tl.GetSetting("timelineFrameRate")),
+                      width=int(tl.GetSetting("timelineResolutionWidth")), height=int(tl.GetSetting("timelineResolutionHeight")))
+        call("/host/heartbeat", dict(host="resolve", state=st), timeout=2)
+        return st
+    except Exception:
+        return None  # engine restarting or no project: try again on the next tick
 
 
 def sort_media_pool(mp, s):
@@ -174,6 +189,7 @@ def main():
     names = sorted(feats, key=lambda k: (feats[k]["group"], feats[k]["title"]))
 
     win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": [120, 120, 560, 780]}, ui.VGroup([
+        ui.Label({"ID": "Live", "Weight": 0}),
         ui.HGroup({"Weight": 0}, [ui.Label({"Text": "Feature", "Weight": 0}), ui.ComboBox({"ID": "Feature"})]),
         ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0}),
         ui.HGroup({"Weight": 0}, [ui.ComboBox({"ID": "Preset"}),
@@ -230,7 +246,7 @@ def main():
                 params["items"] = ",".join(ids) or "-1"
             it["Out"].PlainText = "Working…"
             timeline = read_timeline() if feats[cur()].get("needs_timeline", True) else None
-            res = call("/run", dict(feature=cur(), timeline=timeline, params=params))
+            res = call("/run", dict(feature=cur(), timeline=timeline, params=params, host="resolve"))
             if analyze:
                 it["Items"].Clear()
                 state["items"] = res.get("items", [])
@@ -255,9 +271,23 @@ def main():
     win.On.Analyze.Clicked = lambda ev: run(True)
     win.On.Apply.Clicked = lambda ev: run(False)
     win.On.KerfWin.Close = lambda ev: disp.ExitLoop()
+    def beat(ev=None):
+        s = heartbeat()
+        it["Live"].Text = (f"● {s['project']}" + (f"  ·  {s['sequence']}  ·  {s['timecode']}" if s.get("sequence") else "")) if s \
+            else "○ Kerf engine not reachable"
+
+    try:  # live project / timeline / playhead while the Kerf window is open
+        timer = ui.Timer({"ID": "KerfBeat", "Interval": 1000})
+        disp.On.KerfBeat.Timeout = beat
+        timer.Start()
+    except Exception:
+        timer = None
+    beat()
     load_feature()
     win.Show()
     disp.RunLoop()
+    if timer:
+        timer.Stop()
     win.Hide()
 
 
