@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "ui/src/styles.scss"
+        ],
+        "createdAt": "2026-10-20T07:47:43.169Z",
+        "reason": "user-provided reference screenshot (360-style panel) specifies the orange glow on the logo, primary buttons and Quick Mask bar"
+      }
+    ]
+  }
+}
