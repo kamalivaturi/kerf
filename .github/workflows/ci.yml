@@ -47,7 +47,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
-      - run: mkdir -p engine-dist/kerf-engine   # tauri-build checks that bundled resources exist
+      - run: mkdir -p engine-dist/kerf-engine && tar -czf engine-dist/kerf-engine.tar.gz -C engine-dist kerf-engine   # tauri-build checks bundled resources exist
         shell: bash
       - run: cargo check
         working-directory: desktop/src-tauri
