@@ -18,6 +18,8 @@
 - Resolve: finds Kerf Studio's engine on every OS, reads the playhead, sorts the Media Pool, places layers.
 - Transcription falls back to the CPU automatically when a GPU lacks the CUDA 12 libraries.
 - CI now tests on Windows, macOS and Linux; every tag builds all installers.
+- Fixes: hardware encoders are used only when they actually work (no GPU → x264); transcription works offline
+  from cached models; a clear message when an FFmpeg build has no libass (captions); settings → Report a bug.
 - Graphics & MOGRTs: a 194-template Kerf pack (captions, titles, lower thirds; 14 animations × 5 looks,
   16:9 and 9:16) with live animated previews in the panel, built by After Effects into real .mogrt files
   where every control stays editable in Essential Graphics. Import any .mogrt you own.
