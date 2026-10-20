@@ -33,6 +33,14 @@
         return e;
     }
 
+    function findComp(name) {
+        for (var i = 1; i <= app.project.numItems; i++) {
+            var it = app.project.item(i);
+            if (it instanceof CompItem && it.name === name) return it;
+        }
+        throw new Error("comp not found: " + name);
+    }
+
     function expose(comp, prop, name) {
         if (prop.canAddToMotionGraphicsTemplate(comp)) prop.addToMotionGraphicsTemplateAs(comp, name);
         else log("  cannot expose " + name);
@@ -160,7 +168,7 @@
         var just = ALIGN[look.align || (t.kind === "lower_third" ? "left" : "center")];
         var txt = comp.layers.addText(t.text);
         txt.name = "Text";
-        var tp = styleText(txt, look, t.size, just);
+        styleText(txt, look, t.size, just);
         txt.transform.anchorPoint.expression = 'var r=sourceRectAtTime(time,false);[r.left+r.width/2,r.top+r.height/2]';
         txt.transform.position.expression = ctlRef("Position", "Point");
         txt.transform.scale.expression = 'var s=' + ctlRef("Size %", "Slider") + ';[s,s]';
@@ -197,18 +205,24 @@
                 'L.transform.position+[-r.width*s/2,r.height*s*.65]';
             st.transform.scale.expression = 'var s=' + ctlRef("Size %", "Slider") + ';[s,s]';
             animator(st, "Animate", props, introExpr(t.anim), t.anim.based_on);
-            expose(comp, st.property("ADBE Text Properties").property("ADBE Text Document"), "Subtitle");
         }
 
-        // ---- Essential Graphics (order = panel order in Premiere) ----
-        expose(comp, tp, "Text");
+        // ---- Essential Graphics: AE adds each exposed control at the TOP, so expose in reverse panel order ----
+        // Re-read every property by name here: adding effects/animators invalidates references taken earlier.
+        var params = ctl.property("ADBE Effect Parade");
         var order = [["size", "Size %"], ["fill", "Fill Color"], ["stroke", "Stroke Color"], ["strokeW", "Stroke Width"],
             ["track", "Letter Spacing"], ["lead", "Line Spacing"],
             ["hl", "Highlight Color"], ["hlOn", "Highlight Active Word"], ["hlScale", "Highlight Scale %"],
             ["speed", "Animation Speed"], ["stagger", "Stagger (s)"], ["out", "Animate Out"], ["box", "Box"],
             ["boxColor", "Box Color"], ["boxOp", "Box Opacity"], ["boxPad", "Box Padding"], ["boxRound", "Box Roundness"],
             ["shadow", "Shadow"], ["shadowOp", "Shadow Opacity"], ["glow", "Glow Intensity"], ["pos", "Position"], ["accent", "Accent Color"]];
-        for (var j = 0; j < order.length; j++) if (c[order[j][0]]) expose(comp, c[order[j][0]].property(1), order[j][1]);
+        for (var j = order.length - 1; j >= 0; j--) {
+            var eff = c[order[j][0]] ? params.property(order[j][1]) : null;
+            if (eff) expose(comp, eff.property(1), order[j][1]);
+        }
+        if (t.kind === "lower_third")
+            expose(comp, comp.layer("Subtitle").property("ADBE Text Properties").property("ADBE Text Document"), "Subtitle");
+        expose(comp, txt.property("ADBE Text Properties").property("ADBE Text Document"), "Text");
         return comp;
     }
 
@@ -227,18 +241,21 @@
     app.beginSuppressDialogs();
     try {
         app.newProject();
-        var comps = [];
+        var comps = [];  // [template, comp name]: saving/exporting invalidates CompItem references, so look up by name
         for (var i = 0; i < cfg.templates.length; i++) {
             var t = cfg.templates[i];
-            try { comps.push([t, build(t)]); log("built " + t.id); }
+            try { comps.push([t, build(t).name]); log("built " + t.id); }
             catch (e) { log("FAILED build " + t.id + ": " + e.toString() + " line " + e.line); }
         }
         app.project.save(new File(out.fsName + "/kerf_mogrts.aep")); // export prompts unless saved first
         for (var n = 0; n < comps.length; n++) {
-            var ok = false;
-            try { ok = comps[n][1].exportAsMotionGraphicsTemplate(true, out.fsName); } catch (e2) { log("FAILED export " + comps[n][0].id + ": " + e2); }
-            results.push('{"id":"' + comps[n][0].id + '","comp":"' + comps[n][1].name.replace(/"/g, '\\"') + '","exported":' + ok +
-                ',"controls":' + comps[n][1].motionGraphicsTemplateControllerCount + "}");
+            var ok = false, controls = 0, cm = findComp(comps[n][1]);
+            try {
+                controls = cm.motionGraphicsTemplateControllerCount;
+                ok = cm.exportAsMotionGraphicsTemplate(true, out.fsName);
+            } catch (e2) { log("FAILED export " + comps[n][0].id + ": " + e2 + " line " + e2.line); }
+            results.push('{"id":"' + comps[n][0].id + '","comp":"' + comps[n][1].replace(/"/g, '\\"') + '","exported":' + ok +
+                ',"controls":' + controls + "}");
             log((ok ? "exported " : "NOT exported ") + comps[n][0].id);
         }
     } catch (fatal) {
