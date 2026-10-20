@@ -18,7 +18,7 @@ music with auto-ducking, beat edits, audio cleanup and reframing. It runs on you
 | You use | Get | Then |
 |---|---|---|
 | **Windows** | `Kerf-Studio-…-windows-x64-setup.exe` (or `.msi`) | Run it. Kerf Studio starts the engine for every editor. |
-| **macOS** (Apple silicon / Intel) | `Kerf-Studio-…-macos-arm64.dmg` / `…-macos-x64.dmg` | Drag to Applications. First launch: right-click → Open (unsigned build). |
+| **macOS** (Apple silicon / Intel) | `Kerf-Studio-…-macos-arm64.dmg` / `…-macos-x64.dmg` | Drag to Applications. First launch: right-click → Open, or System Settings → Privacy & Security → Open Anyway. If 0.2.0 says "damaged": `xattr -dr com.apple.quarantine "/Applications/Kerf Studio.app"` (fixed in 0.2.1). |
 | **Linux** | `.AppImage`, `.deb` or `.rpm` | `chmod +x` the AppImage and run it, or install the package. |
 | **Premiere Pro 25.6+** | `kerf-premiere-….ccx` | Double-click (Creative Cloud installs it) → *Window → UXP Plugins → Kerf*. |
 | **After Effects 2024+** | `kerf-aftereffects-….zip` | Run `install/install-aftereffects.ps1` (Windows) or `install/install.sh` (macOS) → *Window → Kerf.jsx*. Enable *Preferences → Scripting & Expressions → Allow Scripts to Write Files and Access Network*. |
@@ -27,6 +27,8 @@ music with auto-ducking, beat edits, audio cleanup and reframing. It runs on you
 | **Python** | `pip install kerf-…whl` or `pip install -e ".[ai]"` | `kerf serve` (needs FFmpeg on PATH). |
 
 Every release lists SHA-256 checksums in `SHA256SUMS.txt`.
+
+Kerf Studio updates itself: new releases download in the background and install when you quit (Settings → Automatic updates).
 
 ## What's inside
 

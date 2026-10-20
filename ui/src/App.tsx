@@ -81,7 +81,7 @@ export default function App() {
   const goView = (v: View) => { setView(v); store.set("view", v); };
   const [projectKey, setProjectKey] = useState("standalone");
   const [history, setHistory] = useState<HistoryEntry[]>(store.get("history", []));
-  const [update, setUpdate] = useState<{ latest: string; url: string } | null>(null);
+  const [update, setUpdate] = useState<{ latest: string; url: string; auto?: boolean } | null>(null);
   const [media, setMedia] = useState(store.get("media", ""));
   const applyRef = useRef<() => void>(() => {});
 
@@ -128,6 +128,12 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
+  async function pickMedia() { const p = await host.pickFile?.(); if (p) setMedia(p); }
+  function needMedia() { // a tool was used before choosing a video: open the picker (Studio) or point at the field
+    if (host.pickFile) pickMedia();
+    else document.getElementById("media")?.focus();
+  }
+  useEffect(() => { host.onFileDrop?.((ps) => setMedia(ps.join("\n"))); }, []);
   const paths = () => media.split("\n").map((s) => s.trim()).filter(Boolean);
   function reset() { setItems(null); setResult(null); setNotes([]); setError(""); }
   function pickGroup(g: string) {
@@ -214,7 +220,9 @@ export default function App() {
           {icon}<span>{label}</span></button>)}
       </nav>
 
-      {update && <div className="banner">Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></div>}
+      {update && <div className="banner">{update.auto
+        ? <>Kerf {update.latest} is downloading in the background and installs when you quit Kerf Studio. <a href={update.url} target="_blank" rel="noreferrer">What's new</a></>
+        : <>Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></>}</div>}
       {panel === "news" && <News onClose={() => setPanel("")} />}
       {panel === "settings" && <Settings prefs={prefs} setPrefs={setPrefs} onClose={() => setPanel("")} />}
       {panel === "history" && <History entries={history} onLoad={(h) => { goView("edit"); setName(h.feature); setGroup(features[h.feature]?.group || group); setTimeout(() => setParams(h.params), 0); setPanel(""); }}
@@ -223,7 +231,12 @@ export default function App() {
       {needsMedia && (
         <section className="card source">
           <label htmlFor="media">{t("media")} <small>{t("mediaHint")}</small></label>
-          <textarea id="media" rows={1} value={media} onChange={(e) => setMedia(e.target.value)} placeholder="C:\Videos\interview.mp4" />
+          <div className="mediarow">
+            <textarea id="media" rows={1} value={media} onChange={(e) => setMedia(e.target.value)} placeholder="C:\Videos\interview.mp4" />
+            {host.pickFile && <button className="primary" onClick={pickMedia}>Choose video…</button>}
+          </div>
+          {!media.trim() && <p className="help">{host.onFileDrop ? "Drag a video anywhere into Kerf Studio, or choose one. " : "Paste the full path of a video. "}
+            Every tool works on this file and writes a timeline you can import into Premiere or Resolve.</p>}
         </section>
       )}
 
@@ -231,7 +244,8 @@ export default function App() {
         goView("edit"); setName("captions"); setGroup(features.captions?.group || group);
         setTimeout(() => setParams({ ...features.captions?.defaults, output: "mogrt", mogrt: file, mogrt_param: "Text" }), 0);
       }} />}
-      {(view === "tools" || view === "graphs" || view === "motion" || view === "shakes") && <Toolkit tab={view} projectKey={projectKey} />}
+      {(view === "tools" || view === "graphs" || view === "motion" || view === "shakes") &&
+        <Toolkit tab={view} projectKey={projectKey} hasMedia={IN_UXP || !!media.trim()} onNeedMedia={needMedia} />}
 
       {view === "edit" && <>
         <div className="search">
@@ -398,6 +412,7 @@ const SETTING_FIELDS: [string, string, string[]?][] = [
   ["local_llm_url", "Local LLM URL (Ollama…)"], ["local_llm_model", "Local model"],
   ["elevenlabs_api_key", "ElevenLabs API key"], ["pexels_api_key", "Pexels API key"],
   ["whisper_model", "Whisper model or fine-tuned path"], ["whisper_device", "Whisper device", ["auto", "cuda", "cpu"]],
+  ["auto_update", "Automatic updates (Kerf Studio)", ["on", "off"]],
 ];
 
 function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void; onClose: () => void }) {

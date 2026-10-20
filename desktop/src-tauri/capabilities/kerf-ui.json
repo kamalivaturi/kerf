@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "kerf-ui",
+  "description": "The Kerf UI (served by the local engine) may open the native file picker and receive dropped file paths.",
+  "windows": [
+    "main"
+  ],
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:7878/*"
+    ]
+  },
+  "permissions": [
+    "core:default",
+    "dialog:allow-open"
+  ]
+}

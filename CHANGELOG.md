@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.1 — 2026-10-20
+
+- **Automatic updates** in Kerf Studio: checks GitHub at launch and every 6 hours, downloads new versions in the
+  background (signed and verified) and installs them when you quit. Switch off in Settings → Automatic updates.
+  Installs from 0.2.0 need this one update by hand; every later version arrives by itself.
+- **macOS:** the app is now signed (ad-hoc), so it no longer reports "damaged" on Apple silicon. First launch
+  still asks once: right-click → Open (or System Settings → Privacy & Security → Open Anyway).
+- **Choosing a video:** a "Choose video…" button (native file picker) and drag-and-drop anywhere in Kerf Studio.
+  Tools pressed before a video is chosen now say so and open the picker instead of showing an error.
+- **MOGRT pack:** 194 After Effects-built templates with previews. Graphics → Install the Kerf MOGRT pack.
+  Essential Graphics controls now list Text first.
+
 ## 0.2.0 — 2026-10-19
 
 - **Kerf Studio desktop app** (Rust/Tauri) for Windows, macOS and Linux: installers (.exe, .msi, .dmg,

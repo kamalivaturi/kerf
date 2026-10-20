@@ -1,6 +1,6 @@
 [package]
 name = "kerf-studio"
-version = "0.2.0"
+version = "0.2.1"
 description = "Kerf Studio: AI editing toolkit for Premiere Pro, After Effects and DaVinci Resolve"
 license = "MIT"
 edition = "2021"
@@ -10,6 +10,10 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-updater = "2"
+tauri-plugin-dialog = "2"
+serde_json = "1"
+tokio = { version = "1", features = ["time"] }
 
 [profile.release]
 strip = true

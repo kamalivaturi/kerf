@@ -207,7 +207,8 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
     <h2>Questions</h2>
     <details><summary>Does my footage leave my computer?</summary><p>No. Cutting, captions, cutouts and renders all run locally. Only the AI providers you switch on (with your own key) receive text such as transcripts.</p></details>
     <details><summary>Will it change my edit?</summary><p>Kerf builds a new sequence or timeline, or adds clips and markers you can undo. Your original edit and media are never modified.</p></details>
-    <details><summary>Why does macOS or Windows warn me on first launch?</summary><p>The builds aren't code-signed yet. On macOS right-click the app and choose Open; on Windows choose More info, then Run anyway.</p></details>
+    <details><summary>Why does macOS or Windows warn me on first launch?</summary><p>The builds aren't signed with an Apple or Microsoft developer certificate yet. On macOS right-click the app and choose Open (or System Settings → Privacy &amp; Security → Open Anyway); on Windows choose More info, then Run anyway. If version 0.2.0 says "damaged" on a Mac, run <code>xattr -dr com.apple.quarantine "/Applications/Kerf Studio.app"</code> in Terminal, or install 0.2.1.</p></details>
+    <details><summary>How do updates work?</summary><p>Kerf Studio checks for new versions when it starts and every few hours, downloads them in the background and installs them when you quit. You can switch this off in Settings.</p></details>
     <details><summary>Is a GPU required?</summary><p>No. With an NVIDIA GPU, transcription uses large-v3-turbo on CUDA; otherwise Kerf picks a fast CPU model automatically.</p></details>
   </section>
 </main>

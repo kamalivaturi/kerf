@@ -9,8 +9,46 @@ use std::{
     time::Duration,
 };
 use tauri::{Manager, RunEvent};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 struct Engine(Arc<Mutex<Option<Child>>>);
+
+/// A downloaded, signature-checked update waiting for the app to quit.
+struct Staged(Mutex<Option<(Update, Vec<u8>)>>);
+
+/// Settings → Automatic updates (`auto_update` in ~/.kerf/settings.json); on unless switched off.
+fn auto_update_on() -> bool {
+    let kerf = std::env::var_os("KERF_HOME_DIR")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                .map(|h| PathBuf::from(h).join(".kerf"))
+        });
+    kerf.and_then(|k| std::fs::read_to_string(k.join("settings.json")).ok())
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .map_or(true, |v| {
+            v.get("auto_update").and_then(|x| x.as_str()) != Some("off")
+        })
+}
+
+/// Check GitHub for a newer release shortly after launch and every 6 hours; download it in the background.
+/// It is installed when the user quits, so nobody loses work to a surprise restart.
+async fn update_loop(app: tauri::AppHandle) {
+    tokio::time::sleep(Duration::from_secs(20)).await; // let the engine and UI start first
+    loop {
+        if auto_update_on() {
+            let found: Result<Option<Update>, tauri_plugin_updater::Error> =
+                async { app.updater()?.check().await }.await;
+            if let Ok(Some(update)) = found {
+                if let Ok(bytes) = update.download(|_, _| {}, || {}).await {
+                    *app.state::<Staged>().0.lock().unwrap() = Some((update, bytes));
+                    return;
+                }
+            }
+        }
+        tokio::time::sleep(Duration::from_secs(6 * 3600)).await;
+    }
+}
 
 fn engine_up() -> bool {
     TcpStream::connect_timeout(
@@ -61,7 +99,7 @@ fn start_engine(dir: PathBuf) -> std::io::Result<Child> {
         let _ = std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755));
     }
     let mut cmd = Command::new(&exe);
-    cmd.arg("serve").current_dir(&dir);
+    cmd.arg("serve").current_dir(&dir).env("KERF_STUDIO", "1"); // the engine tells the UI that Studio self-updates
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -73,8 +111,12 @@ fn start_engine(dir: PathBuf) -> std::io::Result<Child> {
 fn main() {
     let child = Arc::new(Mutex::new(None));
     tauri::Builder::default()
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_dialog::init())
         .manage(Engine(child.clone()))
+        .manage(Staged(Mutex::new(None)))
         .setup(move |app| {
+            tauri::async_runtime::spawn(update_loop(app.handle().clone()));
             if !engine_up() {
                 let res = app.path().resource_dir().map_err(io_err)?;
                 let data = app.path().app_local_data_dir().map_err(io_err)?;
@@ -95,6 +137,9 @@ fn main() {
             if let RunEvent::Exit = event {
                 if let Some(mut c) = app.state::<Engine>().0.lock().unwrap().take() {
                     let _ = c.kill(); // only the engine we started; a separately started one keeps running
+                }
+                if let Some((update, bytes)) = app.state::<Staged>().0.lock().unwrap().take() {
+                    let _ = update.install(bytes); // engine already stopped, so its files can be replaced
                 }
             }
         });

@@ -21,6 +21,7 @@ DEFAULTS = dict(
     whisper_device="auto",
     anthropic_api_key="", openai_api_key="", gemini_api_key="", elevenlabs_api_key="", pexels_api_key="",
     theme="auto",
+    auto_update="on",                  # Kerf Studio: download new releases in the background, install on quit
 )
 ENV = dict(anthropic_api_key="ANTHROPIC_API_KEY", openai_api_key="OPENAI_API_KEY", gemini_api_key="GEMINI_API_KEY",
            elevenlabs_api_key="ELEVENLABS_API_KEY", pexels_api_key="PEXELS_API_KEY", local_llm_url="KERF_LLM_URL",

@@ -268,3 +268,4 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
 // legibility floor + readable placeholders
 small { font-size: 11px; }
 ::placeholder { color: var(--muted); opacity: 1; }
+.mediarow { display: flex; align-items: flex-start; > textarea { flex: 1; } > button { margin-left: 8px; white-space: nowrap; } }

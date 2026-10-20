@@ -250,7 +250,8 @@ def studio(base_id, overrides, name, previews=True):
 
 # ---------------------------------------------------------------- the downloadable Kerf pack
 
-PACK_URL = "https://github.com/{repo}/releases/download/v{v}/kerf-mogrt-pack-{v}.zip"
+# A permanent pre-release holds the pack (built once with After Effects); pre-releases never become "latest".
+PACK_URL = "https://github.com/{repo}/releases/download/mogrt-pack/kerf-mogrt-pack.zip"
 
 
 def export_pack(dest):
@@ -272,14 +273,14 @@ def export_pack(dest):
 
 def install_pack(source=""):
     """Install the Kerf pack from a zip path, or download this version's pack from the release page."""
-    from . import REPO, __version__
+    from . import REPO
     src = Path(source) if source else None
     if src is None or not src.exists():
         import urllib.request
-        src = media.CACHE / f"kerf-mogrt-pack-{__version__}.zip"
+        src = media.CACHE / "kerf-mogrt-pack.zip"
         src.parent.mkdir(parents=True, exist_ok=True)
         tmp = src.with_suffix(".part")
-        urllib.request.urlretrieve(source or PACK_URL.format(repo=REPO, v=__version__), tmp)
+        urllib.request.urlretrieve(source or PACK_URL.format(repo=REPO), tmp)
         tmp.replace(src)
     with zipfile.ZipFile(src) as z:
         manifest = json.loads(z.read("manifest.json"))

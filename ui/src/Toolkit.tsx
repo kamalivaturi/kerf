@@ -45,7 +45,7 @@ const I = {
 };
 
 // ------------------------------------------------------------------ shared runner
-function useRunner() {
+function useRunner(hasMedia: boolean, onNeedMedia: () => void) {
   const [busy, setBusy] = useState(""), [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
   const say = (text: string, ok = true) => { setToast({ ok, text }); setTimeout(() => setToast((t) => (t?.text === text ? null : t)), 6000); };
   async function guard(label: string, fn: () => Promise<string | string[] | void>) {
@@ -54,7 +54,11 @@ function useRunner() {
     try { const r = await fn(); if (r) say(Array.isArray(r) ? r.join(" · ") || "Done" : r); }
     catch (e) { say((e as Error).message, false); } finally { setBusy(""); }
   }
-  const run = (feature: string, params: P, label = feature) => guard(label, async () => {
+  const run = (feature: string, params: P, label = feature) => {
+    if (feature !== "project_sort" && !hasMedia) { say(host.pickFile ? "Choose a video first. Opening the picker…" : "Choose a video first: paste its path in the field at the top."); onNeedMedia(); return; }
+    return runNow(feature, params, label);
+  };
+  const runNow = (feature: string, params: P, label: string) => guard(label, async () => {
     const timeline = feature === "project_sort" ? null : await host.readTimeline();
     const out_dir = store.get<string>("outDir", "") || (await host.outDir());
     const res: RunResult = await api.post("/run", { feature, timeline, params, out_dir });
@@ -63,7 +67,7 @@ function useRunner() {
   });
   const tool = (label: string, fn: (t: NonNullable<typeof host.tools>) => Promise<string>, fallback?: () => void) =>
     host.tools ? guard(label, () => fn(host.tools!)) : fallback ? fallback() : say(`${label} works inside the Premiere panel`, false);
-  return { busy, toast, run, tool, say };
+  return { busy, toast, run, tool, say, hasMedia, onNeedMedia };
 }
 type Runner = ReturnType<typeof useRunner>;
 
@@ -135,8 +139,9 @@ function MaskRegion({ r, onDone }: { r: Runner; onDone: () => void }) {
   const [img, setImg] = useState(""), [box, setBox] = useState<number[] | null>(null), [model, setModel] = useState("u2net_human_seg");
   const [output, setOutput] = useState("cutout"), ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    if (!r.hasMedia) return;
     (async () => { try { setImg((await api.post("/frame", { timeline: await host.readTimeline() })).image); } catch (e) { r.say((e as Error).message, false); } })();
-  }, []);
+  }, [r.hasMedia]);
   function down(e: React.PointerEvent) {
     const rc = ref.current!.getBoundingClientRect();
     const fx = (x: number) => Math.min(1, Math.max(0, (x - rc.left) / rc.width)), fy = (y: number) => Math.min(1, Math.max(0, (y - rc.top) / rc.height));
@@ -149,7 +154,8 @@ function MaskRegion({ r, onDone }: { r: Runner; onDone: () => void }) {
   return <section className="tk-card fade">
     <div className="tk-head"><span className="tk-label">Quick mask — draw around the subject</span><button className="tk-mini" onClick={onDone} aria-label="Close">✕</button></div>
     <div className="mask-canvas" ref={ref} onPointerDown={down}>
-      {img ? <img src={img} alt="Current frame" draggable={false} /> : <div className="help">Reading the frame at the playhead…</div>}
+      {img ? <img src={img} alt="Current frame" draggable={false} /> : r.hasMedia ? <div className="help">Reading the frame at the playhead…</div>
+        : <div className="help">Choose a video first, then draw around the subject. <button className="tk-mini" onClick={r.onNeedMedia}>Choose video…</button></div>}
       {box && <div className="mask-box" style={{ left: `${box[0] * 100}%`, top: `${box[1] * 100}%`, width: `${box[2] * 100}%`, height: `${box[3] * 100}%` }} />}
     </div>
     <div className="tk-row">
@@ -164,8 +170,10 @@ function MaskRegion({ r, onDone }: { r: Runner; onDone: () => void }) {
 }
 
 // ------------------------------------------------------------------ the tabs
-export default function Toolkit({ tab, projectKey }: { tab: ToolTab; projectKey: string }) {
-  const r = useRunner();
+export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
+  tab: ToolTab; projectKey: string; hasMedia: boolean; onNeedMedia: () => void;
+}) {
+  const r = useRunner(hasMedia, onNeedMedia);
   const [s, setS] = useState<P>({ every: 1, smoothing: 50, color: "#000000", axis: "hv", on: IN_UXP ? "playhead" : "cuts", output: "keyframes",
     music: "", curve: "0.42,0,0.58,1", min_speed: 30, max_speed: 300, amount: 120, zdur: 0.6, tracks: "2", scale: 35, margin: 4,
     ...SHAKE, ...store.get<P>("toolkit", {}) });

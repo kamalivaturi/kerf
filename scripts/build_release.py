@@ -9,6 +9,7 @@
     python scripts/build_release.py --portable NAME      engine-dist/ → kerf-studio-portable-<v>-NAME.zip|.tar.gz
     python scripts/build_release.py --collect-desktop NAME   Tauri installers (.exe .msi .dmg .AppImage .deb .rpm)
     python scripts/build_release.py --mogrt-pack         kerf-mogrt-pack-<v>.zip from the built library (needs After Effects once)
+    python scripts/build_release.py --updater-manifest OWNER/REPO   latest.json (signed auto-update feed)
     python scripts/build_release.py --sums               SHA256SUMS.txt for everything in release/
 """
 import hashlib
@@ -80,15 +81,47 @@ def portable(name):
                 t.add(f, f"{base}/{f.name}")
 
 
+# Tauri output → release name suffix. The *.sig files are the updater signatures of the packages before them.
+KINDS = [("-setup.exe", "-setup.exe"), (".msi", ".msi"), (".dmg", ".dmg"), (".app.tar.gz", ".app.tar.gz"),
+         (".AppImage", ".AppImage"), (".deb", ".deb"), (".rpm", ".rpm")]
+UPDATER = {"windows-x64": ("windows-x86_64", "-setup.exe"), "macos-arm64": ("darwin-aarch64", ".app.tar.gz"),
+           "macos-x64": ("darwin-x86_64", ".app.tar.gz"), "linux-x64": ("linux-x86_64", ".AppImage")}
+
+
 def collect_desktop(name):
     bundle = ROOT / "desktop/src-tauri/target/release/bundle"
-    found = [f for f in bundle.rglob("*") if f.is_file() and f.suffix in INSTALLERS]
-    if not found:
+    n = 0
+    for f in (f for f in bundle.rglob("*") if f.is_file()):
+        sig = f.name.endswith(".sig")
+        base = f.name[:-4] if sig else f.name
+        kind = next((k for k in KINDS if base.endswith(k[0])), None)
+        if kind and not (kind[0] == ".exe" and not base.endswith("-setup.exe")):
+            dest = OUT / f"Kerf-Studio-{V}-{name}{kind[1]}{'.sig' if sig else ''}"
+            shutil.copy2(f, dest)
+            print(dest.name)
+            n += 1
+    if not n:
         sys.exit(f"no installers under {bundle}: run `npx tauri build` in desktop/")
-    for f in found:
-        dest = OUT / f"Kerf-Studio-{V}-{name}{'-setup' if f.name.endswith('-setup.exe') else ''}{f.suffix}"
-        shutil.copy2(f, dest)
-        print(dest.name)
+
+
+def updater_manifest(repo):
+    """latest.json for the Kerf Studio updater, from the signed packages collected into release/."""
+    import datetime
+    import json
+    sections = (ROOT / "CHANGELOG.md").read_text("utf-8").split(chr(10) + "## ")
+    notes = sections[1].partition(chr(10))[2].strip()  # this version's entry, without its heading
+    platforms = {}
+    for name, (key, suffix) in UPDATER.items():
+        pkg = OUT / f"Kerf-Studio-{V}-{name}{suffix}"
+        sig = pkg.with_name(pkg.name + ".sig")
+        if pkg.exists() and sig.exists():
+            platforms[key] = dict(signature=sig.read_text().strip(),
+                                  url=f"https://github.com/{repo}/releases/download/v{V}/{pkg.name}")
+    if not platforms:
+        sys.exit("no signed updater packages in release/ (TAURI_SIGNING_PRIVATE_KEY missing at build time?)")
+    (OUT / "latest.json").write_text(json.dumps(dict(version=V, notes=notes, platforms=platforms,
+                                                     pub_date=datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")), indent=1))
+    print("latest.json:", ", ".join(platforms))
 
 
 def sums():
@@ -105,6 +138,8 @@ def main():
         portable(a[a.index("--portable") + 1])
     elif "--collect-desktop" in a:
         collect_desktop(a[a.index("--collect-desktop") + 1])
+    elif "--updater-manifest" in a:
+        updater_manifest(a[a.index("--updater-manifest") + 1])
     elif "--mogrt-pack" in a:  # after building the pack with After Effects: python -c "from kerf import mogrt; mogrt.build(mogrt.catalog())"
         from kerf import mogrt
         print(mogrt.export_pack(OUT / f"kerf-mogrt-pack-{V}.zip"))

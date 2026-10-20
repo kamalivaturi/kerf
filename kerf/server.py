@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import os
 import secrets
 import subprocess
 import sys
@@ -47,7 +48,9 @@ def check_update():
         with urllib.request.urlopen(req, timeout=10) as r:
             rel = json.loads(r.read())
         return dict(current=__version__, latest=rel["tag_name"], url=rel["html_url"],
-                    update_available=vtuple(rel["tag_name"]) > vtuple(__version__))
+                    update_available=vtuple(rel["tag_name"]) > vtuple(__version__),
+                    # Kerf Studio started this engine and updates itself (unless switched off in Settings)
+                    auto=bool(os.environ.get("KERF_STUDIO")) and settings.get("auto_update") != "off")
     except Exception as e:
         return dict(current=__version__, update_available=False, error=str(e))
 

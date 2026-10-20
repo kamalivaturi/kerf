@@ -24,6 +24,7 @@ export interface Host {
   tools?: HostTools;
   projectKey?(): Promise<string>; // per-project UI layouts // NLE-side actions (Premiere): selection-based tools the engine can't do from files
   pickFile?(): Promise<string | undefined>;
+  onFileDrop?(cb: (paths: string[]) => void): void; // files dropped on the window (Kerf Studio)
   launchEngine?(kerfHome: string): Promise<void>;
 }
 
@@ -358,11 +359,26 @@ let mediaPaths: string[] = [];
 export const setStandaloneMedia = (paths: string[]) => { mediaPaths = paths; };
 export const standaloneMedia = () => mediaPaths;
 
+export const NO_MEDIA = "Choose a video first: click “Choose video…” at the top, drag a file into the window, or paste its path.";
+
 function standalone(): Host {
+  const tauri = (globalThis as any).__TAURI__; // Kerf Studio exposes the native file picker and file drops
   return {
     name: "standalone",
+    ...(tauri?.dialog && {
+      async pickFile() {
+        const p = await tauri.dialog.open({ multiple: false, filters: [{ name: "Video, audio or image",
+          extensions: ["mp4", "mov", "mkv", "m4v", "avi", "webm", "mxf", "mts", "wav", "mp3", "m4a", "aac", "flac", "png", "jpg", "jpeg", "mogrt"] }] });
+        return typeof p === "string" ? p : undefined;
+      },
+    }),
+    ...(tauri?.webview && {
+      onFileDrop(cb: (paths: string[]) => void) {
+        tauri.webview.getCurrentWebview().onDragDropEvent((e: any) => { if (e.payload?.type === "drop" && e.payload.paths?.length) cb(e.payload.paths); });
+      },
+    }),
     async readTimeline() {
-      if (!mediaPaths[0]) throw new Error("Enter a media file path first.");
+      if (!mediaPaths[0]) throw new Error(NO_MEDIA);
       const { api } = await import("./api");
       return (await api.post("/media", { path: mediaPaths[0] })).timeline;
     },
