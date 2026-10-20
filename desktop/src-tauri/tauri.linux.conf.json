@@ -1,0 +1,9 @@
+{
+  "bundle": {
+    "resources": {
+      "../../engine-dist/kerf-engine/": null,
+      "../../engine-dist/kerf-engine.tar.gz": "engine.tar.gz"
+    },
+    "linux": { "deb": { "depends": ["tar"] } }
+  }
+}

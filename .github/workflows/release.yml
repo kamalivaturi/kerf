@@ -53,8 +53,11 @@ jobs:
           if [ "$RUNNER_OS" = Windows ]; then taskkill //F //IM kerf-engine.exe || true; fi
       - name: Portable archive
         run: python scripts/build_release.py --portable ${{ matrix.name }}
+      - name: Pack the engine for Linux bundles (one archive, unpacked on first launch)
+        if: runner.os == 'Linux'
+        run: tar -czf engine-dist/kerf-engine.tar.gz -C engine-dist kerf-engine
       - name: Desktop installers (Tauri)
-        run: npm ci && npx tauri build
+        run: npm ci && npx tauri build ${{ runner.os == 'Linux' && '--verbose' || '' }}
         working-directory: desktop
         env:
           NO_STRIP: "true"                # linuxdeploy's old strip chokes on the frozen engine's modern ELF libs

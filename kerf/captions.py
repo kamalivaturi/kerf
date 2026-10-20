@@ -209,6 +209,7 @@ def write_ass(pages, s, w, h):
 
 
 def render_overlay(ass_path, w, h, fps, dur, out):
+    media.need_filter("ass", "libass renders the animated captions")
     media.ffmpeg("-f", "lavfi", "-i", f"color=c=black@0.0:s={w}x{h}:r={fps:.3f}:d={dur:.3f},format=rgba",
                  "-vf", f"ass={ass_path.name}:alpha=1", "-c:v", "prores_ks", "-profile:v", "4444",
                  "-pix_fmt", "yuva444p10le", out.name, cwd=ass_path.parent)
@@ -230,6 +231,7 @@ def preview(path="", params=None, t=1.0, aspect="9:16", safe=True):
     words = [dict(w=x, s=i * .35, e=i * .35 + .3) for i, x in enumerate(SAMPLE)]
     fs = int(s["font_size"]) or int(h * (0.075 if h > w else 0.055))
     pages = paginate(words, s, max(4, int(w * float(s["max_width"]) / 100 / (fs * 0.6))))
+    media.need_filter("ass", "libass renders the caption preview")
     d = media.CACHE / "preview"
     d.mkdir(parents=True, exist_ok=True)
     (d / "cap.ass").write_text(write_ass(pages, s, w, h), "utf-8")

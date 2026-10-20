@@ -23,6 +23,18 @@ def cache_key(path, *extra):
     return hashlib.sha1(raw.encode()).hexdigest()[:20]
 
 
+@functools.lru_cache(maxsize=None)
+def has_filter(name):
+    out = subprocess.run(["ffmpeg", "-hide_banner", "-filters"], capture_output=True, text=True).stdout
+    return f" {name} " in out
+
+
+def need_filter(name, why):
+    if not has_filter(name):
+        raise RuntimeError(f"This FFmpeg has no '{name}' filter ({why}). Use Kerf Studio (FFmpeg included) or a full "
+                           "FFmpeg build (macOS: brew install ffmpeg-full; Windows/Linux: the gyan.dev or BtbN builds).")
+
+
 def ffmpeg(*args, cwd=None):
     subprocess.run(["ffmpeg", "-y", "-hide_banner", "-v", "error", *map(str, args)], check=True, cwd=cwd)
 
