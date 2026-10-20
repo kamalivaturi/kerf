@@ -202,6 +202,29 @@ def test_licence_keys_offline():
         os.environ.pop("KERF_LS_PRODUCT", None)
 
 
+def test_mogrt_pack_round_trip():
+    import zipfile
+    from kerf import mogrt
+    src = TMP / "built" / "Kerf Caption - Pop.mogrt"
+    src.parent.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(src, "w") as z:
+        z.writestr("definition.json", json.dumps({"capsuleNameLocalized": {"strDB": [{"str": "Kerf Caption - Pop"}]},
+                                                 "clientControls": [{"uiName": {"strDB": [{"str": "Text"}]}, "type": 6}]}))
+    gif = TMP / "built" / "caption-pop.gif"
+    gif.write_bytes(b"GIF89a")
+    mogrt._merge_index([dict(id="caption-pop", name="Kerf Caption - Pop", kind="caption", source="pack", file=str(src), gif=str(gif))])
+    pack = TMP / "kerf-mogrt-pack.zip"
+    assert mogrt.export_pack(pack)["templates"] == 1
+    with zipfile.ZipFile(pack, "a") as z:
+        z.writestr("pack/../../escape.txt", "x")  # a hostile entry must never land outside the library
+    mogrt.INDEX.unlink()
+    assert mogrt.install_pack(str(pack))["installed"] == 1
+    e = mogrt.library()[0]
+    assert Path(e["file"]).parent == mogrt.LIB / "pack" and Path(e["gif"]).exists()
+    assert not (mogrt.LIB.parent / "escape.txt").exists() and not (mogrt.LIB / "escape.txt").exists()
+    assert mogrt.inspect(e["file"])["controls"][0]["name"] == "Text"
+
+
 def test_error_log_redacts_home():
     from kerf import server
     try:

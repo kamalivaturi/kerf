@@ -196,6 +196,8 @@ export default function Graphics({ onCaptions, onClose }: { onCaptions: (file: s
           {host.pickFile && <button className="ghost" onClick={async () => { const p = await host.pickFile!(); if (p) setImp(p); }}>…</button>}
           <button className="ghost" disabled={!imp || busy} onClick={() => run("Importing", () => api.post("/mogrt/import", { path: imp }).then((e) => `Imported “${e.name}” · ${e.controls} editable controls`))}>Import</button></div>
         <div className="actions">
+          {!info.library.some((e) => e.source === "pack") && <button className="primary" disabled={busy}
+            onClick={() => run("Downloading the Kerf MOGRT pack (194 templates with previews)…", () => api.post("/mogrt/install-pack", {}).then((r) => `Installed ${r.installed} templates`))}>Install the Kerf MOGRT pack</button>}
           <button className="ghost" disabled={busy || !list.some((s) => s.anim)} onClick={() => run("Building in After Effects (save and close any open AE project first)…",
             () => api.post("/mogrt/build", { ids: list.filter((s) => s.anim && !built[s.id]).map((s) => s.id) }))}>Build {list.filter((s) => s.anim && !built[s.id]).length} in AE</button>
         </div>

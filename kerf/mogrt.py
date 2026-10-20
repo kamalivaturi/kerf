@@ -142,7 +142,9 @@ def render_preview(aep, comp, pid, ae):
     """aerender the comp's work area → looping GIF (panel gallery), MP4 (large preview) and PNG poster."""
     pv = LIB / "previews"
     pv.mkdir(parents=True, exist_ok=True)
-    aer = ae.with_name("aerender.exe" if ae.suffix == ".exe" else "aerender")
+    # Windows: next to AfterFX.exe · macOS: in the After Effects folder, outside the .app bundle
+    aer = next((p for p in (ae.with_name("aerender.exe" if ae.suffix == ".exe" else "aerender"),
+                            *(ae.parents[3:4] and [ae.parents[3] / "aerender"])) if p.exists()), ae.with_name("aerender"))
     err = ""
     for template in ("H.264 - Match Render Settings - 15 Mbps", "Lossless"):
         for old in pv.glob(f"{pid}.raw.*"):
@@ -244,3 +246,51 @@ def studio(base_id, overrides, name, previews=True):
     s = spec(base["kind"], anim, look, fmt, name=name, overrides={**keep, **o})
     s["id"] = "custom-" + re.sub(r"\W+", "-", name.lower()).strip("-")
     return build([s], dest="custom", previews=previews)
+
+
+# ---------------------------------------------------------------- the downloadable Kerf pack
+
+PACK_URL = "https://github.com/{repo}/releases/download/v{v}/kerf-mogrt-pack-{v}.zip"
+
+
+def export_pack(dest):
+    """Zip the built pack (.mogrt + previews) with a manifest of relative paths: what the release ships."""
+    entries = [e for e in library() if e["source"] == "pack"]
+    with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as z:
+        manifest = []
+        for e in entries:
+            rel = dict(e, file=f"pack/{Path(e['file']).name}")
+            z.write(e["file"], rel["file"])
+            for k in ("gif", "mp4", "png"):
+                if e.get(k) and Path(e[k]).exists():
+                    rel[k] = f"previews/{Path(e[k]).name}"
+                    z.write(e[k], rel[k])
+            manifest.append(rel)
+        z.writestr("manifest.json", json.dumps(manifest, indent=1))
+    return dict(templates=len(entries), file=str(dest))
+
+
+def install_pack(source=""):
+    """Install the Kerf pack from a zip path, or download this version's pack from the release page."""
+    from . import REPO, __version__
+    src = Path(source) if source else None
+    if src is None or not src.exists():
+        import urllib.request
+        src = media.CACHE / f"kerf-mogrt-pack-{__version__}.zip"
+        src.parent.mkdir(parents=True, exist_ok=True)
+        tmp = src.with_suffix(".part")
+        urllib.request.urlretrieve(source or PACK_URL.format(repo=REPO, v=__version__), tmp)
+        tmp.replace(src)
+    with zipfile.ZipFile(src) as z:
+        manifest = json.loads(z.read("manifest.json"))
+        for name in z.namelist():  # only the pack's own two folders; never write outside the library
+            if name.startswith(("pack/", "previews/")) and ".." not in name and not name.endswith("/"):
+                out = LIB / name
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_bytes(z.read(name))
+    for e in manifest:
+        for k in ("file", "gif", "mp4", "png"):
+            if e.get(k):
+                e[k] = str(LIB / e[k])
+    _merge_index(manifest)
+    return dict(installed=len(manifest))

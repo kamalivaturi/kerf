@@ -8,6 +8,7 @@
         kerf-<v>-py3-none-any.whl     pip install kerf (engine + CLI)
     python scripts/build_release.py --portable NAME      engine-dist/ → kerf-studio-portable-<v>-NAME.zip|.tar.gz
     python scripts/build_release.py --collect-desktop NAME   Tauri installers (.exe .msi .dmg .AppImage .deb .rpm)
+    python scripts/build_release.py --mogrt-pack         kerf-mogrt-pack-<v>.zip from the built library (needs After Effects once)
     python scripts/build_release.py --sums               SHA256SUMS.txt for everything in release/
 """
 import hashlib
@@ -104,6 +105,9 @@ def main():
         portable(a[a.index("--portable") + 1])
     elif "--collect-desktop" in a:
         collect_desktop(a[a.index("--collect-desktop") + 1])
+    elif "--mogrt-pack" in a:  # after building the pack with After Effects: python -c "from kerf import mogrt; mogrt.build(mogrt.catalog())"
+        from kerf import mogrt
+        print(mogrt.export_pack(OUT / f"kerf-mogrt-pack-{V}.zip"))
     elif "--sums" in a:
         sums()
     else:

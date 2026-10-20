@@ -159,6 +159,7 @@ class Handler(BaseHTTPRequestHandler):
             "/settings": lambda: settings.save(b) or settings.public(),
             "/media": lambda: dict(timeline=Timeline.from_media(b["path"], media.probe).to_dict()),
             "/mogrt/import": lambda: mogrt.import_mogrt(b["path"]),
+            "/mogrt/install-pack": lambda: mogrt.install_pack(b.get("path", "")),
             "/mogrt/studio": lambda: mogrt.studio(b["base"], b.get("overrides", {}), b["name"]),
             "/mogrt/build": lambda: mogrt.build([s for s in mogrt.catalog() if not b.get("ids") or s["id"] in b["ids"]]),
             "/captions/preview": lambda: captions.preview(b.get("path", ""), b.get("params", {}), float(b.get("t", 1.0)),
