@@ -263,6 +263,18 @@ def test_effects_follow_timeline():
     assert [captions.aspect_of(*s) for s in ((1080, 1920), (1080, 1350), (1920, 1080), (3840, 1600))] == ["9:16", "1:1", "16:9", "16:9"]
 
 
+def test_effects_keep_clip_framing():
+    from kerf import tools
+    tl = Timeline.from_dict(dict(fps=30, width=1080, height=1920, playhead=0.5, video=[[dict(
+        path=str(VIDEO), src_in=0, src_out=2, start=0, base_scale=300.0, base_center=[0.1, 0])]], audio=[[]]))
+    z = tools.zoom_move(tl, dict(tools.ZOOMM_DEFAULTS, amount=120.0, at="clip_start"), None)["timeline"]
+    root = ET.fromstring(to_xmeml(z, media.probe, "premiere"))
+    scales = [float(k.findtext("value")) for k in root.iter("keyframe") if k.find("value/horiz") is None]
+    assert abs(scales[0] - 300) < .01 and abs(max(scales) - 360) < .01   # 120% of the clip's own 300%
+    still = ET.fromstring(to_xmeml(tl, media.probe, "premiere"))       # untouched clips keep their framing
+    assert float(next(p for p in still.iter("parameter") if p.findtext("parameterid") == "scale").findtext("value")) == 300
+
+
 def test_editor_detection_and_heartbeat():
     from kerf import hosts
     names = {"Adobe Premiere Pro.exe": "premiere", "AfterFX.exe": "aftereffects", "Resolve.exe": "resolve",

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.2.3 — 2026-10-20
+
+- **Premiere Pro 2026: the panel now reaches the Kerf engine.** Premiere 2026 rejects localhost network
+  permissions, so 0.2.1 and 0.2.2 panels stayed on "engine offline"; this version connects.
+- **Refined panel UI in Premiere:** buttons, icons, curve presets and the bezier curve now look the same as in
+  Kerf Studio (Premiere drew them as plain grey native controls); sliders snap to whole values.
+- **Responsive layout everywhere:** the toolkit cards flow into one, two or three columns with the panel width;
+  the header stays on one line (details hide on narrow panels); nothing overflows sideways.
+- **Effects keep each clip's framing:** zooms, shakes and other effects now build on a clip's existing Scale and
+  Position (read from Premiere and Resolve) instead of resetting it, so a 16:9 clip filling a 9:16 sequence stays
+  filled. Layouts and reframing still place clips themselves.
+- **DaVinci Resolve window:** fixed garbled characters (the installer re-encoded the script), a branded header
+  with live project/timeline/playhead, readable help text, a monospace settings editor, an orange Apply button,
+  and the review list only appears when there is something to review.
+- **Vertical scrolling:** the Premiere panel and Kerf Studio scroll when the panel is shorter than its content;
+  the After Effects panel gets a scrollbar when docked short, and its side-by-side groups stack when narrow.
+- The "closes in Ns" countdown no longer reports while an editor is open; heartbeats never overlap.
+
 ## 0.2.2 — 2026-10-20
 
 - **Live editors:** Kerf sees which of Premiere Pro, After Effects and DaVinci Resolve are running and shows

@@ -1,6 +1,6 @@
 [package]
 name = "kerf-studio"
-version = "0.2.2"
+version = "0.2.3"
 description = "Kerf Studio: AI editing toolkit for Premiere Pro, After Effects and DaVinci Resolve"
 license = "MIT"
 edition = "2021"

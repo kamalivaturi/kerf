@@ -5,10 +5,23 @@ import { resolve } from "node:path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// UXP draws <button> natively and ignores our styles: the UXP build renders them as div.kbtn (src/uxp-jsx-runtime.ts),
+// so the CSS `button` selectors are mapped to `.kbtn` (and :disabled to aria-disabled) in the emitted stylesheet.
+const uxpButtons = {
+  name: "kerf-uxp-buttons",
+  enforce: "post" as const,
+  generateBundle(_: unknown, bundle: Record<string, { type: string; fileName: string; source?: string | Uint8Array }>) {
+    for (const f of Object.values(bundle))
+      if (f.type === "asset" && f.fileName.endsWith(".css"))
+        f.source = String(f.source).replace(/\bbutton\b(?![-\w])/g, ".kbtn").replace(/:disabled/g, '[aria-disabled="true"]');
+  },
+};
+
 export default defineConfig(({ mode }) => {
   const uxp = mode === "uxp";
   return {
-    plugins: [react()],
+    plugins: uxp ? [react({ jsxImportSource: "kerf-jsx" }), uxpButtons] : [react()],
+    resolve: uxp ? { alias: [{ find: /^kerf-jsx\/jsx(-dev)?-runtime$/, replacement: resolve(import.meta.dirname, "src/uxp-jsx-runtime.ts") }] } : {},
     base: "./",
     publicDir: uxp ? "public" : false,
     define: { "process.env.NODE_ENV": JSON.stringify("production"), __UXP__: uxp },

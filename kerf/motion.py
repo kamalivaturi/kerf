@@ -182,7 +182,7 @@ def reframe(tl, fmt="9:16", track=0, follow=True, smoothing=1.5, zoom_pct=100.0,
             disp = info["width"] * s / 100 / W  # displayed width in sequence widths
             lim = max(0.0, (disp - 1) / 2)       # keeps the frame covered: no black bars
             clamp = lambda v: float(np.clip(v, -lim, lim))
-            c.scale = [(0.0, s)]
+            c.scale, c.base_scale, c.base_center = [(0.0, s)], 100.0, (0.0, 0.0)  # reframe sets its own framing
             if ti == track and follow and info["duration"]:
                 try:
                     xs = subject_x(c.path, c.src_in, c.src_out, smoothing, anchor_x)

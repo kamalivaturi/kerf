@@ -77,10 +77,11 @@ def build(tl, W, H, fps, alpha):
                 pieces.append(f"color=c={bg}:s={W}x{H}:r={fps}:d={c.start - t:.3f},format=rgba")
             info = media.probe(c.path)
             # ponytail: first keyframe of scale/center only; animated zooms are exported through the NLE
-            s = (c.scale[0][1] if c.scale else 100.0) / 100
-            if not c.scale and (info["width"], info["height"]) != (W, H):
+            s = (c.scale[0][1] if c.scale else 100.0) / 100 * c.base_scale / 100
+            if not c.scale and c.base_scale == 100.0 and (info["width"], info["height"]) != (W, H):
                 s = min(W / info["width"], H / info["height"])  # fit, like an NLE default
             cx, cy = (c.center[0][1], c.center[0][2]) if c.center else (0.0, 0.0)
+            cx, cy = cx + c.base_center[0], cy + c.base_center[1]
             sw, sh = max(2, int(info["width"] * s) // 2 * 2), max(2, int(info["height"] * s) // 2 * 2)
             k = add_input(c)
             x, y = int((W - sw) / 2 + cx * W), int((H - sh) / 2 + cy * H)

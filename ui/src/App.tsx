@@ -119,11 +119,14 @@ export default function App() {
   }, [engine]);
   useEffect(() => { // live editors: Premiere sends its project/sequence/playhead; every host shows what's open
     if (!engine) return;
+    let inflight = false; // never stack calls on a slow host API
     const beat = async () => {
+      if (inflight) return;
+      inflight = true;
       try {
         if (host.live) await api.post("/host/heartbeat", { host: host.name, state: await host.live() });
         setLive(await api.get("/host"));
-      } catch { /* engine restarting or no project open */ }
+      } catch { /* engine restarting or no project open */ } finally { inflight = false; }
     };
     beat();
     const t = setInterval(beat, 1000);
@@ -428,12 +431,12 @@ const EDITORS: Record<string, string> = { premiere: "Premiere Pro", aftereffects
 function LiveChips({ live, engine }: { live: HostStatus | null; engine: string }) {
   const run = live?.running || [];
   if (!run.length) return <span className="pill status idle" title={`Engine ${engine} · no editor open`}><i />{IN_UXP ? "Premiere" : "Studio"}</span>;
-  return <>{run.map((h) => {
+  return <span className="live-chips">{run.map((h) => {
     const s = live!.live[h];
     const what = s?.sequence ? `${s.sequence} · ${s.timecode ?? ""}` : s?.project || "";
     const tip = [EDITORS[h], s?.project, s?.sequence, s?.width && `${s.width}×${s.height}`, s?.fps && `${+s.fps.toFixed(3)} fps`, s?.timecode].filter(Boolean).join(" · ");
     return <span key={h} className="pill status ok live" title={tip}><i />{EDITORS[h] || h}{what && <small>{what}</small>}</span>;
-  })}</>;
+  })}</span>;
 }
 
 const SETTING_FIELDS: [string, string, string[]?][] = [

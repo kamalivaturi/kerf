@@ -333,6 +333,7 @@ def layout(tl, p, ctx):
                     "align_bottom": "bottom_center"}.get(arr, arr)
             cx, cy = _pos(name, iw * s / 100, ih * s / 100, W, H, m)
         c.scale, c.center = [(0.0, round(s, 3))], [(0.0, cx, cy)]
+        c.base_scale, c.base_center = 100.0, (0.0, 0.0)  # a layout places the clip absolutely
         n_set += 1
     out.name = f"{tl.name} - Layout"
     return dict(timeline=out, report=dict(clips=n_set, arrange=arr))

@@ -13,7 +13,8 @@ from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 # Basic Motion units, measured by importing scripts/calibrate_xml.py output (Premiere 25, Resolve 21):
-# Clip.center is a fraction of the sequence frame (±0.5 = edge, +y down) and Clip.scale is % of native source pixels.
+# Clip.center is a fraction of the sequence frame (±0.5 = edge, +y down) and Clip.scale is % of native source pixels,
+# both relative to the clip's own framing in the editor (base_scale %, base_center) so effects build on it.
 # Premiere reads `center` as a fraction of the *source* size and scale as % of native pixels.
 # Resolve reads `center` as a fraction of the *timeline* size and applies scale on top of its fit-to-frame.
 # Keyframe <when> is media-start based (F(src_in) + F(t)) in both.
@@ -54,6 +55,8 @@ class Clip:
     scale: list = field(default_factory=list)   # [(t, pct)]
     center: list = field(default_factory=list)  # [(t, x, y)]
     rotation: list = field(default_factory=list)  # [(t, degrees)]
+    base_scale: float = 100.0      # the clip's Scale in the editor (% of native pixels)
+    base_center: tuple = (0.0, 0.0)  # its Position, as an offset from frame centre in frame fractions
 
     @property
     def dur(self):
@@ -99,14 +102,17 @@ class Timeline:
     def from_dict(cls, d):
         def clips(tracks):
             return [[Clip(c["path"], float(c["src_in"]), float(c["src_out"]), float(c["start"]),
-                          bool(c.get("enabled", True))) for c in tr] for tr in tracks]
+                          bool(c.get("enabled", True)), base_scale=float(c.get("base_scale") or 100.0),
+                          base_center=tuple(float(v) for v in (c.get("base_center") or (0.0, 0.0))))
+                     for c in tr] for tr in tracks]
         video = clips(d.get("video") or [[]])
         audio = clips(d["audio"]) if d.get("audio") else copy.deepcopy(video)
         return cls(float(d.get("fps", 30)), int(d.get("width", 1920)), int(d.get("height", 1080)),
                    d.get("name", "Kerf"), video, audio, playhead=float(d.get("playhead") or 0.0))
 
     def to_dict(self):
-        clip = lambda c: dict(path=c.path, src_in=c.src_in, src_out=c.src_out, start=c.start, enabled=c.enabled)
+        clip = lambda c: dict(path=c.path, src_in=c.src_in, src_out=c.src_out, start=c.start, enabled=c.enabled,
+                              base_scale=c.base_scale, base_center=list(c.base_center))
         return dict(fps=self.fps, width=self.width, height=self.height, name=self.name,
                     video=[[clip(c) for c in tr] for tr in self.video], audio=[[clip(c) for c in tr] for tr in self.audio])
 
@@ -256,8 +262,10 @@ def to_xmeml(tl, probe, host="premiere"):
                 f"{rate}<duration>{dur}</duration><media>{media}</media></file>")
 
     def motion(c):
-        if not c.scale and not c.center and not c.rotation:
+        framed = c.base_scale != 100.0 or any(c.base_center)
+        if not c.scale and not c.center and not c.rotation and not framed:
             return ""
+        bs, (bx, by) = c.base_scale / 100, c.base_center
         base = F(c.src_in)
         info = probe(c.path)
         sw, sh = info["width"] or tl.width, info["height"] or tl.height
@@ -275,9 +283,9 @@ def to_xmeml(tl, probe, host="premiere"):
                 body += "".join(f"<keyframe><when>{base + F(t)}</when><value>{fmt(v)}</value></keyframe>" for t, *v in kf)
             return f"<parameter><parameterid>{pid}</parameterid><name>{name}</name>{body}</parameter>"
 
-        sc = param("scale", "Scale", c.scale, lambda v: f"{v[0] / fit:.3f}")
-        ce = param("center", "Center", c.center,
-                   lambda v: f"<horiz>{v[0] * kx:.5f}</horiz><vert>{v[1] * ky:.5f}</vert>")
+        sc = param("scale", "Scale", c.scale or [(0.0, 100.0)] * framed, lambda v: f"{v[0] * bs / fit:.3f}")
+        ce = param("center", "Center", c.center or [(0.0, 0.0, 0.0)] * framed,
+                   lambda v: f"<horiz>{(v[0] + bx) * kx:.5f}</horiz><vert>{(v[1] + by) * ky:.5f}</vert>")
         ro = param("rotation", "Rotation", c.rotation, lambda v: f"{v[0]:.3f}")
         return ("<filter><effect><name>Basic Motion</name><effectid>basic</effectid><effectcategory>motion</effectcategory>"
                 f"<effecttype>motion</effecttype><mediatype>video</mediatype>{sc}{ro}{ce}</effect></filter>")

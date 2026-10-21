@@ -3,7 +3,7 @@ $ErrorActionPreference = "Stop"
 $kerf = (Resolve-Path "$PSScriptRoot\..").Path
 $dest = Join-Path $env:APPDATA "Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Utility"
 New-Item -ItemType Directory -Force $dest | Out-Null
-$src = Get-Content "$kerf\resolve\Kerf.py" -Raw
+$src = Get-Content "$kerf\resolve\Kerf.py" -Raw -Encoding utf8  # PS 5.1 reads ANSI otherwise
 $src = $src.Replace('os.environ.get("KERF_HOME", r"C:\Kerf")', "os.environ.get(`"KERF_HOME`", r`"$kerf`")")
 Set-Content -Path (Join-Path $dest "Kerf.py") -Value $src -Encoding utf8
 Write-Host "Installed to $dest. In Resolve: Workspace > Scripts > Kerf"

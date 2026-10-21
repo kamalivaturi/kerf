@@ -38,7 +38,13 @@ $accent: #ff6b2c;
 }
 
 * { box-sizing: border-box; }
+// Premiere build: <button> renders as div.kbtn (see uxp-jsx-runtime.ts); give it a button's box
+.kbtn { display: inline-flex; align-items: center; justify-content: center; text-align: center; cursor: pointer; user-select: none;
+  &:focus { outline: none; border-color: var(--accent); } }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+// UXP panels don't scroll the page: the app root is the vertical scroller (same in Kerf Studio)
+html, body { height: 100%; overflow: hidden; }
+#root { height: 100%; overflow-x: hidden; overflow-y: auto; }
 :root { --fs: 12px; --pad: 10px; --gap: 6px; --ease: 160ms cubic-bezier(.2, .8, .2, 1); }
 :root[data-density="compact"] { --pad: 7px; --gap: 3px; }
 body { font: var(--fs)/1.45 "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif; }
@@ -165,7 +171,14 @@ pre.news { max-height: 420px; overflow-y: auto; white-space: pre-wrap; }
 // ================================================================ premium "ember" skin (overrides the base above)
 html, body { background: radial-gradient(120% 80% at 50% -10%, var(--bg2) 0%, var(--bg) 55%) fixed, var(--bg); }
 body { font-family: "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif; letter-spacing: .01em; }
-.app { max-width: 760px; padding: 10px 12px 28px; }
+.app { max-width: 1280px; padding: 10px 12px 28px; }
+// forms read best at a measured width; the toolkit cards flow into as many columns as the panel fits
+.app > .card { width: 100%; max-width: 900px; align-self: center; }
+.app .toolkit { flex-direction: row; flex-wrap: wrap; align-items: flex-start; margin: 0 -6px;
+  > .tk-slot, > .tk-card { flex: 1 1 380px; min-width: 0; margin: 0 6px 12px; }
+  > .tk-slot > .tk-card { margin: 0; }
+  > .tk-toolbar { flex: 1 1 100%; margin: 0 6px 8px; }
+  > .tk-toast { flex: 0 0 auto; margin: 0 auto 8px; } }
 .card, .tk-card { background: linear-gradient(180deg, var(--card-hi), var(--card)); border: 1px solid var(--line); border-radius: 18px;
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, .05); padding: 14px 16px; margin-bottom: 12px; }
 button { border-radius: 12px; background: linear-gradient(180deg, rgba(255, 255, 255, .06), rgba(255, 255, 255, .02)); border: 1px solid var(--line);
@@ -185,12 +198,14 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
   border: 1px solid var(--line); background: rgba(255, 255, 255, .04); color: var(--text); box-shadow: none;
   &.status i { width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 8px var(--ok); }
   &.icon { padding: 6px 10px; } &.on { color: var(--accent); border-color: rgba(255, 107, 44, .5); } &.ver { color: var(--muted); } }
-.pill.live { min-width: 0; max-width: 48%;
+.top { min-width: 0; .pill { white-space: nowrap; flex: 0 0 auto; } }
+.live-chips { display: flex; flex: 0 1 auto; min-width: 0; overflow: hidden; > * + * { margin-left: 6px; } }
+.pill.live { flex: 0 1 auto; min-width: 0; overflow: hidden;
   small { margin-left: 6px; font-weight: 500; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-variant-numeric: tabular-nums; } }
 .source .match { display: block; margin: 2px 0 6px; color: var(--muted); }
 .pill.status.idle i { background: var(--muted); box-shadow: none; }
-.banner.wait { display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, .05); color: var(--text);
+.banner.wait { display: flex; align-items: center; > span { margin-right: 8px; } background: rgba(255, 255, 255, .05); color: var(--text);
   border: 1px solid var(--line); button { margin-left: auto; flex: none; } }
 
 // main segmented nav
@@ -217,7 +232,7 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
 .tk-row { display: flex; align-items: center; margin-top: 8px; > * + * { margin-left: 8px; }
   &.spread { justify-content: space-between; } &.wrap { flex-wrap: wrap; > * { margin: 0 8px 8px 0; } } &.top { align-items: flex-start; } }
 .tk-col { display: flex; flex-direction: column; flex: 1; min-width: 160px; margin-left: 14px; > * + * { margin-top: 8px; } }
-.tk-grid2 { display: flex; flex-wrap: wrap; margin: -4px; > * { flex: 1 1 calc(50% - 8px); margin: 4px; } }
+.tk-grid2 { display: flex; flex-wrap: wrap; margin: -4px; > * { flex: 1 1 40%; margin: 4px; } }
 .tk-btn { min-height: 46px; padding: 8px 14px; font-weight: 800; letter-spacing: .06em; font-size: 13px; border-radius: 14px;
   &.block { width: 100%; margin-bottom: 8px; } &.green { color: var(--green); border-color: rgba(143, 214, 148, .3); }
   &.grow { flex: 1; display: inline-flex; align-items: center; justify-content: center; svg { margin-right: 8px; } }
@@ -270,6 +285,10 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
 .mask-canvas { position: relative; border-radius: 12px; overflow: hidden; cursor: crosshair; user-select: none; min-height: 80px; background: rgba(0, 0, 0, .35);
   img { display: block; width: 100%; } .help { padding: 20px; } }
 .mask-box { position: absolute; border: 2px dashed var(--accent); background: rgba(255, 107, 44, .14); border-radius: 6px; }
+// cards narrower than their content wrap instead of overflowing the panel
+.tk-split.two { flex-wrap: wrap; > div { margin: 0 18px 8px 0; } > div + div { margin-left: 0; } }
+.seg { flex-wrap: wrap; max-width: 100%; .seg-btn { margin-bottom: 2px; } }
+@media (max-width: 480px) { .pill.ver { display: none; } .pill.live small { display: none; } .top .wordmark { font-size: 22px; } }
 @media (max-width: 560px) { .tk-split { flex-direction: column; > div + div { margin: 14px 0 0; } } .anchor-grid { margin: 0 auto; } }
 
 // legibility floor + readable placeholders

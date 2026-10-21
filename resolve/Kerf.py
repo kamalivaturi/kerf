@@ -84,10 +84,19 @@ def read_timeline():
                     continue  # titles, generators, compound clips
                 src_in = it.GetLeftOffset() / fps
                 enabled = it.GetClipEnabled() if hasattr(it, "GetClipEnabled") else True
-                clips.append(dict(path=path, start=(it.GetStart() - t0) / fps, src_in=src_in,
-                                  src_out=src_in + it.GetDuration() / fps, enabled=bool(enabled)))
+                clip = dict(path=path, start=(it.GetStart() - t0) / fps, src_in=src_in,
+                            src_out=src_in + it.GetDuration() / fps, enabled=bool(enabled))
+                if kind == "video":  # the clip's own framing, so effects build on it (Zoom is over fit-to-frame)
+                    try:
+                        sw, sh = (int(v) for v in mpi.GetClipProperty("Resolution").lower().split("x"))
+                        fit = min(out["width"] / sw, out["height"] / sh)
+                        clip.update(base_scale=float(it.GetProperty("ZoomX")) * fit * 100,
+                                    base_center=[float(it.GetProperty("Pan")) / out["width"], -float(it.GetProperty("Tilt")) / out["height"]])
+                    except Exception:
+                        pass  # unknown resolution or properties: neutral framing
+                clips.append(clip)
             out[kind].append(clips)
-    try:  # playhead (timecode → seconds from the timeline start) for the Toolkit tools
+    try:  # playhead (timecode -> seconds from the timeline start) for the Toolkit tools
         h, m, sec, fr = (int(x) for x in tl.GetCurrentTimecode().replace(";", ":").split(":"))
         start = tl.GetStartTimecode().replace(";", ":").split(":")
         out["playhead"] = max(0.0, (h * 3600 + m * 60 + sec + fr / fps) - (int(start[0]) * 3600 + int(start[1]) * 60 + int(start[2]) + int(start[3]) / fps))
@@ -130,7 +139,7 @@ def sort_media_pool(mp, s):
 
 
 def insert_layer(proj, mp, ins):
-    """Generated layer (solid, bars…) onto a new top video track at the playhead of the open timeline."""
+    """Generated layer (solid, bars...) onto a new top video track at the playhead of the open timeline."""
     tl = proj.GetCurrentTimeline()
     items = mp.ImportMedia([ins["path"]]) if tl else None
     if not items:
@@ -188,23 +197,32 @@ def main():
     feats = call("/features")["features"]
     names = sorted(feats, key=lambda k: (feats[k]["group"], feats[k]["title"]))
 
-    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": [120, 120, 560, 780]}, ui.VGroup([
-        ui.Label({"ID": "Live", "Weight": 0}),
+    # Source stays ASCII (\u escapes): Resolve may read this file in the system code page.
+    dot, sep, ell = "\u25cf", "  \u00b7  ", "\u2026"
+    primary = ("QPushButton { background: #ff6b2c; color: #1a0f08; font-weight: bold; border: none; border-radius: 6px;"
+               " min-height: 28px; } QPushButton:hover { background: #ff8a4f; } QPushButton:disabled { background: #5a3a2a; }")
+    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": [120, 120, 520, 720]}, ui.VGroup({"Spacing": 6}, [
+        ui.HGroup({"Weight": 0}, [
+            ui.Label({"Text": "kerf", "Weight": 0,
+                      "StyleSheet": "color: #ff6b2c; font-size: 22px; font-weight: 900; font-style: italic; padding-right: 10px;"}),
+            ui.Label({"ID": "Live", "StyleSheet": "color: #57d68d;"})]),
         ui.HGroup({"Weight": 0}, [ui.Label({"Text": "Feature", "Weight": 0}), ui.ComboBox({"ID": "Feature"})]),
-        ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0}),
+        ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0, "MinimumSize": [200, 52], "Alignment": {"AlignTop": True},
+                  "StyleSheet": "color: #a59a92;"}),
         ui.HGroup({"Weight": 0}, [ui.ComboBox({"ID": "Preset"}),
-                                  ui.LineEdit({"ID": "PresetName", "PlaceholderText": "Save settings as…"}),
+                                  ui.LineEdit({"ID": "PresetName", "PlaceholderText": "Save settings as" + ell}),
                                   ui.Button({"ID": "SavePreset", "Text": "Save", "Weight": 0})]),
         ui.Label({"Text": "Settings (JSON, edit any value)", "Weight": 0}),
-        ui.TextEdit({"ID": "Params", "Weight": 2}),
-        ui.HGroup({"Weight": 0}, [ui.Button({"ID": "Analyze", "Text": "Analyze"}), ui.Button({"ID": "Apply", "Text": "Apply"})]),
-        ui.Tree({"ID": "Items", "Weight": 2}),
-        ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 1}),
+        ui.TextEdit({"ID": "Params", "Weight": 3, "Font": ui.Font({"Family": "Consolas", "PixelSize": 13})}),
+        ui.HGroup({"Weight": 0}, [ui.Button({"ID": "Analyze", "Text": "Analyze"}),
+                                  ui.Button({"ID": "Apply", "Text": "Apply", "StyleSheet": primary})]),
+        ui.Tree({"ID": "Items", "Weight": 2, "Hidden": True}),  # shown only when there is something to review
+        ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 1, "PlaceholderText": "Results appear here."}),
     ]))
     it = win.GetItems()
     it["Items"].SetHeaderLabels(["Review (untick to skip)"])
     for n in names:
-        it["Feature"].AddItem(f"{feats[n]['group']} · {feats[n]['title']}")
+        it["Feature"].AddItem(feats[n]["group"] + sep + feats[n]["title"])
     state = {"items": []}
 
     def cur():
@@ -218,11 +236,12 @@ def main():
         it["Help"].Text = f["help"]
         show_params(f["defaults"])
         it["Preset"].Clear()
-        it["Preset"].AddItem("Preset…")
+        it["Preset"].AddItem("Preset" + ell)
         for p in f["presets"]["builtin"] + f["presets"]["user"]:
             it["Preset"].AddItem(p)
         it["Analyze"].Enabled = bool(f["review"])
         it["Items"].Clear()
+        it["Items"].Hidden = True
         state["items"] = []
 
     def load_preset(ev):
@@ -244,7 +263,7 @@ def main():
                 tree = it["Items"]
                 ids = [str(x["id"]) for k, x in enumerate(state["items"]) if tree.TopLevelItem(k).CheckState[0] == "Checked"]
                 params["items"] = ",".join(ids) or "-1"
-            it["Out"].PlainText = "Working…"
+            it["Out"].PlainText = "Working" + ell
             timeline = read_timeline() if feats[cur()].get("needs_timeline", True) else None
             res = call("/run", dict(feature=cur(), timeline=timeline, params=params, host="resolve"))
             if analyze:
@@ -255,13 +274,15 @@ def main():
                     row.Text[0] = x["label"]
                     row.CheckState[0] = "Checked"
                     it["Items"].AddTopLevelItem(row)
+                it["Items"].Hidden = not state["items"]
                 it["Out"].PlainText = json.dumps(res.get("report", {}), indent=1)
                 return
             notes = apply(res)
-            it["Out"].PlainText = "\n".join(["✓ " + n for n in notes] + ([res["text"]] if res.get("text") else [])
+            it["Out"].PlainText = "\n".join(["\u2713 " + n for n in notes] + ([res["text"]] if res.get("text") else [])
                                             + [json.dumps(res.get("report", {}), indent=1)])
             state["items"] = []
             it["Items"].Clear()
+            it["Items"].Hidden = True
         except Exception as e:
             it["Out"].PlainText = f"Error: {e}"
 
@@ -273,8 +294,8 @@ def main():
     win.On.KerfWin.Close = lambda ev: disp.ExitLoop()
     def beat(ev=None):
         s = heartbeat()
-        it["Live"].Text = (f"● {s['project']}" + (f"  ·  {s['sequence']}  ·  {s['timecode']}" if s.get("sequence") else "")) if s \
-            else "○ Kerf engine not reachable"
+        it["Live"].Text = (dot + " " + s["project"] + (sep + s["sequence"] + sep + s["timecode"] if s.get("sequence") else "")) if s \
+            else "\u25cb Kerf engine not reachable"
 
     try:  # live project / timeline / playhead while the Kerf window is open
         timer = ui.Timer({"ID": "KerfBeat", "Interval": 1000})

@@ -1,13 +1,13 @@
 {
   "id": "com.kerf.editor",
   "name": "Kerf",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "main": "index.html",
   "manifestVersion": 5,
   "host": { "app": "premierepro", "minVersion": "25.6.0" },
   "requiredPermissions": {
     "localFileSystem": "fullAccess",
-    "network": { "domains": ["http://127.0.0.1:7878", "http://localhost:7878"] },
+    "network": { "domains": "all" },
     "launchProcess": { "schemes": ["https"], "extensions": [".cmd", ".command", ".exe", ".app"] },
     "clipboard": "readAndWrite"
   },

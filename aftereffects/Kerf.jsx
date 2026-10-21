@@ -412,7 +412,14 @@
     function build(thisObj) {
         var win = thisObj instanceof Panel ? thisObj : new Window("palette", "Kerf", undefined, { resizeable: true });
         win.orientation = "column"; win.alignChildren = ["fill", "top"]; win.margins = 8; win.spacing = 6;
-        var tabs = win.add("tabbedpanel"); tabs.alignChildren = ["fill", "top"];
+        win.minimumSize = [280, 200];  // may be shorter than its content: the view scrolls
+        // the tabs sit in a clipping view with a scrollbar, so a short docked panel can still reach everything
+        var body = win.add("group"); body.orientation = "row"; body.alignment = ["fill", "fill"]; body.alignChildren = ["fill", "fill"]; body.spacing = 2;
+        var view = body.add("group"); view.orientation = "column"; view.alignment = ["fill", "fill"]; view.alignChildren = ["fill", "top"]; view.margins = 0;
+        view.minimumSize = [200, 80];
+        var sb = body.add("scrollbar", undefined, 0, 0, 0); sb.alignment = ["right", "fill"]; sb.preferredSize.width = 14;
+        var tabs = view.add("tabbedpanel"); tabs.alignChildren = ["fill", "top"];
+        tabs.minimumSize = [200, 60];  // let the layout give the view less than the full height
         var tMain = tabs.add("tab", undefined, "MAIN"), tGraphs = tabs.add("tab", undefined, "GRAPHS"), tMotion = tabs.add("tab", undefined, "MOTION"),
             tShakes = tabs.add("tab", undefined, "SHAKES"), tAI = tabs.add("tab", undefined, "AI");
 
@@ -492,7 +499,30 @@
         live = win.add("statictext", undefined, "", { truncate: "end" });
         tabs.selection = tMain;
         win.layout.layout(true);
-        win.onResizing = win.onResize = function () { this.layout.resize(); };
+        var flow = [row, row2];  // side-by-side groups stack when the docked panel is narrow
+        function scroll() {  // the layout can't clip, so the scroll area is placed by hand after each resize
+            var m = win.margins, w = win.size[0] - m[0] - m[2], foot = status.size[1] + live.size[1] + 2 * win.spacing;
+            var h = Math.max(60, win.size[1] - m[1] - m[3] - foot), over = Math.max(0, fullH - h), sw = over > 0 ? 16 : 0;
+            body.location = [m[0], m[1]]; body.size = [w, h];
+            view.location = [0, 0]; view.size = [w - sw, h];
+            sb.visible = over > 0; sb.location = [w - 14, 0]; sb.size = [14, h];
+            sb.maxvalue = over; if (sb.value > over) { sb.value = over; }
+            tabs.size = [w - sw, Math.max(fullH, h)]; tabs.location = [0, -sb.value];
+            status.location = [m[0], m[1] + h + win.spacing]; status.size = [w, status.size[1]];
+            live.location = [m[0], status.location[1] + status.size[1] + win.spacing]; live.size = [w, live.size[1]];
+        }
+        var laidOut = false, fullH = 0;  // fullH: the tabs' natural height, measured after a full layout
+        function adapt() {  // full re-layout only when the stacking changes: it would snap the window to its content
+            var narrow = win.size && win.size.width < 470, changed = !laidOut, keep = win.size ? [win.size[0], win.size[1]] : null;
+            each(flow, function (r) { var o = narrow ? "column" : "row"; if (r.orientation !== o) { r.orientation = o; changed = true; } });
+            if (changed) { win.layout.layout(true); laidOut = true; fullH = tabs.size[1]; if (keep && keep[0] > 0) { win.size = keep; } }
+            win.layout.resize();
+            scroll();
+        }
+        sb.onChanging = sb.onChange = function () { tabs.location = [0, -sb.value]; };
+        tabs.onChange = function () { sb.value = 0; laidOut = false; adapt(); };
+        win.onResizing = win.onResize = adapt;
+        adapt();
         if (win instanceof Window) { win.center(); win.show(); }
     }
     build(thisObj);

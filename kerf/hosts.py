@@ -72,8 +72,9 @@ def status():
     live = _active()
     follow_on = settings.get("follow_editors") != "off"
     left = int(_seen[0] + GRACE - time.time())
-    return dict(running=sorted(running() | set(live)), live=live, follow=follow_on,
-                exit_in=max(0, left) if follow_on and FOLLOWING[0] and left < GRACE else None)
+    active = running() | set(live)
+    return dict(running=sorted(active), live=live, follow=follow_on,
+                exit_in=max(0, left) if follow_on and FOLLOWING[0] and not active else None)
 
 
 FOLLOWING = [False]
