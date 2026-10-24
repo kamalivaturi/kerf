@@ -228,12 +228,15 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
 .tk-head { display: flex; align-items: center; justify-content: space-between; .tk-label { margin: 0; } }
 .legend { font-size: 12px; color: var(--muted); display: flex; align-items: center;
   i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin: 0 5px 0 12px; &.o { background: var(--accent); } &.b { background: var(--blue); } } }
-.tk-split { display: flex; > div { flex: 1 1 0; min-width: 0; } > div:first-child { flex: 0 0 auto; } > div + div { margin-left: 18px; } &.two > div:first-child { flex: 0 0 auto; } }
+// card columns wrap instead of squeezing (Proximity: each column stays a readable group)
+.tk-split { display: flex; flex-wrap: wrap; margin-right: -16px; > div { flex: 1 1 150px; min-width: 0; margin: 0 16px 12px 0; }
+  > div:first-child { flex: 0 0 auto; } }
 .tk-row { display: flex; align-items: center; margin-top: 8px; > * + * { margin-left: 8px; }
   &.spread { justify-content: space-between; } &.wrap { flex-wrap: wrap; > * { margin: 0 8px 8px 0; } } &.top { align-items: flex-start; } }
 .tk-col { display: flex; flex-direction: column; flex: 1; min-width: 160px; margin-left: 14px; > * + * { margin-top: 8px; } }
 .tk-grid2 { display: flex; flex-wrap: wrap; margin: -4px; > * { flex: 1 1 40%; margin: 4px; } }
-.tk-btn { min-height: 46px; padding: 8px 14px; font-weight: 800; letter-spacing: .06em; font-size: 13px; border-radius: 14px;
+// one size and style per role; labels never wrap (Similarity, Fitts: ≥44px targets)
+.tk-btn { min-height: 44px; padding: 8px 14px; font-weight: 800; letter-spacing: .04em; font-size: 13px; border-radius: 12px; white-space: nowrap;
   &.block { width: 100%; margin-bottom: 8px; } &.green { color: var(--green); border-color: rgba(143, 214, 148, .3); }
   &.grow { flex: 1; display: inline-flex; align-items: center; justify-content: center; svg { margin-right: 8px; } }
   &.split { display: flex; align-items: stretch; padding: 0; overflow: hidden; border: 1px solid var(--line);
@@ -257,10 +260,11 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
 .tk-bolt { width: 70px; height: 70px; border-radius: 18px; color: var(--accent); display: flex; align-items: center; justify-content: center;
   background: linear-gradient(180deg, rgba(255, 107, 44, .3), rgba(255, 107, 44, .1)); border-color: rgba(255, 107, 44, .55);
   box-shadow: 0 8px 26px rgba(255, 107, 44, .35); }
-.seg { display: flex; align-items: center; padding: 5px; border-radius: 18px; background: rgba(0, 0, 0, .3); border: 1px solid var(--line);
-  b { padding: 0 14px; font-size: 14px; letter-spacing: .06em; }
-  .seg-btn { padding: 10px 12px; margin-left: 4px; border-radius: 13px; color: var(--muted); font-weight: 800;
-    &:first-of-type { color: #ffb48a; background: linear-gradient(180deg, rgba(255, 107, 44, .35), rgba(255, 107, 44, .12)); border-color: rgba(255, 107, 44, .45); } } }
+// segmented row: a label, then equal-width choices (Similarity); no pre-highlighted option (Von Restorff)
+.seg { display: flex; align-items: center; padding: 4px; border-radius: 14px; background: rgba(0, 0, 0, .3); border: 1px solid var(--line);
+  b { flex: 0 0 auto; min-width: 84px; padding: 0 12px; font-size: 13px; }
+  .seg-btn { flex: 1 1 0; min-height: 40px; padding: 8px 10px; margin-left: 4px; border-radius: 10px; font-weight: 700; white-space: nowrap; } }
+.tk-stack { display: flex; flex-direction: column; > * + * { margin-top: 8px; } }
 .tk-wide { width: 100%; min-height: 64px; margin-bottom: 12px; border-radius: 22px; font-size: 15px; font-weight: 900; letter-spacing: .14em;
   display: flex; align-items: center; justify-content: center; color: var(--text);
   background: linear-gradient(180deg, rgba(255, 107, 44, .22), rgba(255, 107, 44, .06)); border: 1.5px solid rgba(255, 107, 44, .65);
@@ -270,7 +274,8 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
   > input, > select { margin-top: 4px; } &.small { flex: 1 1 110px; } input[type="range"] { padding: 0; } }
 .tk-toolbar { display: flex; justify-content: flex-end; margin: -4px 0 8px; > * + * { margin-left: 6px; } }
 .tk-slot { position: relative; &.off { opacity: .35; } }
-.tk-edit { position: absolute; top: 8px; right: 10px; z-index: 2; display: flex; > * + * { margin-left: 4px; } }
+// Customize layout: the move/hide controls get their own row above the card, never over its content (Common Region)
+.tk-edit { display: flex; justify-content: flex-end; margin: 0 0 8px; > * + * { margin-left: 8px; } }
 .tk-toast { position: sticky; bottom: 10px; margin-top: 4px; align-self: center; display: flex; align-items: center; max-width: 100%;
   padding: 10px 16px; border-radius: 999px; background: rgba(20, 14, 10, .92); border: 1px solid rgba(255, 107, 44, .4);
   box-shadow: var(--shadow); font-weight: 600; &.bad { border-color: var(--bad); color: var(--bad); } }
@@ -286,8 +291,6 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
   img { display: block; width: 100%; } .help { padding: 20px; } }
 .mask-box { position: absolute; border: 2px dashed var(--accent); background: rgba(255, 107, 44, .14); border-radius: 6px; }
 // cards narrower than their content wrap instead of overflowing the panel
-.tk-split.two { flex-wrap: wrap; > div { margin: 0 18px 8px 0; } > div + div { margin-left: 0; } }
-.seg { flex-wrap: wrap; max-width: 100%; .seg-btn { margin-bottom: 2px; } }
 @media (max-width: 480px) { .pill.ver { display: none; } .pill.live small { display: none; } .top .wordmark { font-size: 22px; } }
 @media (max-width: 560px) { .tk-split { flex-direction: column; > div + div { margin: 14px 0 0; } } .anchor-grid { margin: 0 auto; } }
 
@@ -298,3 +301,14 @@ small { font-size: 11px; }
 .places { list-style: none; padding: 0; margin: 8px 0 0; li { padding: 8px 0; border-top: 1px solid var(--line); color: var(--muted); } b { color: var(--text); margin-right: 8px; } }
 .offline .wordmark { display: inline-block; margin-bottom: 10px; font-size: 30px; font-weight: 900; font-style: italic; letter-spacing: -.04em;
   line-height: 1; color: var(--accent); text-shadow: 0 2px 0 #b8400f, 0 6px 18px rgba(255, 107, 44, .35); }
+.top-gap { margin-top: 12px; }
+.tk-row.wrap > select { flex: 1 1 160px; width: auto; min-width: 0; }
+.tk-card { padding: 16px; }
+.tk-label { margin-bottom: 12px; }
+// scripts hub: searchable, pinnable list of the editor's own scripts (Hick: search + favourites)
+.script-search { margin-bottom: 8px; }
+.script-list { max-height: 320px; overflow-y: auto; margin: 0 -4px; }
+.script-row { display: flex; align-items: center; padding: 2px 4px; > * + * { margin-left: 8px; } }
+.script-run { flex: 1; min-width: 0; min-height: 40px; display: flex; align-items: center; justify-content: space-between; text-align: left;
+  span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } small { flex: none; margin-left: 8px; } }
+.fav { flex: none; min-width: 36px; min-height: 36px; color: var(--muted); &.on { color: var(--accent); } }

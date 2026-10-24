@@ -209,6 +209,25 @@
         importAbove(path, l, start === undefined || start === null ? l.inPoint : start).name = name;
         return name + " added above " + l.name;
     }
+    // Scripts hub: the user's own installed scripts and ScriptUI panels, run from Kerf (nothing is copied or bundled)
+    function listScripts() {
+        var base = Folder.appPackage.fsName + "/Scripts", dirs = [[base, false], [base + "/ScriptUI Panels", true]], out = [], i, j, fs, n;
+        for (i = 0; i < dirs.length; i++) {
+            fs = new Folder(dirs[i][0]).getFiles(function (x) { return x instanceof File && /\.jsx(bin)?$/i.test(x.name); });
+            for (j = 0; j < fs.length; j++) {
+                n = decodeURI(fs[j].name);
+                if (/^Kerf\.jsx$/i.test(n)) { continue; }
+                out.push({ name: n.replace(/\.jsx(bin)?$/i, ""), path: fs[j].fsName, panel: dirs[i][1] });
+            }
+        }
+        return json(out);
+    }
+    function runScript(path) {
+        var f = new File(path);
+        if (!f.exists) { throw new Error("That script is no longer installed"); }
+        $.evalFile(f);  // ScriptUI panels open as floating windows when run this way
+        return "Opened " + decodeURI(f.name).replace(/\.jsx(bin)?$/i, "");
+    }
     function frameExport() {
         var c = comp(), f = new File(Folder.desktop.fsName + "/" + c.name + " " + c.time.toFixed(2) + "s.png");
         c.saveFrameToPng(c.time, f);
@@ -563,7 +582,8 @@
             adjustment: function () { return addSolid(true); }, solid: function (hex) { return addSolid(false, hex); },
             beats: placeBeats, clearBeats: clearBeats, stabilize: stabilize, zoom: zoom, mask: quickMask, frameExport: frameExport,
             sortProject: sortProject, copyFx: copyFx, applyFx: applyFx, valueCurve: valueCurve, speedCurve: speedCurve, shake: shake,
-            align: align, captions: captions, clipInfo: clipInfo, addMarkers: addMarkers, addLayer: addLayer };
+            align: align, captions: captions, clipInfo: clipInfo, addMarkers: addMarkers, addLayer: addLayer,
+            listScripts: listScripts, runScript: runScript };
         $.global.KerfAE = {
             call: function (name, settings, args) {  // settings: the panel's values for S; returns JSON {ok, text}
                 var k, r;

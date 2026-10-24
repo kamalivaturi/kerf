@@ -19,7 +19,7 @@ const SHAKE: P = { amplitude: 28, rotation: 1.5, frequency: 11, duration: 0.45, 
 const SLIDERS: [string, string, number, number, number][] = [["amplitude", "Amplitude px", 0, 120, 1], ["rotation", "Rotation °", 0, 10, .1],
   ["frequency", "Frequency Hz", 1, 30, .5], ["duration", "Duration s", .1, 3, .05], ["decay", "Decay", 0, 1, .05],
   ["zoom", "Overscan %", 100, 140, 1], ["flash", "Flash", 0, 100, 1], ["chromatic", "Chromatic px", 0, 20, 1]];
-const CARDS = ["anchor", "curves", "shakes", "stabzoom", "mask", "captions", "utils"];
+const CARDS = ["anchor", "curves", "shakes", "stabzoom", "mask", "captions", "utils", "scripts"];
 
 // ------------------------------------------------------------------ icons (stroke SVG, inherit color)
 const I = {
@@ -172,6 +172,28 @@ function MaskRegion({ r, onDone }: { r: Runner; onDone: () => void }) {
   </section>;
 }
 
+// ------------------------------------------------------------------ scripts hub (After Effects)
+type Script = { name: string; path: string; panel: boolean };
+function ScriptsHub({ r }: { r: Runner }) {
+  const [list, setList] = useState<Script[]>([]), [q, setQ] = useState("");
+  const [fav, setFav] = useState<string[]>(store.get("scriptFavs", []));
+  useEffect(() => { host.native?.listScripts?.({}).then((t) => setList(JSON.parse(t))).catch(() => {}); }, []);
+  const toggle = (p: string) => { const n = fav.includes(p) ? fav.filter((x) => x !== p) : [...fav, p]; setFav(n); store.set("scriptFavs", n); };
+  const needle = q.trim().toLowerCase();
+  const shown = list.filter((s) => !needle || s.name.toLowerCase().includes(needle))
+    .sort((a, b) => Number(fav.includes(b.path)) - Number(fav.includes(a.path)) || a.name.localeCompare(b.name));
+  return <section className="tk-card">
+    <div className="tk-head"><span className="tk-label">Your scripts</span><small>{list.length} installed · ★ pins to the top</small></div>
+    <input className="script-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your scripts and panels" aria-label="Search scripts" />
+    <div className="script-list">{shown.map((s) => <div key={s.path} className="script-row">
+      <button className="script-run" disabled={!!r.busy} onClick={() => r.act("runScript", s.name, { path: s.path }, () => {})} title={s.path}>
+        <span>{s.name}</span>{s.panel && <small>panel</small>}</button>
+      <button className={`tk-mini fav${fav.includes(s.path) ? " on" : ""}`} onClick={() => toggle(s.path)} aria-pressed={fav.includes(s.path)}
+        aria-label={`${fav.includes(s.path) ? "Unpin" : "Pin"} ${s.name}`}>★</button></div>)}
+      {!shown.length && <p className="help">{list.length ? "No script matches that search." : "No scripts found in After Effects' Scripts folders."}</p>}</div>
+  </section>;
+}
+
 // ------------------------------------------------------------------ the tabs
 export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
   tab: ToolTab; projectKey: string; hasMedia: boolean; onNeedMedia: () => void;
@@ -236,15 +258,16 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
     </section>,
     shakes: <section className="tk-card">
       <span className="tk-label">Shakes</span>
-      <div className="tk-row spread">{axisRow}<button className="tk-bolt" disabled={busy} onClick={shake} aria-label="Apply shake" title="Apply shake">{I.bolt}</button></div>
+      {axisRow}
+      <button className="tk-btn primary block grow top-gap" disabled={busy} onClick={shake}>{I.bolt} APPLY SHAKE</button>
     </section>,
     stabzoom: <section className="tk-card tk-split two">
       <div><span className="tk-label">Stabilizer</span>
         <div className="tk-row"><button className="tk-btn" disabled={busy} onClick={() => host.native?.stabilize ? r.act("stabilize", "Stabilize", {}, () => {}) : r.run("stabilize", { smoothing: Math.round(Number(s.smoothing) * .6), clips: IN_EDITOR ? "playhead" : "all" }, "Stabilize")}>STABILIZE</button>
           {!host.native?.stabilize && <Stepper label="Smoothness" value={Number(s.smoothing)} set={(v) => set("smoothing", v)} min={10} max={100} step={10} fmt={(v) => `${v}%`} />}</div></div>
       <div><span className="tk-label">Zoom</span>
-        <div className="tk-row">{["in", "out"].map((d) => <div key={d} className="seg"><b>{d.toUpperCase()}</b>
-          {["in", "out"].map((e) => <button key={e} className="seg-btn" disabled={busy} onClick={() => zoom(d, e)} title={`Zoom ${d}, ease ${e}`}>{e.toUpperCase()}</button>)}</div>)}</div></div>
+        <div className="tk-stack">{["in", "out"].map((d) => <div key={d} className="seg"><b>Zoom {d}</b>
+          {["in", "out"].map((e) => <button key={e} className="seg-btn" disabled={busy} onClick={() => zoom(d, e)} title={`Zoom ${d}, ease ${e}`}>Ease {e}</button>)}</div>)}</div></div>
     </section>,
     mask: host.native?.mask ? <section className="tk-card"><span className="tk-label">Quick mask</span>
         <button className="tk-wide" disabled={busy} onClick={() => r.act("mask", "Quick mask", {}, () => {})}><span className="dash" /> CUT OUT SELECTED LAYER</button>
@@ -254,6 +277,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
     captions: has("captions") ? <section className="tk-card"><span className="tk-label">Captions</span>
         <button className="tk-btn primary block" disabled={busy} onClick={() => r.act("captions", "Captions", {}, () => {})}>CAPTIONS FOR SELECTED LAYER</button>
         <p className="help">Transcribes the selected layer and adds an animated caption layer above it.</p></section> : null as unknown as JSX.Element,
+    scripts: has("scripts") ? <ScriptsHub r={r} /> : null as unknown as JSX.Element,
     utils: <section className="tk-card">
       <span className="tk-label">Utilities</span>
       <div className="tk-row wrap">
@@ -298,8 +322,8 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
       <section className="tk-card"><span className="tk-label">Zoom in / out</span>
         <label className="tk-field">Amount <b>{s.amount}%</b><input type="range" min={101} max={200} value={Number(s.amount)} onChange={(e) => set("amount", +e.target.value)} /></label>
         <label className="tk-field">Duration <b>{Number(s.zdur).toFixed(2)} s</b><input type="range" min={.1} max={5} step={.05} value={Number(s.zdur)} onChange={(e) => set("zdur", +e.target.value)} /></label>
-        <div className="tk-row">{["in", "out"].map((d) => <div key={d} className="seg"><b>{d.toUpperCase()}</b>
-          {["in", "out", "in_out"].map((e) => <button key={e} className="seg-btn" disabled={busy} onClick={() => zoom(d, e)}>{e.replace("_", "/").toUpperCase()}</button>)}</div>)}</div>
+        <div className="tk-stack">{["in", "out"].map((d) => <div key={d} className="seg"><b>Zoom {d}</b>
+          {(host.native ? ["in", "out"] : ["in", "out", "in_out"]).map((e) => <button key={e} className="seg-btn" disabled={busy} onClick={() => zoom(d, e)}>{e === "in_out" ? "Both" : `Ease ${e}`}</button>)}</div>)}</div>
       </section>
       {has("alignAE") && <section className="tk-card"><span className="tk-label">Align & distribute</span>
         <div className="tk-row wrap">{([["Left", "left"], ["H centre", "hcenter"], ["Right", "right"], ["Top", "top"], ["V centre", "vcenter"], ["Bottom", "bottom"],

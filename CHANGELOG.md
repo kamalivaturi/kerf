@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 — 2026-10-24
+
+Kerf now lives inside your editors. There is no separate app to open.
+
+- **One installer, no app window.** Installing Kerf sets up the local engine and adds the Kerf panel to Premiere Pro
+  (through Adobe's own plugin installer), After Effects and DaVinci Resolve. Opening a panel starts Kerf; it stops
+  about a minute after your editors close and updates itself in between. Kerf 0.3 removes the old Kerf Studio app.
+- **After Effects: the same Kerf panel as Premiere** (Window › Extensions › Kerf), replacing the grey ScriptUI panel.
+  Every tool runs natively in AE as one undo step; captions, quick mask and beat detection run in the background so
+  After Effects never freezes. New **Scripts hub**: search, pin and run the scripts and ScriptUI panels already
+  installed in your After Effects, from one place.
+- **DaVinci Resolve: a Kerf-styled window** with Tools, Motion, Shakes and Edit tabs, real settings controls instead
+  of a JSON box (all values under "More settings"), and a review list only when there is something to review.
+- **Only what works where you are:** each editor shows just the tools it supports (no Edit or Graphics tabs in
+  After Effects, no MOGRT options in Resolve, no Premiere-only buttons elsewhere).
+- **No file picking:** the media card is gone; Kerf works on the open sequence, composition or timeline.
+- **Cleaner layout** (Laws of UX): one primary action per card, 44px targets, an 8px spacing scale, labels that never
+  wrap, plain zoom controls ("Zoom in · Ease in / Ease out"), and Customize layout controls that no longer cover cards.
+- **Sturdier:** every one of the 31 features runs with its defaults or asks for what it needs in plain language
+  (missing API keys no longer show as errors); no repeating socket task inside After Effects.
+
 ## 0.2.3 — 2026-10-20
 
 - **Premiere Pro 2026: the panel now reaches the Kerf engine.** Premiere 2026 rejects localhost network

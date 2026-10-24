@@ -9,26 +9,27 @@ music with auto-ducking, beat edits, audio cleanup and reframing. It runs on you
 [Download](https://github.com/kamalivaturi/kerf/releases/latest) ·
 [Website](https://kamalivaturi.github.io/kerf/) ·
 [Feature teardown](docs/REVERSE_ENGINEERING.md) ·
-[Changelog](CHANGELOG.md)
+[Changelog](CHANGELOG.md) ·
+[Design brief](docs/DESIGN.md)
 
 ---
 
 ## Download
 
-| You use | Get | Then |
+**One installer adds Kerf to every editor on your computer.** There is no separate app: open the Kerf panel
+inside Premiere Pro, After Effects or DaVinci Resolve and it works on the open sequence, composition or timeline.
+
+| Your computer | Get | Then open Kerf in your editor |
 |---|---|---|
-| **Windows** | `Kerf-Studio-…-windows-x64-setup.exe` (or `.msi`) | Run it. Kerf Studio starts the engine for every editor. |
-| **macOS** (Apple silicon / Intel) | `Kerf-Studio-…-macos-arm64.dmg` / `…-macos-x64.dmg` | Drag to Applications. First launch: right-click → Open, or System Settings → Privacy & Security → Open Anyway. If 0.2.0 says "damaged": `xattr -dr com.apple.quarantine "/Applications/Kerf Studio.app"` (fixed in 0.2.1). |
-| **Linux** | `.AppImage`, `.deb` or `.rpm` | `chmod +x` the AppImage and run it, or install the package. |
-| **Premiere Pro 25.6+** | `kerf-premiere-….ccx` | Double-click (Creative Cloud installs it) → *Window → UXP Plugins → Kerf*. |
-| **After Effects 2024+** | `kerf-aftereffects-….zip` | Run `install/install-aftereffects.ps1` (Windows) or `install/install.sh` (macOS) → *Window → Kerf.jsx*. Enable *Preferences → Scripting & Expressions → Allow Scripts to Write Files and Access Network*. |
-| **DaVinci Resolve 18.6+** (Free or Studio) | `kerf-resolve-….zip` | `install/install-resolve.ps1` (Windows) or `install/install.sh` (macOS/Linux) → *Workspace → Scripts → Kerf*. |
-| **No installer** | `kerf-studio-portable-…` (zip / tar.gz) | Unpack anywhere, run `kerf-engine/kerf-engine serve`, open <http://127.0.0.1:7878/app/>. FFmpeg included. |
+| **Windows** | `Kerf-…-windows-x64-setup.exe` (or `.msi` for IT deployment) | **Premiere Pro 25.6+:** Window › UXP Plugins › Kerf · **After Effects 2022+:** Window › Extensions › Kerf · **Resolve 18.6+:** Workspace › Scripts › Kerf |
+| **macOS** (Apple silicon / Intel) | `Kerf-…-macos-arm64.dmg` / `…-macos-x64.dmg` | Drag Kerf to Applications and open it once (right-click → Open the first time); it adds the panels, then use the same menus. |
+| **Linux** | `.AppImage`, `.deb` or `.rpm` | DaVinci Resolve: Workspace › Scripts › Kerf. |
+| **No installer** | `kerf-portable-…` (zip / tar.gz) | Unpack, run `kerf-engine/kerf-engine serve`, and install the panels from `kerf-premiere-….ccx`, `kerf-resolve-….zip`. |
 | **Python** | `pip install kerf-…whl` or `pip install -e ".[ai]"` | `kerf serve` (needs FFmpeg on PATH). |
 
-Every release lists SHA-256 checksums in `SHA256SUMS.txt`.
-
-Kerf Studio updates itself: new releases download in the background and install when you quit (Settings → Automatic updates).
+Every release lists SHA-256 checksums in `SHA256SUMS.txt`. Kerf starts when you open a panel, stops about a minute
+after your editors close, and updates itself in between (Settings › Automatic updates). Upgrading from Kerf Studio
+0.2.x removes the old app automatically.
 
 Kerf runs alongside your editor: it shows the open project, sequence or composition and the playhead live, and closes about a minute after the last of Premiere Pro, After Effects or Resolve closes (Settings → Run only while … is open).
 
@@ -36,7 +37,7 @@ Kerf runs alongside your editor: it shows the open project, sequence or composit
 
 **Toolkit** (one-click tools, Tools / Graphs / Motion / Shakes tabs)
 
-| Tool | Premiere Pro | After Effects | Resolve & Studio |
+| Tool | Premiere Pro | After Effects | Resolve |
 |---|---|---|---|
 | **Anchor** (9 positions) | moves the anchor of selected clips, picture stays put | same, multi-layer | places clips at that spot |
 | **Add layer** | Null, Adjustment (reuses yours), Solid, cinematic bars, vignette, thirds guides | Null, Null + Parent, Adjustment, Solid | generated layers on a new track |
@@ -106,15 +107,15 @@ kerf run camera_shake --media clip.mp4 --set on=whole --set axis=hv --set output
 Premiere UXP panel (React + TS) ┐                         ┌ FFmpeg · faster-whisper · Silero VAD
 After Effects panel (ScriptUI)  │                         │ U²-Net (ONNX) · OpenCV YuNet · NumPy
 Resolve script (Fusion UI)      ├── 127.0.0.1:7878 ───────┤ yt-dlp · beat tracking · vidstab
-Kerf Studio (Tauri / Rust)      ┘    token-protected      └ Claude / OpenAI / Gemini / Ollama (opt-in)
+Kerf helper (Tauri / Rust)      ┘    token-protected      └ Claude / OpenAI / Gemini / Ollama (opt-in)
    reads the timeline → engine builds the new edit → FCP7 XML / clips / markers → the editor applies it
 ```
 
 ```
 kerf/          engine (Python): timeline model + XML, one module per feature, server, CLI, licensing
-ui/            React + TypeScript + SCSS (Vite) → dist-uxp/ (Premiere) and dist/ (Studio + web)
+ui/            React + TypeScript + SCSS (Vite) → dist-uxp/ (Premiere) and dist/ (After Effects panel)
 aftereffects/  After Effects panel (ExtendScript)     resolve/  DaVinci Resolve script
-desktop/       Kerf Studio (Tauri 2, Rust): bundles the frozen engine → .exe .msi .dmg .AppImage .deb .rpm
+desktop/       Kerf installer + background helper (Tauri 2, Rust): engine + panels → .exe .msi .dmg .AppImage .deb .rpm
 mogrt/         After Effects MOGRT builder            scripts/  engine freezer + release builder
 ```
 
@@ -144,7 +145,7 @@ CI tests the engine on Windows, macOS and Linux, and every `v*` tag builds all i
 
 - macOS and Windows builds are not code-signed yet (Gatekeeper / SmartScreen will ask once).
 - Premiere's scripting has no "create adjustment layer" call: make one once and Kerf reuses it.
-- Kerf Studio writes timeline XML in Premiere's motion units; for Resolve, run features from the Resolve script (it sends Resolve units).
+- Some third-party After Effects scripts open as floating windows when run from the Kerf Scripts hub (that's how AE runs ScriptUI panels from a script).
 
 ## License
 

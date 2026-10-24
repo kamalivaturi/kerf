@@ -30,7 +30,7 @@ const CAPS: Record<string, Set<string>> = {
   premiere: new Set(ALL),
   standalone: new Set(ALL.filter((a) => !["adjustment", "clearBeats", "fx"].includes(a))),
   aftereffects: new Set(["anchor", "null", "parentNull", "adjustment", "solid", "beats", "clearBeats", "valueCurve", "speedCurve", "shake",
-    "stabilize", "zoom", "alignAE", "mask", "frameExport", "sortProject", "fx", "captions"]),
+    "stabilize", "zoom", "alignAE", "mask", "frameExport", "sortProject", "fx", "captions", "scripts"]),
 };
 export const EDITOR_NAME: Record<string, string> = { premiere: "Premiere", aftereffects: "After Effects", standalone: "Studio" };
 
@@ -450,7 +450,17 @@ function standalone(): Host {
 
 function aftereffects(): Host {
   const cep = (globalThis as any).__adobe_cep__;
-  const es = (script: string) => new Promise<string>((ok) => cep.evalScript(script, (r: string) => ok(r)));
+  const raw = (script: string) => new Promise<string>((ok) => cep.evalScript(script, (r: string) => ok(r)));
+  // Load Kerf's After Effects library (Kerf.jsx) by absolute path from the panel itself: it doesn't depend on how
+  // AE ran the manifest's ScriptPath, and it is checked (and retried) before every call.
+  let lib: Promise<void> | null = null;
+  const ensureLib = () => lib ??= (async () => {
+    if ((await raw("typeof KerfAE")) === "object") return;
+    const dir = decodeURI(cep.getSystemPath("extension")).replace(/^file:\/\/\/(?=[A-Za-z]:)/, "").replace(/^file:\/\//, "");
+    const loaded = await raw(`$.global.KERF_LIB = true; $.evalFile(new File(${JSON.stringify(dir + "/Kerf.jsx")})); typeof KerfAE`);
+    if (loaded !== "object") { lib = null; throw new Error("After Effects couldn't load Kerf's tools: reopen the Kerf panel (Window > Extensions > Kerf)"); }
+  })();
+  const es = async (script: string) => { await ensureLib(); return raw(script); };
   const call = async (name: string, settings: object = {}, args: unknown[] = []) => {
     const out = await es(`KerfAE.call(${JSON.stringify(name)}, ${JSON.stringify(settings)}, ${JSON.stringify(args)})`);
     let r: { ok?: boolean; text?: string } = {};
@@ -488,6 +498,7 @@ function aftereffects(): Host {
         return call("addLayer", {}, [res.files[0], `${c.name} (Kerf cutout)`]);
       },
       frameExport: () => call("frameExport"),
+      listScripts: () => call("listScripts"), runScript: (p) => call("runScript", {}, [p.path]),
       sortProject: () => call("sortProject"), copyFx: (p) => call("copyFx", {}, [p.name]), applyFx: (p) => call("applyFx", {}, [p.name]),
       captions: async () => {
         const c = await clip();
@@ -502,7 +513,14 @@ function aftereffects(): Host {
     async readTimeline() { throw new Error("After Effects tools work on the selected layers of the open composition."); },
     async apply() { return []; },
     async outDir() { return undefined; },
-    readToken: () => es("KerfAE.token()"),
+    async readToken() { // the panel can load before AE has run host.jsx: wait for a real token, not an error string
+      for (let i = 0; i < 20; i++) {
+        const t = (await es("KerfAE.token()").catch(() => "")).trim();
+        if (/^[\w-]{16,}$/.test(t)) return t;
+        await new Promise((ok) => setTimeout(ok, 250));
+      }
+      return "";
+    },
     async insertMogrt() { return "MOGRTs are for Premiere Pro"; },
     async launchEngine() { await es("KerfAE.launch()"); },
   };
