@@ -65,7 +65,7 @@ def portable(name):
     eng = ROOT / "engine-dist" / "kerf-engine"
     if not eng.is_dir():
         sys.exit("engine-dist/kerf-engine missing: python scripts/build_engine.py")
-    base = f"kerf-studio-portable-{V}-{name}"
+    base = f"kerf-portable-{V}-{name}"
     extras = [ROOT / n for n in ("README.md", "LICENSE", "start-kerf.cmd", "start-kerf.command", "start-kerf.sh")]
     if name.startswith("windows"):
         with zipfile.ZipFile(OUT / f"{base}.zip", "w", zipfile.ZIP_DEFLATED) as z:
@@ -96,7 +96,7 @@ def collect_desktop(name):
         base = f.name[:-4] if sig else f.name
         kind = next((k for k in KINDS if base.endswith(k[0])), None)
         if kind and not (kind[0] == ".exe" and not base.endswith("-setup.exe")):
-            dest = OUT / f"Kerf-Studio-{V}-{name}{kind[1]}{'.sig' if sig else ''}"
+            dest = OUT / f"Kerf-{V}-{name}{kind[1]}{'.sig' if sig else ''}"
             shutil.copy2(f, dest)
             print(dest.name)
             n += 1
@@ -105,14 +105,14 @@ def collect_desktop(name):
 
 
 def updater_manifest(repo):
-    """latest.json for the Kerf Studio updater, from the signed packages collected into release/."""
+    """latest.json for the Kerf updater, from the signed packages collected into release/."""
     import datetime
     import json
     sections = (ROOT / "CHANGELOG.md").read_text("utf-8").split(chr(10) + "## ")
     notes = sections[1].partition(chr(10))[2].strip()  # this version's entry, without its heading
     platforms = {}
     for name, (key, suffix) in UPDATER.items():
-        pkg = OUT / f"Kerf-Studio-{V}-{name}{suffix}"
+        pkg = OUT / f"Kerf-{V}-{name}{suffix}"
         sig = pkg.with_name(pkg.name + ".sig")
         if pkg.exists() and sig.exists():
             platforms[key] = dict(signature=sig.read_text().strip(),

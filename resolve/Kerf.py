@@ -6,6 +6,7 @@ timeline (FCP7 XML via MediaPool.ImportTimelineFromFile). Stdlib only: runs on R
 import json
 import os
 import subprocess
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -38,9 +39,14 @@ def alive():
 
 
 def engine_command():
-    """Kerf Studio's bundled engine if installed (Windows, macOS, Linux), a portable build, else Python + source."""
+    """The Kerf helper if installed (runs the engine, keeps Kerf updated), a bundled engine, else Python + source."""
+    app = (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kerf", "kerf.exe") if os.name == "nt"
+           else "/Applications/Kerf.app" if sys.platform == "darwin" else "/usr/bin/kerf")
+    if os.path.exists(app):
+        return (["open", "-g", app] if app.endswith(".app") else [app]), os.path.dirname(app) or "/"
     exe = "kerf-engine.exe" if os.name == "nt" else "kerf-engine"
-    for d in (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kerf Studio", "engine"),
+    for d in (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kerf", "engine"),
+              os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kerf Studio", "engine"),
               "/Applications/Kerf Studio.app/Contents/Resources/engine", os.path.expanduser("~/Applications/Kerf Studio.app/Contents/Resources/engine"),
               "/usr/lib/kerf-studio/engine", "/usr/lib/Kerf Studio/engine", os.path.join(KERF_HOME, "kerf-engine"), KERF_HOME):
         if os.path.isfile(os.path.join(d, exe)):
@@ -106,7 +112,7 @@ def read_timeline():
 
 
 def heartbeat():
-    """Tell the engine which project, timeline and playhead are open (shown live in Kerf Studio)."""
+    """Tell the engine which project, timeline and playhead are open (shown live in the Kerf panels)."""
     try:
         p = project()
         tl = p.GetCurrentTimeline() if p else None
@@ -186,55 +192,270 @@ def apply(res):
     return notes
 
 
-# ------------------------------------------------------------------ UI (Fusion UIManager)
+# ------------------------------------------------------------------ UI (Fusion UIManager), styled like the Kerf panel
+
+TOOLKIT = {"speed_ramp", "zoom_move", "layout", "camera_shake", "stabilize", "add_layer", "frame_export", "beat_markers",
+           "quick_mask", "project_sort"}  # these have their own tabs; Edit lists the rest
+COLORS = [("Black", "#000000"), ("White", "#FFFFFF"), ("Kerf orange", "#FF6B2C"), ("Blue", "#3D7CFF"), ("Green", "#13B07A")]
+FORM_ROWS = 10  # settings shown as controls; the rest are under "More settings"
+STYLE = (
+    "QWidget { color: #f3ece7; font-size: 12px; }"
+    "QPushButton { background: #2a221d; border: 1px solid #3d322b; border-radius: 9px; padding: 8px 10px; font-weight: bold; }"
+    "QPushButton:hover { border-color: #ff6b2c; } QPushButton:pressed { background: #3a2c23; }"
+    "QPushButton:disabled { color: #6f645d; border-color: #2a221d; }"
+    "QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QTreeWidget { background: #1b1512; border: 1px solid #3d322b;"
+    " border-radius: 7px; padding: 4px 6px; }"
+    "QLineEdit:focus, QComboBox:focus, QTextEdit:focus { border-color: #ff6b2c; }"
+    "QTabBar::tab { background: transparent; color: #a59a92; padding: 9px 16px; font-weight: bold; border-bottom: 2px solid transparent; }"
+    "QTabBar::tab:selected { color: #f3ece7; border-bottom: 2px solid #ff6b2c; }"
+    "QSlider::groove:horizontal { height: 4px; background: #3d322b; border-radius: 2px; }"
+    "QSlider::handle:horizontal { background: #ff6b2c; width: 14px; margin: -6px 0; border-radius: 7px; }"
+    "QCheckBox::indicator:checked { background: #ff6b2c; border-radius: 3px; }"
+)
+PRIMARY = ("QPushButton { background: #ff6b2c; color: #1a0f08; border: none; border-radius: 9px; padding: 9px 12px; font-weight: bold; }"
+           " QPushButton:hover { background: #ff8a4f; } QPushButton:disabled { background: #5a3a2a; color: #a59a92; }")
+
 
 def main():
     ui = fusion.UIManager  # noqa: F821 (Resolve injects `fusion` and `bmd`)
     disp = bmd.UIDispatcher(ui)  # noqa: F821
     if not ensure_engine():
-        print(f"Kerf: engine did not start. Run `python -m kerf serve` in {KERF_HOME}")
+        print("Kerf: engine did not start. Reinstall Kerf (it sets up the engine), then try again.")
         return
     feats = call("/features")["features"]
-    names = sorted(feats, key=lambda k: (feats[k]["group"], feats[k]["title"]))
-
-    # Source stays ASCII (\u escapes): Resolve may read this file in the system code page.
+    edit_names = sorted((n for n in feats if n not in TOOLKIT), key=lambda k: (feats[k]["group"], feats[k]["title"]))
     dot, sep, ell = "\u25cf", "  \u00b7  ", "\u2026"
-    primary = ("QPushButton { background: #ff6b2c; color: #1a0f08; font-weight: bold; border: none; border-radius: 6px;"
-               " min-height: 28px; } QPushButton:hover { background: #ff8a4f; } QPushButton:disabled { background: #5a3a2a; }")
-    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": [120, 120, 520, 720]}, ui.VGroup({"Spacing": 6}, [
+
+    def head(text):
+        return ui.Label({"Text": text.upper(), "Weight": 0,
+                         "StyleSheet": "color: #a59a92; font-weight: bold; letter-spacing: 2px; padding-top: 8px;"})
+
+    def btn(id_, text, primary=False, tip=""):
+        return ui.Button({"ID": id_, "Text": text, "ToolTip": tip, **({"StyleSheet": PRIMARY} if primary else {})})
+
+    def slider(id_, label, lo, hi, val):
+        return ui.HGroup({"Weight": 0}, [ui.Label({"Text": label, "Weight": 0, "MinimumSize": [110, 0]}),
+                                         ui.Slider({"ID": id_, "Minimum": lo, "Maximum": hi, "Value": val, "Orientation": "Horizontal"}),
+                                         ui.Label({"ID": id_ + "V", "Weight": 0, "MinimumSize": [48, 0], "Alignment": {"AlignRight": True}})])
+
+    def row(*items):
+        return ui.HGroup({"Weight": 0, "Spacing": 6}, list(items))
+
+    tools = ui.VGroup({"Spacing": 6}, [
+        head("Add layer"),
+        row(btn("LNull", "NULL", tip="Transparent placeholder layer at the playhead"), btn("LSolid", "SOLID"),
+            ui.ComboBox({"ID": "LColor", "Weight": 0}), btn("LBars", "BARS 2.39"), btn("LVig", "VIGNETTE")),
+        head("Beats"),
+        row(btn("Beats", "PLACE BEAT MARKERS", True), ui.Label({"Text": "every", "Weight": 0}),
+            ui.SpinBox({"ID": "Every", "Minimum": 1, "Maximum": 16, "Value": 1, "Weight": 0})),
+        head("Speed ramp (clip under the playhead)"),
+        row(btn("SpIn", "EASE IN"), btn("SpOut", "EASE OUT"), btn("SpRamp", "SPEED RAMP"), btn("SpBoth", "IN / OUT")),
+        head("Stabilizer"),
+        row(btn("Stab", "STABILIZE CLIP"), ui.Label({"Text": "Smoothness", "Weight": 0}),
+            ui.Slider({"ID": "Smooth", "Minimum": 10, "Maximum": 100, "Value": 50, "Orientation": "Horizontal"}),
+            ui.Label({"ID": "SmoothV", "Weight": 0, "MinimumSize": [40, 0]})),
+        head("Quick mask (offline AI cutout)"),
+        row(btn("Mask", "CUT OUT SUBJECT", True), ui.ComboBox({"ID": "MaskModel", "Weight": 0})),
+        head("Utilities"),
+        row(btn("Frame", "FRAME \u2192 DESKTOP"), btn("Sort", "SORT MEDIA POOL")),
+        ui.VGap(0, 1),
+    ])
+    motion = ui.VGroup({"Spacing": 6}, [
+        head("Zoom (eased, at the playhead)"),
+        slider("ZAmt", "Amount %", 101, 200, 120), slider("ZDur", "Duration s", 10, 500, 60),
+        row(btn("ZInIn", "IN \u00b7 ease in"), btn("ZInOut", "IN \u00b7 ease out", True), btn("ZOutIn", "OUT \u00b7 ease in"),
+            btn("ZOutOut", "OUT \u00b7 ease out")),
+        head("Place & align clips"),
+        row(ui.Label({"Text": "Arrange", "Weight": 0}), ui.ComboBox({"ID": "Arrange"})),
+        row(ui.Label({"Text": "Tracks", "Weight": 0}), ui.LineEdit({"ID": "LTracks", "Text": "2"}),
+            ui.Label({"Text": "Scale %", "Weight": 0}), ui.SpinBox({"ID": "LScale", "Minimum": 0, "Maximum": 400, "Value": 35}),
+            ui.Label({"Text": "Margin %", "Weight": 0}), ui.SpinBox({"ID": "LMargin", "Minimum": 0, "Maximum": 40, "Value": 4})),
+        row(btn("Layout", "APPLY LAYOUT", True)),
+        ui.Label({"Text": "Picture-in-picture, grids and alignment build a new timeline; Scale 0 = fit.", "WordWrap": True,
+                  "Weight": 0, "StyleSheet": "color: #a59a92;"}),
+        ui.VGap(0, 1),
+    ])
+    shakes = ui.VGroup({"Spacing": 6}, [
+        head("Camera shake"),
+        row(ui.Label({"Text": "Axis", "Weight": 0}), ui.ComboBox({"ID": "Axis"}),
+            ui.Label({"Text": "On", "Weight": 0}), ui.ComboBox({"ID": "On"}),
+            ui.Label({"Text": "Output", "Weight": 0}), ui.ComboBox({"ID": "Output"})),
+        slider("SAmp", "Amplitude px", 0, 120, 28), slider("SFreq", "Frequency Hz", 1, 30, 11),
+        slider("SRot", "Rotation \u00b0", 0, 100, 15), slider("SDur", "Duration s", 10, 300, 45),
+        slider("SDecay", "Decay", 0, 100, 70),
+        row(btn("PImpact", "IMPACT"), btn("PHand", "HANDHELD"), btn("PQuake", "EARTHQUAKE")),
+        row(btn("Shake", "\u26a1 APPLY SHAKE", True)),
+        ui.VGap(0, 1),
+    ])
+    form = []
+    for i in range(FORM_ROWS):
+        form.append(row(ui.Label({"ID": f"FL{i}", "Weight": 0, "MinimumSize": [150, 0]}), ui.LineEdit({"ID": f"FE{i}"}),
+                        ui.ComboBox({"ID": f"FC{i}"}), ui.CheckBox({"ID": f"FK{i}", "Text": ""})))
+    edit = ui.VGroup({"Spacing": 6}, [
+        row(ui.Label({"Text": "Feature", "Weight": 0}), ui.ComboBox({"ID": "Feature"})),
+        ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0, "MinimumSize": [200, 48], "Alignment": {"AlignTop": True},
+                  "StyleSheet": "color: #a59a92;"}),
+        row(ui.ComboBox({"ID": "Preset"}), ui.LineEdit({"ID": "PresetName", "PlaceholderText": "Save settings as" + ell}),
+            ui.Button({"ID": "SavePreset", "Text": "Save", "Weight": 0})),
+        *form,
+        ui.CheckBox({"ID": "More", "Text": "More settings (all values)", "Weight": 0}),
+        ui.TextEdit({"ID": "Params", "Weight": 2, "Hidden": True, "Font": ui.Font({"Family": "Consolas", "PixelSize": 13})}),
+        row(btn("Analyze", "Analyze"), btn("Apply", "Apply", True)),
+        ui.Tree({"ID": "Items", "Weight": 2, "Hidden": True}),  # shown only when there is something to review
+        ui.VGap(0, 1),
+    ])
+    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": [120, 120, 560, 820], "StyleSheet": STYLE},
+                         ui.VGroup({"Spacing": 8}, [
         ui.HGroup({"Weight": 0}, [
             ui.Label({"Text": "kerf", "Weight": 0,
-                      "StyleSheet": "color: #ff6b2c; font-size: 22px; font-weight: 900; font-style: italic; padding-right: 10px;"}),
+                      "StyleSheet": "color: #ff6b2c; font-size: 24px; font-weight: 900; font-style: italic; padding-right: 10px;"}),
             ui.Label({"ID": "Live", "StyleSheet": "color: #57d68d;"})]),
-        ui.HGroup({"Weight": 0}, [ui.Label({"Text": "Feature", "Weight": 0}), ui.ComboBox({"ID": "Feature"})]),
-        ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0, "MinimumSize": [200, 52], "Alignment": {"AlignTop": True},
-                  "StyleSheet": "color: #a59a92;"}),
-        ui.HGroup({"Weight": 0}, [ui.ComboBox({"ID": "Preset"}),
-                                  ui.LineEdit({"ID": "PresetName", "PlaceholderText": "Save settings as" + ell}),
-                                  ui.Button({"ID": "SavePreset", "Text": "Save", "Weight": 0})]),
-        ui.Label({"Text": "Settings (JSON, edit any value)", "Weight": 0}),
-        ui.TextEdit({"ID": "Params", "Weight": 3, "Font": ui.Font({"Family": "Consolas", "PixelSize": 13})}),
-        ui.HGroup({"Weight": 0}, [ui.Button({"ID": "Analyze", "Text": "Analyze"}),
-                                  ui.Button({"ID": "Apply", "Text": "Apply", "StyleSheet": primary})]),
-        ui.Tree({"ID": "Items", "Weight": 2, "Hidden": True}),  # shown only when there is something to review
-        ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 1, "PlaceholderText": "Results appear here."}),
+        ui.TabBar({"ID": "Tabs", "Weight": 0}),
+        ui.Stack({"ID": "Pages"}, [tools, motion, shakes, edit]),
+        ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 0, "MinimumSize": [200, 90], "PlaceholderText": "Results appear here."}),
     ]))
     it = win.GetItems()
+    for t in ("Tools", "Motion", "Shakes", "Edit"):
+        it["Tabs"].AddTab(t)
     it["Items"].SetHeaderLabels(["Review (untick to skip)"])
-    for n in names:
+    for name, _ in COLORS:
+        it["LColor"].AddItem(name)
+    for label in ("People (best)", "Objects (fast)", "Objects (detailed)"):
+        it["MaskModel"].AddItem(label)
+    for a in feats["layout"]["choices"]["arrange"]:
+        it["Arrange"].AddItem(a.replace("_", " "))
+    for combo, key in (("Axis", "axis"), ("On", "on"), ("Output", "output")):
+        for v in feats["camera_shake"]["choices"][key]:
+            if not (key == "on" and v == "times"):
+                it[combo].AddItem(v)
+    it["Axis"].CurrentText, it["On"].CurrentText = "hv", "playhead"
+    for n in edit_names:
         it["Feature"].AddItem(feats[n]["group"] + sep + feats[n]["title"])
-    state = {"items": []}
+    state = {"items": [], "params": {}, "keys": [], "loading": False}
 
+    # ---------------------------------------------------------------- running a feature
+    def say(text):
+        it["Out"].PlainText = text
+
+    def run(name, params, label, analyze=False):
+        try:
+            say(label + ell)
+            timeline = read_timeline() if feats[name].get("needs_timeline", True) else None
+            res = call("/run", dict(feature=name, timeline=timeline, params=params, host="resolve"))
+            if analyze:
+                return res
+            notes = apply(res)
+            report = res.get("report") or {}
+            say("\n".join(["\u2713 " + n for n in notes] + ([res["text"]] if res.get("text") else [])
+                          + [f"{k}: {v}" for k, v in list(report.items())[:6]]) or "\u2713 " + label + " done")
+        except Exception as e:
+            say(f"\u26a0 {label}: {e}")
+        return None
+
+    def val(id_, k=1.0):
+        return round(it[id_].Value * k, 3)
+
+    def show_vals(ev=None):
+        for id_, k, fmt in (("ZAmt", 1, "{:.0f}%"), ("ZDur", .01, "{:.2f}s"), ("SAmp", 1, "{:.0f}"), ("SFreq", 1, "{:.0f}"),
+                            ("SRot", .1, "{:.1f}\u00b0"), ("SDur", .01, "{:.2f}s"), ("SDecay", .01, "{:.2f}"), ("Smooth", 1, "{:.0f}%")):
+            it[id_ + "V"].Text = fmt.format(it[id_].Value * k)
+
+    def shake_params():
+        return dict(axis=it["Axis"].CurrentText, on=it["On"].CurrentText, output=it["Output"].CurrentText,
+                    amplitude=val("SAmp"), frequency=val("SFreq"), rotation=val("SRot", .1), duration=val("SDur", .01),
+                    decay=val("SDecay", .01), clips="playhead")
+
+    def preset(values):
+        for id_, v in values.items():
+            it[id_].Value = v
+        show_vals()
+
+    def color():
+        return COLORS[int(it["LColor"].CurrentIndex)][1]
+
+    on = win.On
+    on.LNull.Clicked = lambda ev: run("add_layer", dict(kind="transparent"), "Null")
+    on.LSolid.Clicked = lambda ev: run("add_layer", dict(kind="solid", color=color()), "Solid")
+    on.LBars.Clicked = lambda ev: run("add_layer", dict(kind="letterbox", aspect=2.39, duration=0), "Bars")
+    on.LVig.Clicked = lambda ev: run("add_layer", dict(kind="vignette"), "Vignette")
+    on.Beats.Clicked = lambda ev: run("beat_markers", dict(every=it["Every"].Value), "Beat markers")
+    for id_, preset_name in (("SpIn", "ease_in"), ("SpOut", "ease_out"), ("SpRamp", "speedramp"), ("SpBoth", "ease_in_out")):
+        setattr(getattr(on, id_), "Clicked", lambda ev, p=preset_name: run("speed_ramp", dict(preset=p, clips="playhead"), "Speed ramp"))
+    on.Stab.Clicked = lambda ev: run("stabilize", dict(smoothing=round(it["Smooth"].Value * .6), clips="playhead"), "Stabilize")
+    on.Mask.Clicked = lambda ev: run("quick_mask", dict(model=["u2net_human_seg", "u2netp", "silueta"][int(it["MaskModel"].CurrentIndex)],
+                                                         output="cutout", clips="playhead"), "Quick mask")
+    on.Frame.Clicked = lambda ev: run("frame_export", {}, "Frame export")
+    on.Sort.Clicked = lambda ev: run("project_sort", {}, "Sort media pool")
+    for id_, d, e in (("ZInIn", "in", "in"), ("ZInOut", "in", "out"), ("ZOutIn", "out", "in"), ("ZOutOut", "out", "out")):
+        setattr(getattr(on, id_), "Clicked", lambda ev, d=d, e=e: run("zoom_move", dict(direction=d, ease=e, amount=val("ZAmt"),
+                                                                                         duration=val("ZDur", .01)), f"Zoom {d}"))
+    on.Layout.Clicked = lambda ev: run("layout", dict(arrange=it["Arrange"].CurrentText.replace(" ", "_"), tracks=it["LTracks"].Text,
+                                                      scale=it["LScale"].Value, margin=it["LMargin"].Value), "Layout")
+    on.Shake.Clicked = lambda ev: run("camera_shake", shake_params(), "Camera shake")
+    on.PImpact.Clicked = lambda ev: preset(dict(SAmp=40, SFreq=11, SRot=15, SDur=35, SDecay=70))
+    on.PHand.Clicked = lambda ev: (preset(dict(SAmp=6, SFreq=2, SRot=4, SDur=300, SDecay=0)), setattr(it["On"], "CurrentText", "whole"))
+    on.PQuake.Clicked = lambda ev: preset(dict(SAmp=70, SFreq=18, SRot=30, SDur=120, SDecay=30))
+    for id_ in ("ZAmt", "ZDur", "SAmp", "SFreq", "SRot", "SDur", "SDecay", "Smooth"):
+        setattr(getattr(on, id_), "ValueChanged", show_vals)
+    on.Tabs.CurrentChanged = lambda ev: setattr(it["Pages"], "CurrentIndex", int(it["Tabs"].CurrentIndex))
+
+    # ---------------------------------------------------------------- Edit tab: settings form
     def cur():
-        return names[int(it["Feature"].CurrentIndex)]
+        return edit_names[int(it["Feature"].CurrentIndex)]
 
-    def show_params(p):
-        it["Params"].PlainText = json.dumps({k: v for k, v in p.items() if k not in ("items", "preview")}, indent=1)
+    def choices_for(key):
+        ch = feats[cur()]["choices"].get(key) or []
+        return [c for c in ch if c != "mogrt"]  # MOGRTs are Premiere-only
+
+    def show_json():
+        it["Params"].PlainText = json.dumps(state["params"], indent=1)
+
+    def fill(params):
+        state["loading"], state["params"] = True, {k: v for k, v in params.items() if k not in ("items", "preview", "plan_only")}
+        state["keys"] = list(state["params"])[:FORM_ROWS]
+        for i in range(FORM_ROWS):
+            key = state["keys"][i] if i < len(state["keys"]) else None
+            v = state["params"].get(key)
+            ch = choices_for(key) if key else []
+            it[f"FL{i}"].Text = key.replace("_", " ").capitalize() if key else ""
+            it[f"FE{i}"].Hidden = not key or isinstance(v, bool) or bool(ch)
+            it[f"FC{i}"].Hidden = not key or not ch
+            it[f"FK{i}"].Hidden = not key or not isinstance(v, bool)
+            it[f"FL{i}"].Hidden = not key
+            if key and ch:
+                it[f"FC{i}"].Clear()
+                for c in ch:
+                    it[f"FC{i}"].AddItem(c)
+                it[f"FC{i}"].CurrentText = str(v)
+            elif key and isinstance(v, bool):
+                it[f"FK{i}"].Checked = v
+            elif key:
+                it[f"FE{i}"].Text = "" if v is None else str(v)
+        show_json()
+        state["loading"] = False
+
+    def form_changed(i, value):
+        if state["loading"] or i >= len(state["keys"]):
+            return
+        state["params"][state["keys"][i]] = value
+        show_json()
+
+    for i in range(FORM_ROWS):
+        setattr(getattr(on, f"FE{i}"), "TextChanged", lambda ev, i=i: form_changed(i, it[f"FE{i}"].Text))
+        setattr(getattr(on, f"FC{i}"), "CurrentIndexChanged", lambda ev, i=i: form_changed(i, it[f"FC{i}"].CurrentText))
+        setattr(getattr(on, f"FK{i}"), "Clicked", lambda ev, i=i: form_changed(i, bool(it[f"FK{i}"].Checked)))
+
+    def json_changed(ev):
+        if state["loading"]:
+            return
+        try:
+            state["params"] = json.loads(it["Params"].PlainText)
+        except ValueError:
+            pass  # still typing
 
     def load_feature(ev=None):
         f = feats[cur()]
         it["Help"].Text = f["help"]
-        show_params(f["defaults"])
         it["Preset"].Clear()
         it["Preset"].AddItem("Preset" + ell)
         for p in f["presets"]["builtin"] + f["presets"]["user"]:
@@ -243,55 +464,54 @@ def main():
         it["Items"].Clear()
         it["Items"].Hidden = True
         state["items"] = []
+        fill(f["defaults"])
 
     def load_preset(ev):
         if int(it["Preset"].CurrentIndex) > 0:
-            show_params(call(f"/presets?feature={cur()}&name={urllib.parse.quote(it['Preset'].CurrentText)}"))
+            fill(call(f"/presets?feature={cur()}&name={urllib.parse.quote(it['Preset'].CurrentText)}"))
 
     def save_preset(ev):
-        if it["PresetName"].Text.strip():
-            call("/presets", dict(feature=cur(), name=it["PresetName"].Text.strip(), params=json.loads(it["Params"].PlainText)))
+        name = it["PresetName"].Text.strip()
+        if name:
+            call("/presets", dict(feature=cur(), name=name, params=state["params"]))
             feats.update(call("/features")["features"])
             load_feature()
+            say("\u2713 Saved preset " + name)
 
-    def run(analyze):
-        try:
-            params = json.loads(it["Params"].PlainText)
-            if analyze:
-                params["plan_only" if cur() == "prompt_edit" else "preview"] = True
-            elif state["items"]:
-                tree = it["Items"]
-                ids = [str(x["id"]) for k, x in enumerate(state["items"]) if tree.TopLevelItem(k).CheckState[0] == "Checked"]
-                params["items"] = ",".join(ids) or "-1"
-            it["Out"].PlainText = "Working" + ell
-            timeline = read_timeline() if feats[cur()].get("needs_timeline", True) else None
-            res = call("/run", dict(feature=cur(), timeline=timeline, params=params, host="resolve"))
-            if analyze:
-                it["Items"].Clear()
-                state["items"] = res.get("items", [])
-                for x in state["items"]:
-                    row = it["Items"].NewItem()
-                    row.Text[0] = x["label"]
-                    row.CheckState[0] = "Checked"
-                    it["Items"].AddTopLevelItem(row)
-                it["Items"].Hidden = not state["items"]
-                it["Out"].PlainText = json.dumps(res.get("report", {}), indent=1)
-                return
-            notes = apply(res)
-            it["Out"].PlainText = "\n".join(["\u2713 " + n for n in notes] + ([res["text"]] if res.get("text") else [])
-                                            + [json.dumps(res.get("report", {}), indent=1)])
+    def run_edit(analyze):
+        params = dict(state["params"])
+        if analyze:
+            params["plan_only" if cur() == "prompt_edit" else "preview"] = True
+        elif state["items"]:
+            tree = it["Items"]
+            ids = [str(x["id"]) for k, x in enumerate(state["items"]) if tree.TopLevelItem(k).CheckState[0] == "Checked"]
+            params["items"] = ",".join(ids) or "-1"
+        res = run(cur(), params, feats[cur()]["title"], analyze)
+        if analyze and res is not None:
+            it["Items"].Clear()
+            state["items"] = res.get("items", [])
+            for x in state["items"]:
+                r = it["Items"].NewItem()
+                r.Text[0] = x["label"]
+                r.CheckState[0] = "Checked"
+                it["Items"].AddTopLevelItem(r)
+            it["Items"].Hidden = not state["items"]
+            say(f"{len(state['items'])} item(s) to review. Untick any to skip, then Apply." if state["items"]
+                else json.dumps(res.get("report", {}), indent=1))
+        elif not analyze:
             state["items"] = []
             it["Items"].Clear()
             it["Items"].Hidden = True
-        except Exception as e:
-            it["Out"].PlainText = f"Error: {e}"
 
-    win.On.Feature.CurrentIndexChanged = load_feature
-    win.On.Preset.CurrentIndexChanged = load_preset
-    win.On.SavePreset.Clicked = save_preset
-    win.On.Analyze.Clicked = lambda ev: run(True)
-    win.On.Apply.Clicked = lambda ev: run(False)
-    win.On.KerfWin.Close = lambda ev: disp.ExitLoop()
+    on.Feature.CurrentIndexChanged = load_feature
+    on.Preset.CurrentIndexChanged = load_preset
+    on.SavePreset.Clicked = save_preset
+    on.More.Clicked = lambda ev: setattr(it["Params"], "Hidden", not it["More"].Checked)
+    on.Params.TextChanged = json_changed
+    on.Analyze.Clicked = lambda ev: run_edit(True)
+    on.Apply.Clicked = lambda ev: run_edit(False)
+    on.KerfWin.Close = lambda ev: disp.ExitLoop()
+
     def beat(ev=None):
         s = heartbeat()
         it["Live"].Text = (dot + " " + s["project"] + (sep + s["sequence"] + sep + s["timecode"] if s.get("sequence") else "")) if s \
@@ -304,6 +524,7 @@ def main():
     except Exception:
         timer = None
     beat()
+    show_vals()
     load_feature()
     win.Show()
     disp.RunLoop()

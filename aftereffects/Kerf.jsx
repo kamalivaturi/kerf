@@ -51,7 +51,7 @@
     function http(method, path, body, timeout) {
         var s = new Socket(), payload = body === undefined ? "" : json(body), raw = "", i;
         s.timeout = timeout || 3600;
-        if (!s.open(ENGINE, "BINARY")) { throw new Error("Can't reach the Kerf engine: start Kerf Studio (or start-kerf), and enable Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network."); }
+        if (!s.open(ENGINE, "BINARY")) { throw new Error("Can't reach the Kerf engine: install Kerf (or run start-kerf), and enable Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network."); }
         s.write(method + " " + path + " HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nX-Kerf-Token: " + token() +
                 "\r\nContent-Length: " + payload.length + "\r\n\r\n" + payload);
         while (!s.eof) { raw += s.read(65536); }
@@ -117,9 +117,12 @@
         }
         return parent ? "Null parented to " + sel.length + " layer(s)" : "Null added";
     }
-    function addSolid(adjust) {
+    function addSolid(adjust, hex) {  // hex "#rrggbb" from the HTML panel, else AE's colour picker
         var c = comp(), col = [0, 0, 0], picked;
-        if (!adjust) {
+        if (!adjust && hex) {
+            picked = parseInt(String(hex).replace("#", ""), 16);
+            col = [(picked >> 16 & 255) / 255, (picked >> 8 & 255) / 255, (picked & 255) / 255];
+        } else if (!adjust) {
             picked = $.colorPicker(0x000000);
             if (picked < 0) { return "Cancelled"; }
             col = [(picked >> 16 & 255) / 255, (picked >> 8 & 255) / 255, (picked & 255) / 255];
@@ -179,6 +182,32 @@
         var res = http("POST", "/run", { feature: "quick_mask", timeline: tl, params: { clips: "all", region: region, model: "u2net_human_seg" } });
         importAbove(res.files[0], l, l.inPoint).name = l.name + " (Kerf cutout)";
         return "Cutout added above " + l.name + (region ? " (mask region)" : "");
+    }
+    // HTML panel: it runs the engine itself (async, no frozen AE) and only asks AE for these quick steps
+    function clipInfo() {  // the selected layer as a Kerf timeline, plus a mask drawn on it as the cutout region
+        var c = comp(), l = layers()[0], tl = clipOf(l, c), region = "", v, xs = [], ys = [], i, w, h, x0, y0;
+        if (l.mask && l.mask.numProperties > 0) {
+            v = l.mask(1).maskShape.value.vertices; w = l.source.width; h = l.source.height;
+            for (i = 0; i < v.length; i++) { xs.push(v[i][0]); ys.push(v[i][1]); }
+            x0 = Math.min.apply(null, xs); y0 = Math.min.apply(null, ys);
+            region = [x0 / w, y0 / h, (Math.max.apply(null, xs) - x0) / w, (Math.max.apply(null, ys) - y0) / h].join(",");
+        }
+        return json({ timeline: tl, path: tl.video[0][0].path, name: l.name, region: region });
+    }
+    function addMarkers(list) {  // beat times relative to the layer's source
+        var c = comp(), l = layers()[0], mp = c.markerProperty || l.property("Marker"), i, t, n = 0;
+        for (i = 0; i < list.length; i++) {
+            t = l.startTime + list[i].t;
+            if (t < l.inPoint || t > l.outPoint) { continue; }
+            mp.setValueAtTime(t, new MarkerValue(list[i].name));
+            n++;
+        }
+        return n + " beat marker(s) on " + l.name;
+    }
+    function addLayer(path, name, start) {
+        var l = layers()[0];
+        importAbove(path, l, start === undefined || start === null ? l.inPoint : start).name = name;
+        return name + " added above " + l.name;
     }
     function frameExport() {
         var c = comp(), f = new File(Folder.desktop.fsName + "/" + c.name + " " + c.time.toFixed(2) + "s.png");
@@ -376,20 +405,24 @@
 
     // ------------------------------------------------------------ live: tell Kerf which project / comp / time is open
     var live;
-    function startStudio() {  // bring up Kerf Studio (and its engine) when the engine isn't running
+    function startStudio() {  // start the Kerf helper (it runs the engine) when the engine isn't running
         var win = $.os.indexOf("Windows") >= 0;
-        var f = win ? new File($.getenv("LOCALAPPDATA") + "/Kerf Studio/kerf-studio.exe") : new Folder("/Applications/Kerf Studio.app");
+        var f = win ? new File($.getenv("LOCALAPPDATA") + "/Kerf/kerf.exe") : new Folder("/Applications/Kerf.app");
         if (!f.exists) { return false; }
-        system.callSystem(win ? 'cmd /c start "" "' + f.fsName + '"' : 'open "' + f.fsName + '"');
+        system.callSystem(win ? 'cmd /c start "" "' + f.fsName + '"' : 'open -g "' + f.fsName + '"');
         return true;
+    }
+    function liveState() {
+        var c = app.project.activeItem, st = { project: app.project.file ? app.project.file.displayName : "Untitled project" };
+        if (c instanceof CompItem) {
+            st.sequence = c.name; st.playhead = c.time; st.fps = c.frameRate; st.width = c.width; st.height = c.height;
+            st.timecode = timeToCurrentFormat(c.time, c.frameRate);
+        }
+        return st;
     }
     $.global.kerfBeat = function () {
         try {
-            var c = app.project.activeItem, st = { project: app.project.file ? app.project.file.displayName : "Untitled project" };
-            if (c instanceof CompItem) {
-                st.sequence = c.name; st.playhead = c.time; st.fps = c.frameRate; st.width = c.width; st.height = c.height;
-                st.timecode = timeToCurrentFormat(c.time, c.frameRate);
-            }
+            var st = liveState();
             http("POST", "/host/heartbeat", { host: "aftereffects", state: st }, 2);
             if (live) { live.text = "\u25CF " + st.project + (st.sequence ? "  \u00B7  " + st.sequence + "  \u00B7  " + st.timecode : ""); }
         } catch (e) { try { if (live) { live.text = "\u25CB Kerf engine not running"; } } catch (e2) { /* panel closed */ } }
@@ -525,8 +558,30 @@
         adapt();
         if (win instanceof Window) { win.center(); win.show(); }
     }
+    if ($.global.KERF_LIB) {  // loaded by the HTML panel (aftereffects/cep): expose the tools, no ScriptUI
+        var FUNCS = { anchor: anchor, "null": function () { return addNull(false); }, parentNull: function () { return addNull(true); },
+            adjustment: function () { return addSolid(true); }, solid: function (hex) { return addSolid(false, hex); },
+            beats: placeBeats, clearBeats: clearBeats, stabilize: stabilize, zoom: zoom, mask: quickMask, frameExport: frameExport,
+            sortProject: sortProject, copyFx: copyFx, applyFx: applyFx, valueCurve: valueCurve, speedCurve: speedCurve, shake: shake,
+            align: align, captions: captions, clipInfo: clipInfo, addMarkers: addMarkers, addLayer: addLayer };
+        $.global.KerfAE = {
+            call: function (name, settings, args) {  // settings: the panel's values for S; returns JSON {ok, text}
+                var k, r;
+                for (k in settings) { if (settings.hasOwnProperty(k)) { S[k] = settings[k]; } }
+                app.beginUndoGroup("Kerf: " + name);
+                try { r = { ok: true, text: String(FUNCS[name].apply(null, args || []) || name + " done") }; }
+                catch (e) { r = { ok: false, text: e.message }; }
+                app.endUndoGroup();
+                return json(r);
+            },
+            live: function () { try { return json(liveState()); } catch (e) { return "{}"; } },
+            token: function () { try { return token(); } catch (e) { return ""; } },
+            launch: function () { return startStudio() ? "1" : ""; }
+        };
+        return;
+    }
     build(thisObj);
-    try { http("GET", "/settings", undefined, 2); } catch (e) { if (startStudio()) { say("Starting Kerf Studio\u2026"); } }
-    if ($.global.kerfBeatTask) { app.cancelTask($.global.kerfBeatTask); }
-    $.global.kerfBeatTask = app.scheduleTask("kerfBeat()", 2000, true);
+    try { http("GET", "/settings", undefined, 2); } catch (e) { if (startStudio()) { say("Starting Kerf\u2026"); } }
+    if ($.global.kerfBeatTask) { app.cancelTask($.global.kerfBeatTask); $.global.kerfBeatTask = 0; }
+    kerfBeat();  // once on open; no repeating socket task (idle-task sockets can destabilise AE)
 })(this);

@@ -213,7 +213,7 @@ def _multipart(fields, file_field, file_path):
 def dub(tl, p, ctx):
     key = settings.get("elevenlabs_api_key")
     if not key:
-        raise RuntimeError("Dubbing needs an ElevenLabs API key: add it in Settings")
+        raise ValueError("Dubbing needs an ElevenLabs API key: add it in Settings")
     voice = mixdown(tl, parse_tracks(p["voice_tracks"]), ctx.out_dir / f"{tl.name} - voice.wav")
     lang = p["target_language"]
     body, ctype = _multipart(dict(target_lang=lang, source_lang=p["source_language"]), "file", voice)

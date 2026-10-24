@@ -1,7 +1,7 @@
 // Client for the local Kerf engine (python -m kerf serve). Every call except /health carries the token.
-import { host } from "./host";
+import { host, IN_CEP } from "./host";
 
-const BASE = __UXP__ || import.meta.env.DEV ? "http://127.0.0.1:7878" : "";
+const BASE = __UXP__ || IN_CEP || import.meta.env.DEV ? "http://127.0.0.1:7878" : "";
 let token = "";
 
 export const store = {

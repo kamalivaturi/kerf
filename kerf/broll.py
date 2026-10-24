@@ -76,7 +76,7 @@ def run(tl, p, ctx):
     from . import settings
     key = p["pexels_key"] or settings.get("pexels_api_key")
     if p["source"] == "pexels" and not key:
-        raise RuntimeError("Pexels needs a free API key (pexels.com/api): set pexels_key or PEXELS_API_KEY")
+        raise ValueError("Pexels needs a free API key (pexels.com/api): set pexels_key or PEXELS_API_KEY")
     clips, used, missing = [], set(), []
     for it in selected(p, items):
         path = (pexels(it["query"], key, p["orientation"], ctx.out_dir) if p["source"] == "pexels"

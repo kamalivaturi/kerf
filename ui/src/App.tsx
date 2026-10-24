@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, store } from "./api";
 import Graphics from "./Graphics";
 import Toolkit, { ToolTab } from "./Toolkit";
-import { host, IN_UXP, Live, liveSequence, RunResult, setStandaloneMedia } from "./host";
+import { EDITOR_NAME, host, IN_EDITOR, IN_UXP, Live, liveSequence, RunResult, setStandaloneMedia } from "./host";
 import { LANGS, setLang, t } from "./i18n";
 
 const HELP_URL = "https://github.com/kamalivaturi/kerf#readme";
@@ -145,12 +145,6 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  async function pickMedia() { const p = await host.pickFile?.(); if (p) setMedia(p); }
-  function needMedia() { // a tool was used before choosing a video: open the picker (Studio) or point at the field
-    if (host.pickFile) pickMedia();
-    else document.getElementById("media")?.focus();
-  }
-  useEffect(() => { host.onFileDrop?.((ps) => setMedia(ps.join("\n"))); }, []);
   const paths = () => media.split("\n").map((s) => s.trim()).filter(Boolean);
   function reset() { setItems(null); setResult(null); setNotes([]); setError(""); }
   function pickGroup(g: string) {
@@ -177,7 +171,7 @@ export default function App() {
     else if (items) p.items = [...checked].join(",") || "-1";
     setStarted(Date.now());
     try {
-      if (!IN_UXP && f.needs_timeline && paths().length > 1 && !analyze) {
+      if (!IN_EDITOR && f.needs_timeline && paths().length > 1 && !analyze) {
         setBusy(`Batch: ${paths().length} files`);
         setResult({ report: await api.post("/batch", { feature: name, paths: paths(), params: p }) });
         return;
@@ -209,9 +203,10 @@ export default function App() {
   }
   applyRef.current = () => run(false);
 
+  if (!IN_EDITOR && !PREVIEW) return <InEditorOnly />; // Kerf reads the open sequence/comp/timeline: it lives in the editor
   if (!engine) return <Offline onRetry={connect} prefs={prefs} setPrefs={setPrefs} />;
 
-  const NAV: [View, string, JSX.Element][] = [
+  const NAV_ALL: [View, string, JSX.Element][] = [
     ["tools", "Tools", <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>],
     ["graphs", "Graphs", <svg viewBox="0 0 24 24"><path d="M3 20c4 0 5-16 9-16s5 16 9 16" /></svg>],
     ["motion", "Motion", <svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3M20 16H8l3 3" /><circle cx="4" cy="16" r="1.5" /></svg>],
@@ -219,7 +214,8 @@ export default function App() {
     ["edit", "Edit", <svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" /></svg>],
     ["graphics", "Graphics", <svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" /></svg>],
   ];
-  const needsMedia = !IN_UXP && view !== "graphics" && (view !== "edit" || f?.needs_timeline !== false);
+  const NAV = NAV_ALL.filter(([k]) => !(["graphs", "edit", "graphics"] as View[]).includes(k) || host.has(k)); // only what this editor supports
+  if (!NAV.some(([k]) => k === view)) setTimeout(() => goView("tools"), 0);
 
   return (
     <div className="app">
@@ -238,7 +234,7 @@ export default function App() {
       </nav>
 
       {update && <div className="banner">{update.auto
-        ? <>Kerf {update.latest} is downloading in the background and installs when you quit Kerf Studio. <a href={update.url} target="_blank" rel="noreferrer">What's new</a></>
+        ? <>Kerf {update.latest} is downloading in the background and installs after you close your editors. <a href={update.url} target="_blank" rel="noreferrer">What's new</a></>
         : <>Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></>}</div>}
       {live && !live.running.length && live.exit_in != null && <div className="banner wait" role="status">
         <span>Kerf runs alongside Premiere Pro, After Effects or DaVinci Resolve. Open one, or Kerf closes in {live.exit_in}s.</span>
@@ -248,25 +244,13 @@ export default function App() {
       {panel === "history" && <History entries={history} onLoad={(h) => { goView("edit"); setName(h.feature); setGroup(features[h.feature]?.group || group); setTimeout(() => setParams(h.params), 0); setPanel(""); }}
         onClear={() => { setHistory([]); store.set("history", []); }} onClose={() => setPanel("")} />}
 
-      {needsMedia && (
-        <section className="card source">
-          <label htmlFor="media">{t("media")} <small>{t("mediaHint")}</small></label>
-          {seq && <small className="match">Effects match {EDITORS[seq.host]} “{seq.sequence}”: {seq.width}×{seq.height} · {+seq.fps!.toFixed(3)} fps</small>}
-          <div className="mediarow">
-            <textarea id="media" rows={1} value={media} onChange={(e) => setMedia(e.target.value)} placeholder="C:\Videos\interview.mp4" />
-            {host.pickFile && <button className="primary" onClick={pickMedia}>Choose video…</button>}
-          </div>
-          {!media.trim() && <p className="help">{host.onFileDrop ? "Drag a video anywhere into Kerf Studio, or choose one. " : "Paste the full path of a video. "}
-            Every tool works on this file and writes a timeline you can import into Premiere or Resolve.</p>}
-        </section>
-      )}
 
       {view === "graphics" && <Graphics vertical={seq ? seq.height! > seq.width! : undefined} onClose={() => goView("tools")} onCaptions={(file) => {
         goView("edit"); setName("captions"); setGroup(features.captions?.group || group);
         setTimeout(() => setParams({ ...features.captions?.defaults, output: "mogrt", mogrt: file, mogrt_param: "Text" }), 0);
       }} />}
       {(view === "tools" || view === "graphs" || view === "motion" || view === "shakes") &&
-        <Toolkit tab={view} projectKey={projectKey} hasMedia={IN_UXP || !!media.trim()} onNeedMedia={needMedia} />}
+        <Toolkit tab={view} projectKey={projectKey} hasMedia={IN_EDITOR || !!media.trim()} onNeedMedia={() => {}} />}
 
       {view === "edit" && <>
         <div className="search">
@@ -296,7 +280,7 @@ export default function App() {
             {prefs.showHelp && <p className="help">{f.help}</p>}
             <Presets feature={name} f={f} params={params} setParams={setParams} reload={connect} />
             <Form f={f} params={params} setParams={setParams} />
-            {name === "captions" && params.output !== "srt_only" && <CaptionPreview params={params} media={IN_UXP ? "" : paths()[0] || ""} size={seq ? [seq.width!, seq.height!] : undefined} />}
+            {name === "captions" && params.output !== "srt_only" && <CaptionPreview params={params} media={IN_EDITOR ? "" : paths()[0] || ""} size={seq ? [seq.width!, seq.height!] : undefined} />}
             <div className="actions">
               <button className="ghost" onClick={() => setParams({ ...f.defaults })} title="Reset to defaults">{t("reset")}</button>
               {f.review && <button disabled={!!busy} onClick={() => run(true)}>{name === "prompt_edit" ? t("plan") : t("analyze")}</button>}
@@ -307,7 +291,7 @@ export default function App() {
             {busy && <div className="busy"><span className="spinner" /> {busy}… <span className="elapsed">{Math.round((Date.now() - started) / 1000)}s</span></div>}
             {error && <div className="error">{error}</div>}
             {items && <Review items={items} checked={checked} setChecked={setChecked} edits={edits} setEdits={setEdits} />}
-            {result && <Result res={result} notes={notes} onUse={!IN_UXP ? (p) => { setMedia(p); pickGroup("Cut"); } : undefined} />}
+            {result && <Result res={result} notes={notes} onUse={!IN_EDITOR ? (p) => { setMedia(p); pickGroup("Cut"); } : undefined} />}
           </main>
         )}
       </>}
@@ -430,7 +414,7 @@ const EDITORS: Record<string, string> = { premiere: "Premiere Pro", aftereffects
 
 function LiveChips({ live, engine }: { live: HostStatus | null; engine: string }) {
   const run = live?.running || [];
-  if (!run.length) return <span className="pill status idle" title={`Engine ${engine} · no editor open`}><i />{IN_UXP ? "Premiere" : "Studio"}</span>;
+  if (!run.length) return <span className="pill status idle" title={`Engine ${engine} · no editor open`}><i />{EDITOR_NAME[host.name]}</span>;
   return <span className="live-chips">{run.map((h) => {
     const s = live!.live[h];
     const what = s?.sequence ? `${s.sequence} · ${s.timecode ?? ""}` : s?.project || "";
@@ -447,7 +431,7 @@ const SETTING_FIELDS: [string, string, string[]?][] = [
   ["local_llm_url", "Local LLM URL (Ollama…)"], ["local_llm_model", "Local model"],
   ["elevenlabs_api_key", "ElevenLabs API key"], ["pexels_api_key", "Pexels API key"],
   ["whisper_model", "Whisper model or fine-tuned path"], ["whisper_device", "Whisper device", ["auto", "cuda", "cpu"]],
-  ["auto_update", "Automatic updates (Kerf Studio)", ["on", "off"]],
+  ["auto_update", "Automatic updates", ["on", "off"]],
   ["follow_editors", "Run only while Premiere, After Effects or Resolve is open", ["on", "off"]],
 ];
 
@@ -517,14 +501,37 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
   );
 }
 
+// Outside an editor there is nothing to work on; ?preview shows the full UI (development, layout checks).
+const PREVIEW = typeof location !== "undefined" && new URLSearchParams(location.search).has("preview");
+
+function InEditorOnly() {
+  return <div className="app offline"><main className="card fade">
+    <div className="brand"><span className="wordmark">kerf</span></div>
+    <h2>Kerf works inside your editor</h2>
+    <p className="help">Open Kerf where you edit and it uses the open sequence, composition or timeline: no files to pick.</p>
+    <ul className="places"><li><b>Premiere Pro</b> Window › UXP Plugins › Kerf</li><li><b>After Effects</b> Window › Extensions › Kerf</li>
+      <li><b>DaVinci Resolve</b> Workspace › Scripts › Kerf</li></ul>
+  </main></div>;
+}
+
 function Offline({ onRetry, prefs, setPrefs }: { onRetry: () => void; prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void }) {
+  const [starting, setStarting] = useState(!!host.launchEngine);
+  useEffect(() => { // open the panel = Kerf starts; the parent keeps polling and switches over when the engine answers
+    if (!host.launchEngine) return;
+    host.launchEngine(store.get("kerfHome", "C:\\Kerf")).catch(() => {});
+    const t = setTimeout(() => setStarting(false), 25000);
+    return () => clearTimeout(t);
+  }, []);
+  if (starting) return <div className="app offline"><main className="card fade"><div className="busy"><span className="spinner" /> Starting Kerf…</div>
+    <p className="help">The first start can take a few seconds.</p></main></div>;
   return (
     <div className="app offline">
       <header className="top"><div className="brand"><span className="logo">K</span> Kerf</div>
         <span className="status bad">● engine offline</span><ThemePicker prefs={prefs} set={setPrefs} /></header>
       <main className="card fade">
-        <h2>Start the Kerf engine</h2>
-        <p className="help">Kerf does its work in a small local engine (Python + FFmpeg). Nothing leaves your computer unless you turn on an AI provider or download something.</p>
+        <h2>Kerf isn't running</h2>
+        <p className="help">Kerf does its work in a small local engine on this computer. If it didn't start, install Kerf (one installer adds the engine and the panels for Premiere Pro, After Effects and Resolve), then click Retry.</p>
+        <p className="help"><a href="https://github.com/kamalivaturi/kerf/releases/latest" onClick={(e) => { e.preventDefault(); openHelp("https://github.com/kamalivaturi/kerf/releases/latest"); }}>Download Kerf</a></p>
         {host.launchEngine
           ? <button className="primary" onClick={() => host.launchEngine!(store.get("kerfHome", "C:\\Kerf")).then(() => setTimeout(onRetry, 3000))}>{t("startEngine")}</button>
           : <pre>python -m kerf serve</pre>}
@@ -536,6 +543,7 @@ function Offline({ onRetry, prefs, setPrefs }: { onRetry: () => void; prefs: Pre
 
 function openHelp(url = HELP_URL) {
   if (IN_UXP) (globalThis as any).require?.("uxp")?.shell?.openExternal(url);
+  else if ((globalThis as any).cep?.util) (globalThis as any).cep.util.openURLInDefaultBrowser(url);
   else window.open(url, "_blank", "noopener");
 }
 

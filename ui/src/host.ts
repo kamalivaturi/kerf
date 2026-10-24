@@ -23,8 +23,21 @@ export type RunResult = {
   error?: string;
 };
 
+// What each editor can do; the UI only shows tabs, cards and buttons whose action the editor supports.
+const ALL = ["anchor", "null", "bars", "adjustment", "solid", "beats", "clearBeats", "valueCurve", "speedCurve", "speedGraph", "shake",
+  "shakeEngine", "stabilize", "zoom", "layout", "mask", "frameExport", "sortProject", "fx", "graphs", "edit", "graphics"];
+const CAPS: Record<string, Set<string>> = {
+  premiere: new Set(ALL),
+  standalone: new Set(ALL.filter((a) => !["adjustment", "clearBeats", "fx"].includes(a))),
+  aftereffects: new Set(["anchor", "null", "parentNull", "adjustment", "solid", "beats", "clearBeats", "valueCurve", "speedCurve", "shake",
+    "stabilize", "zoom", "alignAE", "mask", "frameExport", "sortProject", "fx", "captions"]),
+};
+export const EDITOR_NAME: Record<string, string> = { premiere: "Premiere", aftereffects: "After Effects", standalone: "Studio" };
+
 export interface Host {
-  name: "premiere" | "standalone";
+  name: "premiere" | "aftereffects" | "standalone";
+  has(action: string): boolean; // capability: hide what this editor can't do
+  native?: Record<string, (p: Record<string, any>) => Promise<string>>; // tools that run inside the editor itself
   readTimeline(): Promise<TimelineDict>;
   apply(res: RunResult): Promise<string[]>; // returns human-readable notes
   outDir(): Promise<string | undefined>;
@@ -49,6 +62,8 @@ export interface HostTools {
 
 const req: ((m: string) => any) | undefined = (globalThis as any).require;
 export const IN_UXP: boolean = __UXP__ && typeof req === "function";
+export const IN_CEP: boolean = !__UXP__ && typeof (globalThis as any).__adobe_cep__ !== "undefined"; // After Effects HTML panel
+export const IN_EDITOR = IN_UXP || IN_CEP;
 
 // ------------------------------------------------------------------ Premiere Pro (UXP)
 
@@ -300,6 +315,7 @@ function premiere(): Host {
 
   return {
     name: "premiere",
+    has: (a) => CAPS.premiere.has(a),
     tools,
     async projectKey() { return (await ppro.Project.getActiveProject())?.path || "untitled"; },
     async live() {
@@ -381,9 +397,9 @@ function premiere(): Host {
     },
     async launchEngine(kerfHome) {
       const os = req!("os"), win = os.platform?.() === "win32";
-      // Kerf Studio if installed (it starts the bundled engine), else the source checkout's start script
-      const studio = win ? `${os.homedir()}\\AppData\\Local\\Kerf Studio\\kerf-studio.exe` : "/Applications/Kerf Studio.app";
-      if (await uxp.shell.openPath(studio).then((r: unknown) => !r, () => false)) return;
+      // the Kerf helper (set up by the Kerf installer) starts the engine; else a source checkout's start script
+      const helper = win ? `${os.homedir()}\\AppData\\Local\\Kerf\\kerf.exe` : "/Applications/Kerf.app";
+      if (await uxp.shell.openPath(helper).then((r: unknown) => !r, () => false)) return;
       await uxp.shell.openPath(win ? `${kerfHome}\\start-kerf.cmd` : `${kerfHome}/start-kerf.command`);
     },
   };
@@ -401,6 +417,7 @@ function standalone(): Host {
   const tauri = (globalThis as any).__TAURI__; // Kerf Studio exposes the native file picker and file drops
   return {
     name: "standalone",
+    has: (a) => CAPS.standalone.has(a),
     ...(tauri?.dialog && {
       async pickFile() {
         const p = await tauri.dialog.open({ multiple: false, filters: [{ name: "Video, audio or image",
@@ -429,4 +446,66 @@ function standalone(): Host {
   };
 }
 
-export const host: Host = IN_UXP ? premiere() : standalone();
+// ------------------------------------------------------------------ After Effects (CEP panel; tools run in ExtendScript, aftereffects/Kerf.jsx)
+
+function aftereffects(): Host {
+  const cep = (globalThis as any).__adobe_cep__;
+  const es = (script: string) => new Promise<string>((ok) => cep.evalScript(script, (r: string) => ok(r)));
+  const call = async (name: string, settings: object = {}, args: unknown[] = []) => {
+    const out = await es(`KerfAE.call(${JSON.stringify(name)}, ${JSON.stringify(settings)}, ${JSON.stringify(args)})`);
+    let r: { ok?: boolean; text?: string } = {};
+    try { r = JSON.parse(out); } catch { throw new Error(out && out !== "EvalScript error." ? out : "After Effects didn't answer: open a composition and try again"); }
+    if (!r.ok) throw new Error(r.text || `${name} failed`);
+    return r.text || "Done";
+  };
+  // Engine work runs here, asynchronously, so After Effects never freezes; ExtendScript only adds the result.
+  const engine = async (feature: string, params: Record<string, unknown>, timeline: unknown) => {
+    const { api } = await import("./api");
+    return (await api.post("/run", { feature, timeline, params })) as RunResult & { files?: string[] };
+  };
+  const clip = async () => JSON.parse(await call("clipInfo")) as { timeline: TimelineDict; path: string; name: string; region: string };
+  return {
+    name: "aftereffects",
+    has: (a) => CAPS.aftereffects.has(a),
+    native: {
+      anchor: (p) => call("anchor", {}, [p.ax, p.ay]), null: () => call("null"), parentNull: () => call("parentNull"),
+      adjustment: () => call("adjustment"), solid: (p) => call("solid", {}, [p.color]),
+      beats: async (p) => {
+        const c = await clip();
+        const res = await engine("beat_markers", { music: c.path, every: p.every }, c.path);
+        return call("addMarkers", {}, [res.markers || []]);
+      },
+      clearBeats: () => call("clearBeats"),
+      valueCurve: (p) => call("valueCurve", {}, [p.name]), speedCurve: (p) => call("speedCurve", {}, [p.kind]),
+      shake: (p) => call("shake", { axis: p.axis, amp: p.amplitude, freq: p.frequency, rot: p.rotation, dur: p.duration, decay: p.decay, flash: Number(p.flash) > 0 }),
+      stabilize: () => call("stabilize"),
+      zoom: (p) => call("zoom", { amount: p.amount, zdur: p.duration }, [p.direction, p.ease === "out" ? "out" : "in"]),
+      align: (p) => call("align", {}, [p.mode]),
+      mask: async () => {
+        const c = await clip();
+        const res = await engine("quick_mask", { clips: "all", region: c.region, model: "u2net_human_seg" }, c.timeline);
+        if (!res.files?.length) throw new Error("No cutout was made: is the selected layer a video?");
+        return call("addLayer", {}, [res.files[0], `${c.name} (Kerf cutout)`]);
+      },
+      frameExport: () => call("frameExport"),
+      sortProject: () => call("sortProject"), copyFx: (p) => call("copyFx", {}, [p.name]), applyFx: (p) => call("applyFx", {}, [p.name]),
+      captions: async () => {
+        const c = await clip();
+        const res = await engine("captions", { output: "overlay" }, { ...c.timeline, audio: c.timeline.video });
+        const mov = (res.files || []).find((f) => /\.mov$/i.test(f));
+        if (!mov) return "No speech found in the selected layer";
+        return call("addLayer", {}, [mov, "Kerf captions", 0]);
+      },
+    },
+    async live() { try { return JSON.parse(await es("KerfAE.live()")); } catch { return {}; } },
+    async projectKey() { return (await this.live!()).project || "untitled"; },
+    async readTimeline() { throw new Error("After Effects tools work on the selected layers of the open composition."); },
+    async apply() { return []; },
+    async outDir() { return undefined; },
+    readToken: () => es("KerfAE.token()"),
+    async insertMogrt() { return "MOGRTs are for Premiere Pro"; },
+    async launchEngine() { await es("KerfAE.launch()"); },
+  };
+}
+
+export const host: Host = IN_UXP ? premiere() : IN_CEP ? aftereffects() : standalone();

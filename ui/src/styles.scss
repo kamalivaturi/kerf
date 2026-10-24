@@ -295,3 +295,6 @@ input, select, textarea { border-radius: 10px; background: var(--field); }
 small { font-size: 11px; }
 ::placeholder { color: var(--muted); opacity: 1; }
 .mediarow { display: flex; align-items: flex-start; > textarea { flex: 1; } > button { margin-left: 8px; white-space: nowrap; } }
+.places { list-style: none; padding: 0; margin: 8px 0 0; li { padding: 8px 0; border-top: 1px solid var(--line); color: var(--muted); } b { color: var(--text); margin-right: 8px; } }
+.offline .wordmark { display: inline-block; margin-bottom: 10px; font-size: 30px; font-weight: 900; font-style: italic; letter-spacing: -.04em;
+  line-height: 1; color: var(--accent); text-shadow: 0 2px 0 #b8400f, 0 6px 18px rgba(255, 107, 44, .35); }

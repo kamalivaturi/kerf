@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 jobs:
-  desktop:  # Kerf Studio installers + portable engine, per OS
+  desktop:  # Kerf installers (engine + editor panels) + portable engine, per OS
     strategy:
       fail-fast: false
       matrix:
@@ -35,6 +35,19 @@ jobs:
       - name: Build the panel / web UI
         run: npm ci && npm run build
         working-directory: ui
+      - name: Bundle the editor panels the installer puts in place
+        run: python scripts/build_panels.py
+      - name: Sign the After Effects panel on its own platform (self-signed, so it loads without CEP debug mode)
+        if: runner.os != 'Linux'
+        run: |
+          base=https://github.com/Adobe-CEP/CEP-Resources/raw/master/ZXPSignCMD/4.1.3
+          if [ "$RUNNER_OS" = Windows ]; then Z=./ZXPSignCmd.exe; curl -sfL -o $Z "$base/x64/ZXPSignCmd.exe"
+          else Z=./ZXPSignCmd; curl -sfL -o $Z "$base/macOS/ZXPSignCmd"; chmod +x $Z; fi
+          $Z -selfSignedCert US CA Kerf Kerf "$GITHUB_RUN_ID" kerf-cep.p12 -validityDays 3650
+          $Z -sign build/panels/com.kerf.aftereffects kerf-ae.zxp kerf-cep.p12 "$GITHUB_RUN_ID"
+          rm -rf build/panels/com.kerf.aftereffects && mkdir build/panels/com.kerf.aftereffects
+          (cd build/panels/com.kerf.aftereffects && unzip -q ../../../kerf-ae.zxp)
+          ls build/panels/com.kerf.aftereffects/META-INF
       - name: Freeze the engine (static ffmpeg included)
         run: |
           python -m venv .venv

@@ -32,7 +32,7 @@ def complete(prompt, system="You are a concise assistant for video editors.", sc
     if provider not in PROVIDERS:
         raise ValueError(f"unknown AI provider '{provider}' (use {', '.join(PROVIDERS)})")
     if not _key(provider, s):
-        raise RuntimeError(f"No credentials for {provider}: add an API key (or local URL) in Kerf AI settings")
+        raise ValueError(f"No credentials for {provider}: add an API key (or local URL) in Kerf AI settings")
     model = model or s[{"claude": "claude_model", "openai": "openai_model", "gemini": "gemini_model",
                         "local": "local_llm_model"}[provider]]
 

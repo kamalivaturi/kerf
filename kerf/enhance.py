@@ -53,7 +53,7 @@ def enhance_file(path, p, out_dir):
     if p["provider"] == "elevenlabs":
         key = settings.get("elevenlabs_api_key")
         if not key:
-            raise RuntimeError("ElevenLabs needs an API key: add it in Kerf AI settings")
+            raise ValueError("ElevenLabs needs an API key: add it in Kerf AI settings")
         src = temp = elevenlabs(path, key, out)
     else:
         af = local_chain(p)

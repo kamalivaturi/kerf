@@ -2,7 +2,7 @@
 // Engine tools run through /run like every feature; selection-based ones use host.tools (Premiere).
 import { useEffect, useRef, useState } from "react";
 import { api, store } from "./api";
-import { host, IN_UXP, RunResult } from "./host";
+import { host, IN_EDITOR, RunResult } from "./host";
 
 export type ToolTab = "tools" | "graphs" | "motion" | "shakes";
 type P = Record<string, string | number | boolean>;
@@ -19,7 +19,7 @@ const SHAKE: P = { amplitude: 28, rotation: 1.5, frequency: 11, duration: 0.45, 
 const SLIDERS: [string, string, number, number, number][] = [["amplitude", "Amplitude px", 0, 120, 1], ["rotation", "Rotation °", 0, 10, .1],
   ["frequency", "Frequency Hz", 1, 30, .5], ["duration", "Duration s", .1, 3, .05], ["decay", "Decay", 0, 1, .05],
   ["zoom", "Overscan %", 100, 140, 1], ["flash", "Flash", 0, 100, 1], ["chromatic", "Chromatic px", 0, 20, 1]];
-const CARDS = ["anchor", "curves", "shakes", "stabzoom", "mask", "utils"];
+const CARDS = ["anchor", "curves", "shakes", "stabzoom", "mask", "captions", "utils"];
 
 // ------------------------------------------------------------------ icons (stroke SVG, inherit color)
 const I = {
@@ -67,7 +67,10 @@ function useRunner(hasMedia: boolean, onNeedMedia: () => void) {
   });
   const tool = (label: string, fn: (t: NonNullable<typeof host.tools>) => Promise<string>, fallback?: () => void) =>
     host.tools ? guard(label, () => fn(host.tools!)) : fallback ? fallback() : say(`${label} works inside the Premiere panel`, false);
-  return { busy, toast, run, tool, say, hasMedia, onNeedMedia };
+  // a tool the editor runs itself (After Effects ExtendScript), else the engine / Premiere path
+  const act = (name: string, label: string, p: P, fallback: () => unknown) =>
+    host.native?.[name] ? guard(label, () => host.native![name](p)) : fallback();
+  return { busy, toast, run, tool, act, say, hasMedia, onNeedMedia };
 }
 type Runner = ReturnType<typeof useRunner>;
 
@@ -174,7 +177,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
   tab: ToolTab; projectKey: string; hasMedia: boolean; onNeedMedia: () => void;
 }) {
   const r = useRunner(hasMedia, onNeedMedia);
-  const [s, setS] = useState<P>({ every: 1, smoothing: 50, color: "#000000", axis: "hv", on: IN_UXP ? "playhead" : "cuts", output: "keyframes",
+  const [s, setS] = useState<P>({ every: 1, smoothing: 50, color: "#000000", axis: "hv", on: IN_EDITOR ? "playhead" : "cuts", output: "keyframes",
     music: "", curve: "0.42,0,0.58,1", min_speed: 30, max_speed: 300, amount: 120, zdur: 0.6, tracks: "2", scale: 35, margin: 4,
     ...SHAKE, ...store.get<P>("toolkit", {}) });
   const set = (k: string, v: string | number | boolean) => setS((x) => { const n = { ...x, [k]: v }; store.set("toolkit", n); return n; });
@@ -188,12 +191,14 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
 
   const anchor = (ax: number, ay: number) => {
     const pos = `${["top", "middle", "bottom"][ay * 2]}_${["left", "center", "right"][ax * 2]}`.replace("middle_center", "center");
-    r.tool("Anchor", (t) => t.setAnchor(ax, ay), () => r.run("layout", { arrange: pos, tracks: s.tracks, scale: s.scale, margin: s.margin }, "Position"));
+    r.act("anchor", "Anchor", { ax, ay }, () => r.tool("Anchor", (t) => t.setAnchor(ax, ay), () => r.run("layout", { arrange: pos, tracks: s.tracks, scale: s.scale, margin: s.margin }, "Position")));
   };
   const layer = (kind: string, extra: P = {}) => r.run("add_layer", { kind, color: s.color, ...extra }, `Add ${kind}`);
-  const shake = () => r.run("camera_shake", { axis: s.axis, on: s.on, music: s.music, output: s.output,
-    ...Object.fromEntries(Object.keys(SHAKE).map((k) => [k, s[k]])) }, "Shake");
-  const zoom = (direction: string, ease: string) => r.run("zoom_move", { direction, ease, amount: s.amount, duration: s.zdur }, `Zoom ${direction}`);
+  const shakeP = { axis: s.axis, ...Object.fromEntries(Object.keys(SHAKE).map((k) => [k, s[k]])) };
+  const shake = () => r.act("shake", "Shake", shakeP, () => r.run("camera_shake", { ...shakeP, on: s.on, music: s.music, output: s.output }, "Shake"));
+  const zoom = (direction: string, ease: string) => r.act("zoom", `Zoom ${direction}`, { direction, ease, amount: s.amount, duration: s.zdur },
+    () => r.run("zoom_move", { direction, ease, amount: s.amount, duration: s.zdur }, `Zoom ${direction}`));
+  const has = (a: string) => host.has(a);
   const busy = !!r.busy;
   const axisRow = <div className="icons">{AXES.map(([k, l]) => <button key={k} className={`tk-icon tall${s.axis === k ? " on" : ""}`}
     onClick={() => set("axis", k)} aria-pressed={s.axis === k}>{I.axis(k)}<small>{l}</small></button>)}</div>;
@@ -206,25 +211,27 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
             aria-label={`Anchor ${ay === 0 ? "top" : ay === 1 ? "bottom" : "middle"} ${ax === 0 ? "left" : ax === 1 ? "right" : "center"}`}><i /></button>))}</div></div>
       <div><span className="tk-label">Add layer</span>
         <div className="tk-grid2">
-          <button className="tk-btn" disabled={busy} onClick={() => layer("transparent")}>NULL</button>
-          <button className="tk-btn" disabled={busy} onClick={() => layer("letterbox", { aspect: 2.39, duration: 0 })}>BARS</button>
-          <button className="tk-btn green" disabled={busy} onClick={() => r.tool("Adjustment", (t) => t.adjustment())}>ADJ</button>
-          <div className="tk-btn split"><button disabled={busy} onClick={() => layer("solid")}>SOLID</button>
+          <button className="tk-btn" disabled={busy} onClick={() => r.act("null", "Null", {}, () => layer("transparent"))}>NULL</button>
+          {has("parentNull") && <button className="tk-btn" disabled={busy} onClick={() => r.act("parentNull", "Null + parent", {}, () => {})} title="Parents the selected layers to a new null">NULL + PARENT</button>}
+          {has("bars") && <button className="tk-btn" disabled={busy} onClick={() => layer("letterbox", { aspect: 2.39, duration: 0 })}>BARS</button>}
+          {has("adjustment") && <button className="tk-btn green" disabled={busy} onClick={() => r.act("adjustment", "Adjustment", {}, () => r.tool("Adjustment", (t) => t.adjustment()))}>ADJ</button>}
+          <div className="tk-btn split"><button disabled={busy} onClick={() => r.act("solid", "Solid", { color: s.color }, () => layer("solid"))}>SOLID</button>
             <input type="color" value={String(s.color)} onChange={(e) => set("color", e.target.value)} aria-label="Solid color" /></div>
         </div></div>
       <div><span className="tk-label">Beats</span>
-        <button className="tk-btn primary block" disabled={busy} onClick={() => r.run("beat_markers", { music: s.music, every: s.every }, "Beats")}>PLACE BEATS</button>
-        <button className="tk-btn block" disabled={busy} onClick={() => r.tool("Clear", (t) => t.clearMarkers("Beat"))}>CLEAR</button>
+        <button className="tk-btn primary block" disabled={busy} title={host.native ? "Select the music layer" : undefined}
+          onClick={() => r.act("beats", "Beats", { every: s.every }, () => r.run("beat_markers", { music: s.music, every: s.every }, "Beats"))}>PLACE BEATS</button>
+        {has("clearBeats") && <button className="tk-btn block" disabled={busy} onClick={() => r.act("clearBeats", "Clear beats", {}, () => r.tool("Clear", (t) => t.clearMarkers("Beat")))}>CLEAR</button>}
         <Stepper label="Every N beats" value={Number(s.every)} set={(v) => set("every", v)} min={1} max={16} /></div>
     </section>,
     curves: <section className="tk-card">
       <div className="tk-head"><span className="tk-label">Curves</span><span className="legend"><i className="o" />Value <i className="b" />Speed</span></div>
       <div className="tk-row spread">
         <div className="icons">{CURVES.map(([l, b, m]) => <button key={l} className="tk-icon" title={`Value: ${l} (selected clips' keyframes)`} disabled={busy}
-          onClick={() => r.tool(l, (t) => t.ease(m as "linear" | "bezier"), () => { set("curve", b); r.say(`Curve set to ${l} for Zoom and the custom speed ramp`); })}>{I.curve(b)}</button>)}</div>
+          onClick={() => r.act("valueCurve", l, { name: l }, () => r.tool(l, (t) => t.ease(m as "linear" | "bezier"), () => { set("curve", b); r.say(`Curve set to ${l} for Zoom and the custom speed ramp`); }))}>{I.curve(b)}</button>)}</div>
         <span className="vsep" />
         <div className="icons">{SPEEDS.map(([l, k]) => <button key={k} className="tk-icon" title={`Speed: ${l}`} disabled={busy}
-          onClick={() => r.run("speed_ramp", { preset: k, min_speed: s.min_speed, max_speed: s.max_speed, clips: IN_UXP ? "playhead" : "all" }, `Speed ${l}`)}>{I.speed(k)}</button>)}</div>
+          onClick={() => r.act("speedCurve", `Speed ${l}`, { kind: k }, () => r.run("speed_ramp", { preset: k, min_speed: s.min_speed, max_speed: s.max_speed, clips: IN_EDITOR ? "playhead" : "all" }, `Speed ${l}`))}>{I.speed(k)}</button>)}</div>
       </div>
     </section>,
     shakes: <section className="tk-card">
@@ -233,27 +240,33 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
     </section>,
     stabzoom: <section className="tk-card tk-split two">
       <div><span className="tk-label">Stabilizer</span>
-        <div className="tk-row"><button className="tk-btn" disabled={busy} onClick={() => r.run("stabilize", { smoothing: Math.round(Number(s.smoothing) * .6), clips: IN_UXP ? "playhead" : "all" }, "Stabilize")}>STABILIZE</button>
-          <Stepper label="Smoothness" value={Number(s.smoothing)} set={(v) => set("smoothing", v)} min={10} max={100} step={10} fmt={(v) => `${v}%`} /></div></div>
+        <div className="tk-row"><button className="tk-btn" disabled={busy} onClick={() => host.native?.stabilize ? r.act("stabilize", "Stabilize", {}, () => {}) : r.run("stabilize", { smoothing: Math.round(Number(s.smoothing) * .6), clips: IN_EDITOR ? "playhead" : "all" }, "Stabilize")}>STABILIZE</button>
+          {!host.native?.stabilize && <Stepper label="Smoothness" value={Number(s.smoothing)} set={(v) => set("smoothing", v)} min={10} max={100} step={10} fmt={(v) => `${v}%`} />}</div></div>
       <div><span className="tk-label">Zoom</span>
         <div className="tk-row">{["in", "out"].map((d) => <div key={d} className="seg"><b>{d.toUpperCase()}</b>
           {["in", "out"].map((e) => <button key={e} className="seg-btn" disabled={busy} onClick={() => zoom(d, e)} title={`Zoom ${d}, ease ${e}`}>{e.toUpperCase()}</button>)}</div>)}</div></div>
     </section>,
-    mask: mask ? <MaskRegion r={r} onDone={() => setMask(false)} />
+    mask: host.native?.mask ? <section className="tk-card"><span className="tk-label">Quick mask</span>
+        <button className="tk-wide" disabled={busy} onClick={() => r.act("mask", "Quick mask", {}, () => {})}><span className="dash" /> CUT OUT SELECTED LAYER</button>
+        <p className="help">Offline AI cutout of the selected footage layer. Draw a mask on the layer first to limit it to a region.</p></section>
+      : mask ? <MaskRegion r={r} onDone={() => setMask(false)} />
       : <button className="tk-wide" onClick={() => setMask(true)}><span className="dash" /> QUICK MASK — DRAW REGION</button>,
+    captions: has("captions") ? <section className="tk-card"><span className="tk-label">Captions</span>
+        <button className="tk-btn primary block" disabled={busy} onClick={() => r.act("captions", "Captions", {}, () => {})}>CAPTIONS FOR SELECTED LAYER</button>
+        <p className="help">Transcribes the selected layer and adds an animated caption layer above it.</p></section> : null as unknown as JSX.Element,
     utils: <section className="tk-card">
       <span className="tk-label">Utilities</span>
       <div className="tk-row wrap">
-        <button className="tk-btn" disabled={busy} onClick={() => r.run("frame_export", {}, "Frame export")}>FRAME → DESKTOP</button>
-        <button className="tk-btn" disabled={busy} onClick={() => r.run("project_sort", {}, "Sort project")}>SORT PROJECT</button>
-        <button className="tk-btn" disabled={busy} onClick={() => r.tool("Copy FX", async (t) => {
+        <button className="tk-btn" disabled={busy} onClick={() => r.act("frameExport", "Frame export", {}, () => r.run("frame_export", {}, "Frame export"))}>FRAME → DESKTOP</button>
+        <button className="tk-btn" disabled={busy} onClick={() => r.act("sortProject", "Sort project", {}, () => r.run("project_sort", {}, "Sort project"))}>SORT PROJECT</button>
+        {has("fx") && <><button className="tk-btn" disabled={busy} onClick={() => host.native?.copyFx ? Promise.resolve(r.act("copyFx", "Copy FX", { name: window.prompt?.("Name this effect preset", "My look") || `FX ${new Date().toLocaleTimeString()}` }, () => {})).then(() => api.get("/fx").then((x) => setFx(x.presets))) : r.tool("Copy FX", async (t) => {
           const name = window.prompt?.("Name this effect preset", "My look") || `FX ${new Date().toLocaleTimeString()}`;
           const res = await api.post("/fx/save", { name, chain: await t.copyFx() });
           setFx((await api.get("/fx")).presets); setFxSel(name);
           return `Saved “${name}” (${res.components} effects)`;
         })}>COPY FX</button>
         <select value={fxSel} onChange={(e) => setFxSel(e.target.value)} aria-label="FX preset"><option value="">FX preset…</option>{fx.map((n) => <option key={n}>{n}</option>)}</select>
-        <button className="tk-btn primary" disabled={busy || !fxSel} onClick={() => r.tool("Apply FX", async (t) => t.applyFx(await api.post("/fx/get", { name: fxSel })))}>APPLY FX</button>
+        <button className="tk-btn primary" disabled={busy || !fxSel} onClick={() => r.act("applyFx", "Apply FX", { name: fxSel }, () => r.tool("Apply FX", async (t) => t.applyFx(await api.post("/fx/get", { name: fxSel }))))}>APPLY FX</button></>}
       </div>
     </section>,
   };
@@ -262,7 +275,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
     {tab === "tools" && <>
       <div className="tk-toolbar"><button className={`tk-mini${edit ? " on" : ""}`} onClick={() => setEdit(!edit)}>{edit ? "Done" : "Customize layout"}</button>
         {edit && <button className="tk-mini" onClick={() => saveLayout(CARDS, [])}>Reset</button>}</div>
-      {order.filter((c) => cards[c] && (edit || !hidden.includes(c))).map((c) => <div key={c} className={`tk-slot${hidden.includes(c) ? " off" : ""}`}>
+      {[...order, ...CARDS.filter((c) => !order.includes(c))].filter((c) => cards[c] && (edit || !hidden.includes(c))).map((c) => <div key={c} className={`tk-slot${hidden.includes(c) ? " off" : ""}`}>
         {edit && <div className="tk-edit"><button className="tk-mini" onClick={() => move(c, -1)} aria-label="Move up">↑</button>
           <button className="tk-mini" onClick={() => move(c, 1)} aria-label="Move down">↓</button>
           <button className="tk-mini" onClick={() => saveLayout(order, hidden.includes(c) ? hidden.filter((x) => x !== c) : [...hidden, c])}>{hidden.includes(c) ? "Show" : "Hide"}</button></div>}
@@ -276,7 +289,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
           <label className="tk-field">Curve<input value={String(s.curve)} onChange={(e) => set("curve", e.target.value)} /></label>
           <label className="tk-field">Slowest <b>{s.min_speed}%</b><input type="range" min={5} max={100} value={Number(s.min_speed)} onChange={(e) => set("min_speed", +e.target.value)} /></label>
           <label className="tk-field">Fastest <b>{s.max_speed}%</b><input type="range" min={100} max={1000} step={10} value={Number(s.max_speed)} onChange={(e) => set("max_speed", +e.target.value)} /></label>
-          <button className="tk-btn primary" disabled={busy} onClick={() => r.run("speed_ramp", { preset: "custom", curve: s.curve, min_speed: s.min_speed, max_speed: s.max_speed, clips: IN_UXP ? "playhead" : "all" }, "Speed ramp")}>RAMP CLIP</button>
+          <button className="tk-btn primary" disabled={busy} onClick={() => r.run("speed_ramp", { preset: "custom", curve: s.curve, min_speed: s.min_speed, max_speed: s.max_speed, clips: IN_EDITOR ? "playhead" : "all" }, "Speed ramp")}>RAMP CLIP</button>
           <button className="tk-btn" disabled={busy} onClick={() => r.run("zoom_move", { curve: s.curve, amount: s.amount, duration: s.zdur }, "Zoom")}>ZOOM WITH THIS CURVE</button>
           {host.tools && <button className="tk-btn" disabled={busy} onClick={() => r.tool("Ease", (t) => t.ease("bezier"))}>EASE SELECTED KEYFRAMES</button>}
         </div></div>
@@ -288,7 +301,12 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
         <div className="tk-row">{["in", "out"].map((d) => <div key={d} className="seg"><b>{d.toUpperCase()}</b>
           {["in", "out", "in_out"].map((e) => <button key={e} className="seg-btn" disabled={busy} onClick={() => zoom(d, e)}>{e.replace("_", "/").toUpperCase()}</button>)}</div>)}</div>
       </section>
-      <section className="tk-card"><span className="tk-label">Align & distribute</span>
+      {has("alignAE") && <section className="tk-card"><span className="tk-label">Align & distribute</span>
+        <div className="tk-row wrap">{([["Left", "left"], ["H centre", "hcenter"], ["Right", "right"], ["Top", "top"], ["V centre", "vcenter"], ["Bottom", "bottom"],
+          ["Distribute H", "dist_h"], ["Distribute V", "dist_v"]] as [string, string][]).map(([l, m]) =>
+          <button key={m} className="tk-btn" disabled={busy} onClick={() => r.act("align", `Align ${l}`, { mode: m }, () => {})}>{l.toUpperCase()}</button>)}</div>
+        <p className="help">Aligns the selected layers to the composition (distribute needs three or more).</p></section>}
+      {has("layout") && <section className="tk-card"><span className="tk-label">Align & distribute</span>
         <div className="tk-row wrap">
           <label className="tk-field small">Tracks<input value={String(s.tracks)} onChange={(e) => set("tracks", e.target.value)} /></label>
           <label className="tk-field small">Scale %<input type="number" value={Number(s.scale)} onChange={(e) => set("scale", +e.target.value)} /></label>
@@ -296,19 +314,19 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
         <div className="tk-row wrap">{["align_left", "align_right", "align_top", "align_bottom", "distribute_horizontal", "distribute_vertical", "grid"].map((a) =>
           <button key={a} className="tk-btn" disabled={busy} onClick={() => r.run("layout", { arrange: a, tracks: s.tracks, scale: a.startsWith("dist") || a === "grid" ? 0 : s.scale, margin: s.margin }, a)}>{a.replace("_", " ").toUpperCase()}</button>)}</div>
         <p className="help">Anchor (Tools tab) moves the anchor point of the selected clips in Premiere; elsewhere it places the clips on these tracks at that spot.</p>
-      </section>
+      </section>}
     </>}
     {tab === "shakes" && <section className="tk-card">
       <span className="tk-label">Camera shake</span>
       <div className="tk-row spread">{axisRow}</div>
       <ShakePreview p={s} axis={String(s.axis)} />
-      {SLIDERS.map(([k, l, mn, mx, st]) => <label key={k} className="tk-field">{l} <b>{Number(s[k]).toFixed(st < 1 ? 2 : 0)}</b>
+      {SLIDERS.filter(([k]) => has("shakeEngine") || !["zoom", "chromatic"].includes(k)).map(([k, l, mn, mx, st]) => <label key={k} className="tk-field">{l} <b>{Number(s[k]).toFixed(st < 1 ? 2 : 0)}</b>
         <input type="range" min={mn} max={mx} step={st} value={Number(s[k])} onChange={(e) => set(k, +e.target.value)} /></label>)}
-      <div className="tk-row wrap">
+      {has("shakeEngine") && <div className="tk-row wrap">
         <label className="tk-field small">Trigger<select value={String(s.on)} onChange={(e) => set("on", e.target.value)}>{["playhead", "cuts", "beats", "whole"].map((o) => <option key={o}>{o}</option>)}</select></label>
         <label className="tk-field small">Output<select value={String(s.output)} onChange={(e) => set("output", e.target.value)}><option value="keyframes">Keyframes (editable)</option><option value="render">Render (flash + RGB)</option></select></label>
         {s.on === "beats" && <label className="tk-field">Music file<input value={String(s.music)} onChange={(e) => set("music", e.target.value)} placeholder="song.mp3" /></label>}
-      </div>
+      </div>}
       <div className="tk-row wrap">
         {([["Impact", { axis: "all", amplitude: 40, duration: .35 }], ["Handheld", { on: "whole", axis: "hv", amplitude: 6, frequency: 1.5, rotation: .4, zoom: 104 }],
           ["Earthquake", { axis: "all", amplitude: 70, frequency: 18, duration: 1.2, decay: .3 }], ["Reset", SHAKE]] as [string, P][]).map(([n, v]) =>
