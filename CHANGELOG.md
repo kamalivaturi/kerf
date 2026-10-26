@@ -11,6 +11,7 @@
   Settings in pixels are "at 1080p" and scale with the timeline, so the look is the same in 4K, 720p or 9:16.
   Installed for your user only (no admin rights needed).
 - The Resolve window's Shakes tab points to Kerf FX for live, keyframeable versions.
+- Like Kerf? You can now [buy me a coffee](https://buymeacoffee.com/kamalivaturi) (also on the website and GitHub).
 - Every Kerf FX build is rendered in a test OpenFX host (all effects, extreme settings, half-resolution and 9:16
   frames) before it ships.
 
