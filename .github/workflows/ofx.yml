@@ -2,7 +2,7 @@ name: Kerf FX (OpenFX)
 on:
   push:
     branches: [main]
-    paths: ["ofx/**", "scripts/build_ofx.py", ".github/workflows/ofx.yml"]
+    paths: ["ofx/**", "scripts/build_ofx.py", "tests/ofx_host_test.py", ".github/workflows/ofx.yml"]
   workflow_dispatch:
 
 jobs:
@@ -18,6 +18,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/build_ofx.py
+      - run: python tests/ofx_host_test.py
       - uses: actions/upload-artifact@v4
         with:
           name: KerfFX-${{ runner.os }}

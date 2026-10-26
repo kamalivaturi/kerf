@@ -76,10 +76,10 @@ static void describeParams(Kind k, OfxParamSetHandle ps) {
       number(ps, "angle", "Angle (deg)", 0, -180, 180, "Direction of the split");
       break;
     case VIGNETTE:
-      number(ps, "amount", "Amount", 0.5, 0, 1, "How dark the edges get");
-      number(ps, "size", "Size", 0.75, 0.1, 1.5, "Where the darkening starts (1 = frame edge)");
-      number(ps, "softness", "Softness", 0.6, 0.01, 2, "Width of the fade");
-      number(ps, "roundness", "Roundness", 1, 0, 1, "0 follows the frame shape, 1 is a circle");
+      number(ps, "amount", "Amount", 0.45, 0, 1, "How dark the edges get");
+      number(ps, "size", "Size", 0.85, 0.1, 1.5, "Where the darkening starts (1 = frame edge)");
+      number(ps, "softness", "Softness", 0.9, 0.01, 2, "Width of the fade");
+      number(ps, "roundness", "Roundness", 0.4, 0, 1, "0 follows the frame shape, 1 is a circle");
       break;
     case LETTERBOX:
       number(ps, "aspect", "Aspect ratio", 2.39, 0.3, 4, "2.39 scope, 1.85 flat, 1.33 for 4:3 pillars");
@@ -303,7 +303,8 @@ static OfxStatus describe(Kind k, OfxImageEffectHandle fx) {
   P->propSetString(p, kOfxPropLabel, 0, LABELS[k]);
   P->propSetString(p, kOfxPropPluginDescription, 0, ABOUT[k]);
   P->propSetString(p, kOfxImageEffectPluginPropGrouping, 0, "Kerf");
-  P->propSetString(p, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);
+  P->propSetString(p, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);  // Edit/Color pages
+  P->propSetString(p, kOfxImageEffectPropSupportedContexts, 1, kOfxImageEffectContextGeneral);  // Fusion page
   P->propSetString(p, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
   P->propSetInt(p, kOfxImageEffectPluginPropSingleInstance, 0, 0);
   P->propSetInt(p, kOfxImageEffectPluginPropHostFrameThreading, 0, 0);

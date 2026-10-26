@@ -11,4 +11,9 @@
   RMDir /r "$APPDATA\Adobe\CEP\extensions\com.kerf.aftereffects"
   Delete "$APPDATA\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Utility\Kerf.py"
   Delete "$PROFILE\.kerf\panels-version"
+  RMDir /r "$LOCALAPPDATA\Kerf\OFX"
+  ; OFX_PLUGIN_PATH: remove it only when Kerf FX is all it points to (other plugins may share it)
+  ReadRegStr $0 HKCU "Environment" "OFX_PLUGIN_PATH"
+  StrCmp $0 "$LOCALAPPDATA\Kerf\OFX" 0 +2
+    DeleteRegValue HKCU "Environment" "OFX_PLUGIN_PATH"
 !macroend

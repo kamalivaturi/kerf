@@ -1,7 +1,7 @@
 {
   "name": "kerf-studio",
   "private": true,
-  "version": "0.3.1",
+  "version": "0.3.2",
   "scripts": { "tauri": "tauri", "build": "tauri build", "dev": "tauri dev" },
   "devDependencies": { "@tauri-apps/cli": "^2" }
 }

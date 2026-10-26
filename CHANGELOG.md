@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.3.2 — 2026-10-27
+
+- **Kerf FX for DaVinci Resolve (new):** five OpenFX effects you drop on any clip in the Edit page (or the Color
+  and Fusion pages), with live preview and Resolve's own keyframes. Find them in Effects › OpenFX › Kerf after
+  restarting Resolve:
+  - **Kerf Shake:** camera shake that moves, tilts and hides its own edges (amplitude, frequency, rotation, axis, seed).
+  - **Kerf Zoom:** eased zoom in or out at the start or end of a clip, around any point.
+  - **Kerf RGB Split**, **Kerf Vignette** and **Kerf Letterbox** (any aspect: 2.39, 1.85, 4:3 pillars).
+  Settings in pixels are "at 1080p" and scale with the timeline, so the look is the same in 4K, 720p or 9:16.
+  Installed for your user only (no admin rights needed).
+- The Resolve window's Shakes tab points to Kerf FX for live, keyframeable versions.
+- Every Kerf FX build is rendered in a test OpenFX host (all effects, extreme settings, half-resolution and 9:16
+  frames) before it ships.
+
 ## 0.3.1 — 2026-10-26
 
 - **DaVinci Resolve window fits every screen:** it opens at a size that fits the screen's work area at any display

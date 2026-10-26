@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Kerf for After Effects: the same Kerf UI as the Premiere panel, as an HTML (CEP) panel. Window > Extensions > Kerf.
      scripts/build_cep.py assembles it: ui/ = the built Kerf UI (ui/dist), Kerf.jsx + host.jsx = the After Effects tools. -->
-<ExtensionManifest Version="7.0" ExtensionBundleId="com.kerf.aftereffects" ExtensionBundleVersion="0.3.1" ExtensionBundleName="Kerf"
+<ExtensionManifest Version="7.0" ExtensionBundleId="com.kerf.aftereffects" ExtensionBundleVersion="0.3.2" ExtensionBundleName="Kerf"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <ExtensionList>
-    <Extension Id="com.kerf.aftereffects.panel" Version="0.3.1" />
+    <Extension Id="com.kerf.aftereffects.panel" Version="0.3.2" />
   </ExtensionList>
   <ExecutionEnvironment>
     <HostList>

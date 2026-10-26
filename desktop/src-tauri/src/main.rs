@@ -148,6 +148,43 @@ fn resolve_scripts() -> Option<PathBuf> {
     }
 }
 
+/// Kerf FX, the OpenFX effects for Resolve's Edit, Color and Fusion pages. The standard OFX folders need admin
+/// rights, so Kerf FX lives in a per-user folder that Resolve finds through OFX_PLUGIN_PATH.
+fn ofx_dir() -> Option<PathBuf> {
+    if cfg!(windows) {
+        std::env::var_os("LOCALAPPDATA").map(|a| PathBuf::from(a).join(r"Kerf\OFX"))
+    } else if cfg!(target_os = "macos") {
+        home().map(|h| h.join("Library/Application Support/Kerf/OFX"))
+    } else {
+        home().map(|h| h.join(".local/share/kerf/OFX"))
+    }
+}
+
+/// Adds the Kerf FX folder to the user's OFX_PLUGIN_PATH for apps started from now on (Resolve reads it at launch).
+fn add_ofx_path(dir: &Path) {
+    let d = dir.to_string_lossy().to_string();
+    let current = std::env::var("OFX_PLUGIN_PATH").unwrap_or_default();
+    let sep = if cfg!(windows) { ';' } else { ':' };
+    if current.split(sep).any(|p| p == d) {
+        return;
+    }
+    let value = if current.is_empty() { d.clone() } else { format!("{current}{sep}{d}") };
+    if cfg!(windows) {
+        let _ = quiet(Command::new("setx").args(["OFX_PLUGIN_PATH", &value])).status(); // user scope, tells Explorer
+    } else if cfg!(target_os = "macos") {
+        // apps launched from the Dock only see launchd's environment: set it now and at every login
+        let _ = quiet(Command::new("launchctl").args(["setenv", "OFX_PLUGIN_PATH", &value])).status();
+        if let Some(agents) = home().map(|h| h.join("Library/LaunchAgents")) {
+            let plist = format!(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>com.kerf.ofx-path</string><key>ProgramArguments</key><array><string>launchctl</string><string>setenv</string><string>OFX_PLUGIN_PATH</string><string>{value}</string></array><key>RunAtLoad</key><true/></dict></plist>\n"
+            );
+            let _ = fs::create_dir_all(&agents).and_then(|_| fs::write(agents.join("com.kerf.ofx-path.plist"), plist));
+        }
+    } else if let Some(conf) = home().map(|h| h.join(".config/environment.d")) {
+        let _ = fs::create_dir_all(&conf).and_then(|_| fs::write(conf.join("kerf-ofx.conf"), format!("OFX_PLUGIN_PATH={value}\n")));
+    }
+}
+
 /// Puts (or refreshes) the Kerf panel in every editor on this machine, once per Kerf version unless forced.
 fn install_panels(res: &Path, version: &str, force: bool) {
     let marker = kerf_dir().map(|k| k.join("panels-version"));
@@ -166,6 +203,14 @@ fn install_panels(res: &Path, version: &str, force: bool) {
     }
     if let Some(dir) = resolve_scripts() {
         let _ = fs::create_dir_all(&dir).and_then(|_| fs::copy(p.join("Kerf.py"), dir.join("Kerf.py")).map(|_| ()));
+    }
+    let fx = p.join("KerfFX.ofx.bundle");
+    if let (Some(dir), true) = (ofx_dir(), fx.is_dir()) {
+        let dest = dir.join("KerfFX.ofx.bundle"); // Resolve: Effects > OpenFX > Kerf (after Resolve restarts)
+        let _ = fs::remove_dir_all(&dest);
+        if copy_dir(&fx, &dest).is_ok() {
+            add_ofx_path(&dir);
+        }
     }
     if let Some(m) = marker {
         if let Some(parent) = m.parent() {

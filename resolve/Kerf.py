@@ -333,6 +333,7 @@ def main():
         slider("SDecay", "Decay", 0, 100, 70),
         row(btn("PImpact", "IMPACT"), btn("PHand", "HANDHELD"), btn("PQuake", "EARTHQUAKE")),
         row(btn("Shake", "\u26a1 APPLY SHAKE", True)),
+        ui.Label({"Text": "Live, keyframeable shake, zoom, RGB split, vignette and bars on any clip: Edit page \u203a Effects \u203a OpenFX \u203a Kerf.", "WordWrap": True, "Weight": 0, "StyleSheet": "color: #a59a92;"}),
         ui.VGap(0, 1),
     ])
     form = []

@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-__version__ = "0.3.1"
+__version__ = "0.3.2"
 # Desktop/portable builds ship ffmpeg + ffprobe in <bundle>/bin: put them first on PATH for every subprocess.
 _BIN = Path(__file__).resolve().parent.parent / "bin"
 if _BIN.is_dir():
