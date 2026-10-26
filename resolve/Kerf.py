@@ -252,17 +252,16 @@ PRIMARY = ("QPushButton { background: #ff6b2c; color: #1a0f08; border: none; bor
 
 
 def geometry(w=480, h=820):
-    """Window rect in screen pixels: Resolve takes raw pixels while its widgets follow display scaling (Windows)."""
+    """Window rect in logical pixels (Resolve applies display scaling itself), capped to the screen's work area."""
     try:
         import ctypes
         dc = ctypes.windll.user32.GetDC(0)
         k = ctypes.windll.shcore.GetScaleFactorForDevice(0) / 100
-        screen_h = ctypes.windll.gdi32.GetDeviceCaps(dc, 117)  # DESKTOPVERTRES: physical pixels
+        screen_h = ctypes.windll.gdi32.GetDeviceCaps(dc, 117) / k  # DESKTOPVERTRES (physical) -> logical
         ctypes.windll.user32.ReleaseDC(0, dc)
-    except Exception:  # macOS / Linux: points already
-        k, screen_h = 1, 10_000
-    h = min(h * k, screen_h - 90 * k)
-    return [int(60 * k), int(40 * k), int(w * k), int(h)]
+    except Exception:  # macOS / Linux
+        screen_h = 10_000
+    return [60, 30, w, int(min(h, screen_h - 110))]  # leaves room for the title bar and taskbar
 
 
 def main():
@@ -321,9 +320,8 @@ def main():
         row(ui.Label({"Text": "Tracks", "Weight": 0}), ui.LineEdit({"ID": "LTracks", "Text": "2"})),
         row(ui.Label({"Text": "Scale %", "Weight": 0}), ui.SpinBox({"ID": "LScale", "Minimum": 0, "Maximum": 400, "Value": 35}),
             ui.Label({"Text": "Margin %", "Weight": 0}), ui.SpinBox({"ID": "LMargin", "Minimum": 0, "Maximum": 40, "Value": 4})),
-        row(btn("Layout", "APPLY LAYOUT", True)),
-        ui.Label({"Text": "Picture-in-picture, grids and alignment build a new timeline; Scale 0 = fit.", "WordWrap": True,
-                  "Weight": 0, "StyleSheet": "color: #a59a92;"}),
+        row(btn("Layout", "APPLY LAYOUT", True,
+                "Picture-in-picture, grids and alignment build a new timeline; Scale 0 = fit")),
         ui.VGap(0, 1),
     ])
     shakes = ui.VGroup({"Spacing": 6}, [
@@ -343,7 +341,7 @@ def main():
                         ui.ComboBox({"ID": f"FC{i}"}), ui.CheckBox({"ID": f"FK{i}", "Text": ""})))
     edit = ui.VGroup({"Spacing": 6}, [
         row(ui.Label({"Text": "Feature", "Weight": 0}), ui.ComboBox({"ID": "Feature"})),
-        ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0, "MinimumSize": [200, 48], "Alignment": {"AlignTop": True},
+        ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0, "MinimumSize": [200, 56], "Alignment": {"AlignTop": True},
                   "StyleSheet": "color: #a59a92;"}),
         row(ui.ComboBox({"ID": "Preset"}), ui.LineEdit({"ID": "PresetName", "PlaceholderText": "Save settings as" + ell}),
             ui.Button({"ID": "SavePreset", "Text": "Save", "Weight": 0})),
@@ -354,7 +352,8 @@ def main():
         ui.Tree({"ID": "Items", "Weight": 2, "Hidden": True}),  # shown only when there is something to review
         ui.VGap(0, 1),
     ])
-    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": geometry(), "StyleSheet": STYLE},
+    geom = geometry()
+    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": geom, "StyleSheet": STYLE},
                          ui.VGroup({"Spacing": 8}, [
         ui.HGroup({"Weight": 0}, [
             ui.Label({"Text": "kerf", "Weight": 0,
@@ -508,7 +507,9 @@ def main():
 
     def load_feature(ev=None):
         f = feats[cur()]
-        it["Help"].Text = f["help"]
+        h = f["help"]  # the label shows what fits in three lines; hover it for the rest
+        it["Help"].Text = h if len(h) <= 150 else h[:h.rfind(" ", 0, 148)] + ell
+        it["Help"].ToolTip = h
         it["Preset"].Clear()
         it["Preset"].AddItem("Preset" + ell)
         for p in f["presets"]["builtin"] + f["presets"]["user"]:
@@ -579,6 +580,9 @@ def main():
     beat()
     show_vals()
     load_feature()
+    it["Params"].Hidden = it["Items"].Hidden = True  # hidden at creation, Qt still reserves their height
+    win.RecalcLayout()
+    win.Resize(geom[2:])  # Fusion restores the last size per window ID; start from one that fits
     win.Show()
     disp.RunLoop()
     if timer:
