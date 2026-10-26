@@ -1,10 +1,11 @@
 # Kerf FX OpenFX plugin. cmake -B build -DOFX_INCLUDE=<openfx>/include && cmake --build build --config Release
 cmake_minimum_required(VERSION 3.16)
+# universal macOS binary; must be set before project()
+set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 project(KerfFX CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")  # static CRT: no Visual C++ redistributable needed
-set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "")
-set(CMAKE_OSX_DEPLOYMENT_TARGET "11.0" CACHE STRING "")
 
 add_library(KerfFX MODULE kerf_fx.cpp)
 target_include_directories(KerfFX PRIVATE ${OFX_INCLUDE})
