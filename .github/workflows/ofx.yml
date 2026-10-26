@@ -1,0 +1,24 @@
+name: Kerf FX (OpenFX)
+on:
+  push:
+    branches: [main]
+    paths: ["ofx/**", "scripts/build_ofx.py", ".github/workflows/ofx.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/build_ofx.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KerfFX-${{ runner.os }}
+          path: build/panels/KerfFX.ofx.bundle
