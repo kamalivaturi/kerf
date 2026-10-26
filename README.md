@@ -10,7 +10,8 @@ music with auto-ducking, beat edits, audio cleanup and reframing. It runs on you
 [Website](https://kamalivaturi.github.io/kerf/) ·
 [Feature teardown](docs/REVERSE_ENGINEERING.md) ·
 [Changelog](CHANGELOG.md) ·
-[Design brief](docs/DESIGN.md)
+[Design brief](docs/DESIGN.md) ·
+[☕ Buy me a coffee](https://buymeacoffee.com/kamalivaturi)
 
 ---
 
@@ -151,3 +152,10 @@ CI tests the engine on Windows, macOS and Linux, and every `v*` tag builds all i
 
 [MIT](LICENSE). Kerf is an independent project and is not affiliated with Adobe, Blackmagic Design,
 or any commercial plugin vendor.
+
+## Support Kerf
+
+Kerf is free and stays free. If it saves you editing time, you can
+[buy me a coffee](https://buymeacoffee.com/kamalivaturi). It keeps new tools coming.
+
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00?style=for-the-badge&labelColor=1a0f08)](https://buymeacoffee.com/kamalivaturi)

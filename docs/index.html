@@ -38,6 +38,8 @@ header.nav nav a:hover { color: var(--text); }
   box-shadow: 0 8px 22px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35); }
 .btn:hover { transform: translateY(-1px); }
 .btn small { font-weight: 600; opacity: .75; }
+header.nav nav a.coffee { color: var(--accent-ink); }
+.btn.coffee-btn { color: #1a0f08; border-color: transparent; background: #ffdd00; }
 .hero { padding: 84px 0 40px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
 .eyebrow { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 700; }
 .eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
@@ -105,7 +107,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
 <body>
 <header class="nav"><div class="wrap">
   <a class="mark" href="#">kerf</a>
-  <nav><a href="#toolkit">Toolkit</a><a href="#features">Features</a><a href="#hosts">Hosts</a><a href="#download">Download</a><a href="#pricing">Pricing</a><a href="https://github.com/kamalivaturi/kerf">GitHub</a></nav>
+  <nav><a href="#toolkit">Toolkit</a><a href="#features">Features</a><a href="#hosts">Hosts</a><a href="#download">Download</a><a href="#pricing">Pricing</a><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a class="coffee" href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">☕ Support</a></nav>
   <button class="theme" id="theme" aria-label="Toggle light or dark theme">◐</button>
 </div></header>
 
@@ -116,13 +118,13 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
       <h1>The editing toolkit that <em>does the busywork</em>.</h1>
       <p class="lede">Silence cuts, animated captions, 194 editable MOGRTs, speed ramps, camera shakes, stabilizer, offline AI cutouts and more, inside Premiere Pro, After Effects and DaVinci Resolve. It runs on your own computer.</p>
       <div class="ctas">
-        <a class="btn primary" id="dl-main" href="https://github.com/kamalivaturi/kerf/releases/latest">Download Kerf Studio <small id="dl-os"></small></a>
+        <a class="btn primary" id="dl-main" href="https://github.com/kamalivaturi/kerf/releases/latest">Download Kerf <small id="dl-os"></small></a>
         <a class="btn" href="#download">All downloads</a>
       </div>
       <div class="hosts"><span>Premiere Pro</span><span>After Effects</span><span>DaVinci Resolve (Free &amp; Studio)</span><span>Windows · macOS · Linux</span></div>
     </div>
     <div class="panel" aria-hidden="true">
-      <div class="top"><b>kerf</b><div class="pills"><span>● Studio</span><span>v0.2.0</span></div></div>
+      <div class="top"><b>kerf</b><div class="pills"><span>● Premiere Pro</span><span>live</span></div></div>
       <div class="tabs"><span class="on">TOOLS</span><span>GRAPHS</span><span>MOTION</span><span>SHAKES</span><span>EDIT</span></div>
       <div class="pcard"><div class="row">
         <div><div class="lbl">ANCHOR</div><div class="dots"><i></i><i></i><i></i><i></i><i class="c"></i><i></i><i></i><i></i><i></i></div></div>
@@ -168,14 +170,14 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
 
   <section id="hosts">
     <h2>Every host, every OS</h2>
-    <p class="sub">One local engine with a native panel in each app. Kerf Studio, the desktop app, runs it for you.</p>
+    <p class="sub">One installer, one local engine, and a native Kerf panel in each app. There is no separate app to open.</p>
     <div class="tablewrap"><table class="matrix">
       <thead><tr><th>Host</th><th>Windows</th><th>macOS</th><th>Linux</th><th>Panel</th></tr></thead>
       <tbody>
-        <tr><td>Premiere Pro 25.6+</td><td class="ok">✓</td><td class="ok">✓</td><td>n/a</td><td>UXP (.ccx)</td></tr>
-        <tr><td>After Effects 2024+</td><td class="ok">✓</td><td class="ok">✓</td><td>n/a</td><td>ScriptUI panel</td></tr>
-        <tr><td>DaVinci Resolve 18.6+ (Free &amp; Studio)</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td>Workspace › Scripts</td></tr>
-        <tr><td>Kerf Studio (no editor needed)</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td>Desktop app</td></tr>
+        <tr><td>Premiere Pro 25.6+</td><td class="ok">✓</td><td class="ok">✓</td><td>n/a</td><td>Window › UXP Plugins › Kerf</td></tr>
+        <tr><td>After Effects 2022+</td><td class="ok">✓</td><td class="ok">✓</td><td>n/a</td><td>Window › Extensions › Kerf</td></tr>
+        <tr><td>DaVinci Resolve 18.6+ (Free &amp; Studio)</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td>Workspace › Scripts › Kerf</td></tr>
+        <tr><td>Kerf FX in Resolve (Edit, Color, Fusion)</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td>Effects › OpenFX › Kerf</td></tr>
       </tbody>
     </table></div>
   </section>
@@ -196,7 +198,9 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
     <p class="sub">Everything on this page is free. Paid plans will add things that cost real money to run, never a lock on what you already have.</p>
     <div class="price">
       <div class="card"><span class="tag">Community</span><div class="amount">Free</div><p>Every feature, on every host and OS. MIT licensed.</p>
-        <ul><li>All tools, AI features and the full MOGRT library</li><li>Bring your own AI keys, or run fully offline</li><li>Updates via GitHub releases</li></ul></div>
+        <ul><li>All tools, AI features and the full MOGRT library</li><li>Bring your own AI keys, or run fully offline</li><li>Automatic updates</li></ul>
+        <p style="margin-top:16px">Kerf saves you time? Help keep it free.</p>
+        <p style="margin-top:12px"><a class="btn coffee-btn" href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">☕ Buy me a coffee</a></p></div>
       <div class="card feat"><span class="tag">Pro · coming</span><div class="amount">Subscription</div><p>For editors who want it hosted and handled.</p>
         <ul><li>Cloud GPU transcription and AI edits, no keys needed</li><li>Premium template and preset packs</li><li>Signed installers, priority support</li></ul>
         <p style="margin-top:16px"><a class="btn" href="https://github.com/kamalivaturi/kerf">Watch on GitHub for launch</a></p></div>
@@ -207,15 +211,15 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
     <h2>Questions</h2>
     <details><summary>Does my footage leave my computer?</summary><p>No. Cutting, captions, cutouts and renders all run locally. Only the AI providers you switch on (with your own key) receive text such as transcripts.</p></details>
     <details><summary>Will it change my edit?</summary><p>Kerf builds a new sequence or timeline, or adds clips and markers you can undo. Your original edit and media are never modified.</p></details>
-    <details><summary>Why does macOS or Windows warn me on first launch?</summary><p>The builds aren't signed with an Apple or Microsoft developer certificate yet. On macOS right-click the app and choose Open (or System Settings → Privacy &amp; Security → Open Anyway); on Windows choose More info, then Run anyway. If version 0.2.0 says "damaged" on a Mac, run <code>xattr -dr com.apple.quarantine "/Applications/Kerf Studio.app"</code> in Terminal, or install 0.2.1.</p></details>
-    <details><summary>How do updates work?</summary><p>Kerf Studio checks for new versions when it starts and every few hours, downloads them in the background and installs them when you quit. You can switch this off in Settings.</p></details>
+    <details><summary>Why does macOS or Windows warn me on first launch?</summary><p>The builds aren't signed with an Apple or Microsoft developer certificate yet. On macOS right-click the app and choose Open (or System Settings → Privacy &amp; Security → Open Anyway); on Windows choose More info, then Run anyway. If macOS says the app is "damaged", run <code>xattr -dr com.apple.quarantine /Applications/Kerf.app</code> in Terminal.</p></details>
+    <details><summary>How do updates work?</summary><p>Kerf checks for new versions while your editor is open, downloads them in the background and installs them after you close your editors, panels included. You can switch this off in the panel's Settings.</p></details>
     <details><summary>Is a GPU required?</summary><p>No. With an NVIDIA GPU, transcription uses large-v3-turbo on CUDA; otherwise Kerf picks a fast CPU model automatically.</p></details>
   </section>
 </main>
 
 <footer><div class="wrap">
   <span><b class="mark" style="font-size:20px">kerf</b> · MIT licensed · not affiliated with Adobe or Blackmagic Design</span>
-  <span><a href="https://github.com/kamalivaturi/kerf">GitHub</a> · <a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a></span>
+  <span><a href="https://github.com/kamalivaturi/kerf">GitHub</a> · <a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a> · <a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">☕ Buy me a coffee</a></span>
 </div></footer>
 
 <script>
