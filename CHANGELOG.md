@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 — 2026-10-24
+## 0.3.0 — 2026-10-26
 
 Kerf now lives inside your editors. There is no separate app to open.
 
@@ -13,6 +13,9 @@ Kerf now lives inside your editors. There is no separate app to open.
   installed in your After Effects, from one place.
 - **DaVinci Resolve: a Kerf-styled window** with Tools, Motion, Shakes and Edit tabs, real settings controls instead
   of a JSON box (all values under "More settings"), and a review list only when there is something to review.
+  The window sizes itself for high-DPI displays (all four tabs visible, fits a 1440p screen at 150%), zoom,
+  shake, layout and stabilize timelines import reliably (clips already in the Media Pool are reused, repeat runs
+  get numbered names), and Frame → Desktop saves the composited frame (every track, color and effects).
 - **Only what works where you are:** each editor shows just the tools it supports (no Edit or Graphics tabs in
   After Effects, no MOGRT options in Resolve, no Premiere-only buttons elsewhere).
 - **No file picking:** the media card is gone; Kerf works on the open sequence, composition or timeline.

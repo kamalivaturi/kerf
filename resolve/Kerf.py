@@ -5,6 +5,7 @@ timeline (FCP7 XML via MediaPool.ImportTimelineFromFile). Stdlib only: runs on R
 """
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -157,6 +158,38 @@ def insert_layer(proj, mp, ins):
     return "Added the layer at the playhead" if ok else None
 
 
+def pool_paths(folder):
+    paths = {os.path.normcase(os.path.normpath(c.GetClipProperty("File Path") or ".")) for c in folder.GetClipList()}
+    for sub in folder.GetSubFolderList():
+        paths |= pool_paths(sub)
+    return paths
+
+
+def import_timeline(mp, xml, name):
+    """Resolve refuses an XML whose source clips are already in the Media Pool when asked to import them, so add
+    only the missing files first, then build the timeline from the pool."""
+    text = open(xml, encoding="utf-8").read()
+    files = {os.path.normpath(re.sub(r"^/(?=[A-Za-z]:)", "", urllib.parse.unquote(u)))
+             for u in re.findall(r"<pathurl>file://localhost(/.*?)</pathurl>", text)}
+    pool = pool_paths(mp.GetRootFolder())
+    missing = [f for f in files if os.path.normcase(f) not in pool and os.path.exists(f)]
+    if missing:
+        mp.ImportMedia(missing)
+    return (mp.ImportTimelineFromFile(xml, {"timelineName": name, "importSourceClips": False})
+            or mp.ImportTimelineFromFile(xml, {"timelineName": name, "importSourceClips": True}))
+
+
+def export_still(proj):
+    """The composited frame at the playhead (every track, color and effects), straight from Resolve."""
+    tl = proj.GetCurrentTimeline()
+    if not tl or not hasattr(proj, "ExportCurrentFrameAsStill"):
+        return None
+    desk = os.path.join(os.path.expanduser("~"), "Desktop")
+    folder = desk if os.path.isdir(desk) else os.path.join(os.path.expanduser("~"), ".kerf", "output")
+    f = os.path.join(folder, f"{tl.GetName()} {tl.GetCurrentTimecode().replace(':', '-')}.png")
+    return f if proj.ExportCurrentFrameAsStill(f) else None
+
+
 def apply(res):
     proj, notes = project(), []
     mp = proj.GetMediaPool()
@@ -172,7 +205,9 @@ def apply(res):
     names = res.get("sequence_names") or []
     for i, xml in enumerate(res.get("xml", [])):
         name = names[i] if i < len(names) else os.path.splitext(os.path.basename(xml))[0]
-        new = mp.ImportTimelineFromFile(xml, {"timelineName": name, "importSourceClips": True})
+        taken = {proj.GetTimelineByIndex(i + 1).GetName() for i in range(proj.GetTimelineCount())}
+        name = next(n for n in [name] + [f"{name} {k}" for k in range(2, 999)] if n not in taken)  # Resolve rejects duplicates
+        new = import_timeline(mp, xml, name)
         if new:
             proj.SetCurrentTimeline(new)
             notes.append(f"Created timeline '{name}'")
@@ -197,7 +232,7 @@ def apply(res):
 TOOLKIT = {"speed_ramp", "zoom_move", "layout", "camera_shake", "stabilize", "add_layer", "frame_export", "beat_markers",
            "quick_mask", "project_sort"}  # these have their own tabs; Edit lists the rest
 COLORS = [("Black", "#000000"), ("White", "#FFFFFF"), ("Kerf orange", "#FF6B2C"), ("Blue", "#3D7CFF"), ("Green", "#13B07A")]
-FORM_ROWS = 10  # settings shown as controls; the rest are under "More settings"
+FORM_ROWS = 7  # settings shown as controls; the rest are under "More settings"
 STYLE = (
     "QWidget { color: #f3ece7; font-size: 12px; }"
     "QPushButton { background: #2a221d; border: 1px solid #3d322b; border-radius: 9px; padding: 8px 10px; font-weight: bold; }"
@@ -214,6 +249,20 @@ STYLE = (
 )
 PRIMARY = ("QPushButton { background: #ff6b2c; color: #1a0f08; border: none; border-radius: 9px; padding: 9px 12px; font-weight: bold; }"
            " QPushButton:hover { background: #ff8a4f; } QPushButton:disabled { background: #5a3a2a; color: #a59a92; }")
+
+
+def geometry(w=480, h=820):
+    """Window rect in screen pixels: Resolve takes raw pixels while its widgets follow display scaling (Windows)."""
+    try:
+        import ctypes
+        dc = ctypes.windll.user32.GetDC(0)
+        k = ctypes.windll.shcore.GetScaleFactorForDevice(0) / 100
+        screen_h = ctypes.windll.gdi32.GetDeviceCaps(dc, 117)  # DESKTOPVERTRES: physical pixels
+        ctypes.windll.user32.ReleaseDC(0, dc)
+    except Exception:  # macOS / Linux: points already
+        k, screen_h = 1, 10_000
+    h = min(h * k, screen_h - 90 * k)
+    return [int(60 * k), int(40 * k), int(w * k), int(h)]
 
 
 def main():
@@ -244,12 +293,14 @@ def main():
     tools = ui.VGroup({"Spacing": 6}, [
         head("Add layer"),
         row(btn("LNull", "NULL", tip="Transparent placeholder layer at the playhead"), btn("LSolid", "SOLID"),
-            ui.ComboBox({"ID": "LColor", "Weight": 0}), btn("LBars", "BARS 2.39"), btn("LVig", "VIGNETTE")),
+            ui.ComboBox({"ID": "LColor", "Weight": 0})),
+        row(btn("LBars", "BARS 2.39"), btn("LVig", "VIGNETTE")),
         head("Beats"),
         row(btn("Beats", "PLACE BEAT MARKERS", True), ui.Label({"Text": "every", "Weight": 0}),
             ui.SpinBox({"ID": "Every", "Minimum": 1, "Maximum": 16, "Value": 1, "Weight": 0})),
         head("Speed ramp (clip under the playhead)"),
-        row(btn("SpIn", "EASE IN"), btn("SpOut", "EASE OUT"), btn("SpRamp", "SPEED RAMP"), btn("SpBoth", "IN / OUT")),
+        row(btn("SpIn", "EASE IN"), btn("SpOut", "EASE OUT")),
+        row(btn("SpRamp", "SPEED RAMP"), btn("SpBoth", "IN / OUT")),
         head("Stabilizer"),
         row(btn("Stab", "STABILIZE CLIP"), ui.Label({"Text": "Smoothness", "Weight": 0}),
             ui.Slider({"ID": "Smooth", "Minimum": 10, "Maximum": 100, "Value": 50, "Orientation": "Horizontal"}),
@@ -263,12 +314,12 @@ def main():
     motion = ui.VGroup({"Spacing": 6}, [
         head("Zoom (eased, at the playhead)"),
         slider("ZAmt", "Amount %", 101, 200, 120), slider("ZDur", "Duration s", 10, 500, 60),
-        row(btn("ZInIn", "IN \u00b7 ease in"), btn("ZInOut", "IN \u00b7 ease out", True), btn("ZOutIn", "OUT \u00b7 ease in"),
-            btn("ZOutOut", "OUT \u00b7 ease out")),
+        row(btn("ZInIn", "Zoom in \u00b7 ease in"), btn("ZInOut", "Zoom in \u00b7 ease out", True)),
+        row(btn("ZOutIn", "Zoom out \u00b7 ease in"), btn("ZOutOut", "Zoom out \u00b7 ease out")),
         head("Place & align clips"),
         row(ui.Label({"Text": "Arrange", "Weight": 0}), ui.ComboBox({"ID": "Arrange"})),
-        row(ui.Label({"Text": "Tracks", "Weight": 0}), ui.LineEdit({"ID": "LTracks", "Text": "2"}),
-            ui.Label({"Text": "Scale %", "Weight": 0}), ui.SpinBox({"ID": "LScale", "Minimum": 0, "Maximum": 400, "Value": 35}),
+        row(ui.Label({"Text": "Tracks", "Weight": 0}), ui.LineEdit({"ID": "LTracks", "Text": "2"})),
+        row(ui.Label({"Text": "Scale %", "Weight": 0}), ui.SpinBox({"ID": "LScale", "Minimum": 0, "Maximum": 400, "Value": 35}),
             ui.Label({"Text": "Margin %", "Weight": 0}), ui.SpinBox({"ID": "LMargin", "Minimum": 0, "Maximum": 40, "Value": 4})),
         row(btn("Layout", "APPLY LAYOUT", True)),
         ui.Label({"Text": "Picture-in-picture, grids and alignment build a new timeline; Scale 0 = fit.", "WordWrap": True,
@@ -277,9 +328,8 @@ def main():
     ])
     shakes = ui.VGroup({"Spacing": 6}, [
         head("Camera shake"),
-        row(ui.Label({"Text": "Axis", "Weight": 0}), ui.ComboBox({"ID": "Axis"}),
-            ui.Label({"Text": "On", "Weight": 0}), ui.ComboBox({"ID": "On"}),
-            ui.Label({"Text": "Output", "Weight": 0}), ui.ComboBox({"ID": "Output"})),
+        row(ui.Label({"Text": "Axis", "Weight": 0}), ui.ComboBox({"ID": "Axis"}), ui.Label({"Text": "On", "Weight": 0}), ui.ComboBox({"ID": "On"})),
+        row(ui.Label({"Text": "Output", "Weight": 0}), ui.ComboBox({"ID": "Output"})),
         slider("SAmp", "Amplitude px", 0, 120, 28), slider("SFreq", "Frequency Hz", 1, 30, 11),
         slider("SRot", "Rotation \u00b0", 0, 100, 15), slider("SDur", "Duration s", 10, 300, 45),
         slider("SDecay", "Decay", 0, 100, 70),
@@ -304,7 +354,7 @@ def main():
         ui.Tree({"ID": "Items", "Weight": 2, "Hidden": True}),  # shown only when there is something to review
         ui.VGap(0, 1),
     ])
-    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": [120, 120, 560, 820], "StyleSheet": STYLE},
+    win = disp.AddWindow({"ID": "KerfWin", "WindowTitle": "Kerf", "Geometry": geometry(), "StyleSheet": STYLE},
                          ui.VGroup({"Spacing": 8}, [
         ui.HGroup({"Weight": 0}, [
             ui.Label({"Text": "kerf", "Weight": 0,
@@ -312,7 +362,7 @@ def main():
             ui.Label({"ID": "Live", "StyleSheet": "color: #57d68d;"})]),
         ui.TabBar({"ID": "Tabs", "Weight": 0}),
         ui.Stack({"ID": "Pages"}, [tools, motion, shakes, edit]),
-        ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 0, "MinimumSize": [200, 90], "PlaceholderText": "Results appear here."}),
+        ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 0, "MinimumSize": [200, 64], "PlaceholderText": "Results appear here."}),
     ]))
     it = win.GetItems()
     for t in ("Tools", "Motion", "Shakes", "Edit"):
@@ -384,7 +434,10 @@ def main():
     on.Stab.Clicked = lambda ev: run("stabilize", dict(smoothing=round(it["Smooth"].Value * .6), clips="playhead"), "Stabilize")
     on.Mask.Clicked = lambda ev: run("quick_mask", dict(model=["u2net_human_seg", "u2netp", "silueta"][int(it["MaskModel"].CurrentIndex)],
                                                          output="cutout", clips="playhead"), "Quick mask")
-    on.Frame.Clicked = lambda ev: run("frame_export", {}, "Frame export")
+    def frame(ev):
+        f = export_still(project())
+        say("\u2713 Saved " + f) if f else run("frame_export", {}, "Frame export")
+    on.Frame.Clicked = frame
     on.Sort.Clicked = lambda ev: run("project_sort", {}, "Sort media pool")
     for id_, d, e in (("ZInIn", "in", "in"), ("ZInOut", "in", "out"), ("ZOutIn", "out", "in"), ("ZOutOut", "out", "out")):
         setattr(getattr(on, id_), "Clicked", lambda ev, d=d, e=e: run("zoom_move", dict(direction=d, ease=e, amount=val("ZAmt"),

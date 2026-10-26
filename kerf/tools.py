@@ -404,7 +404,7 @@ def frame_export(tl, p, ctx):
     t = tl.playhead if str(p["time"]).strip().lower() in ("", "playhead") else float(p["time"])
     hit = [c for tr in reversed(tl.video) for c in tr if c.enabled and c.start - EPS <= t < c.end]  # topmost first
     if not hit:
-        raise ValueError(f"no video at {t:.2f}s")
+        raise ValueError(f"No video at {t:.2f}s: move the playhead over a clip and try again")
     c = hit[0]
     desk = Path.home() / "Desktop"
     folder = Path(p["folder"]) if p["folder"] else desk if desk.is_dir() else ctx.out_dir
@@ -616,7 +616,7 @@ def frame_image(tl, t=None, width=480):
     t = tl.playhead if t is None else float(t)
     hit = [c for tr in reversed(tl.video) for c in tr if c.enabled and c.start - EPS <= t < c.end]
     if not hit:
-        raise ValueError(f"no video at {t:.2f}s")
+        raise ValueError(f"No video at {t:.2f}s: move the playhead over a clip and try again")
     c = hit[0]
     f = media.CACHE / "frame.jpg"
     media.CACHE.mkdir(parents=True, exist_ok=True)
