@@ -1,6 +1,6 @@
 [package]
 name = "kerf-studio"
-version = "0.3.0"
+version = "0.3.1"
 description = "Kerf: background helper that installs the Kerf panels and runs the local engine"
 license = "MIT"
 edition = "2021"

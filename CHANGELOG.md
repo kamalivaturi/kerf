@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.3.1 — 2026-10-26
+
+- **DaVinci Resolve window fits every screen:** it opens at a size that fits the screen's work area at any display
+  scaling (the bottom results box was hidden behind the taskbar on 1440p at 150%), the hidden settings editor and
+  review list no longer make the window taller, and Fusion's remembered size is reset to one that fits.
+- **No clipped text:** long feature help ends with "…" (hover it for the full text) and the layout note moved into
+  the Apply Layout tooltip instead of overlapping the button.
+- Updates from 0.3.0 arrive automatically; the Resolve script is refreshed by the update.
+
 ## 0.3.0 — 2026-10-26
 
 Kerf now lives inside your editors. There is no separate app to open.
