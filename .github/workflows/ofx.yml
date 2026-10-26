@@ -18,7 +18,9 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/build_ofx.py
-      - run: python tests/ofx_host_test.py
+      - name: Render every effect in a stand-in OFX host (Apple silicon tests the x86_64 slice under Rosetta)
+        shell: bash
+        run: if [ "$(uname -sm)" = "Darwin arm64" ]; then arch -x86_64 /usr/bin/python3 tests/ofx_host_test.py; else python tests/ofx_host_test.py; fi
       - uses: actions/upload-artifact@v4
         with:
           name: KerfFX-${{ runner.os }}

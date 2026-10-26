@@ -38,7 +38,7 @@ jobs:
       - name: Bundle the editor panels the installer puts in place
         run: python scripts/build_panels.py
       - name: Kerf FX for DaVinci Resolve (OpenFX), checked in a stand-in OFX host
-        run: python scripts/build_ofx.py && python tests/ofx_host_test.py
+        run: python scripts/build_ofx.py && { if [ "$(uname -sm)" = "Darwin arm64" ]; then arch -x86_64 /usr/bin/python3 tests/ofx_host_test.py; else python tests/ofx_host_test.py; fi; }
       - name: Sign the After Effects panel on its own platform (self-signed, so it loads without CEP debug mode)
         if: runner.os != 'Linux'
         run: |

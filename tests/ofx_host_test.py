@@ -3,6 +3,9 @@ create instance, render, destroy, unload) and renders every effect on test frame
 half-resolution renders and a 9:16 frame. Fails on a crash, a non-OK status, NaNs, or an effect that does nothing.
 
     python tests/ofx_host_test.py [path/to/KerfFX.ofx.bundle]     (previews go to build/ofx/test/*.png)
+
+On Apple silicon run it with an x86_64 Python (arch -x86_64): ctypes callbacks cannot read arm64 variadic
+arguments, and paramGetValueAtTime is variadic.
 """
 import ctypes as C
 import math
