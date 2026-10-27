@@ -1,9 +1,9 @@
 # AutoCut feature teardown → Kerf implementation map
 
 Source of truth: the public autocut.com marketing pages (all 11 feature pages, pricing, FAQ)
-and four public help-center settings articles, scraped 2026-10-16. No AutoCut binaries or
-code were downloaded, decompiled, or copied. Everything below is either **observed** (stated
-on their site) or **design** (how Kerf does it). Where Kerf deviates, it says so.
+and four public help-center settings articles, scraped 2026-10-16, plus a static look at the
+AutoCut 4.60.37 Windows installer on 2026-10-27 (see below; nothing was run or copied).
+Everything here is either **observed** or **design** (how Kerf does it). Where Kerf deviates, it says so.
 
 ## What AutoCut is (observed)
 
@@ -63,7 +63,37 @@ custom MOGRT captions · drop-in plugins · per-feature presets · standalone we
 - Colour emoji in captions (libass limitation).
 - "Emotion AI" is loudness-peak based, not a trained emotion model.
 
-## 360 Tool (360mediaedits.com) → Kerf Toolkit
+## AutoCut desktop app (installer, static analysis 2026-10-27)
+
+Observed by listing and reading the shipped files, without running the installer:
+
+- **Packaging:** Velopack 1.2.161 installer (`AutoCut-win-Setup.exe`, 4.60.37) around an Electron app built with
+  Electron Forge and Vite, code-signed through Azure Trusted Signing.
+- **Thin shell:** the ASAR holds only a main process (`packages/main/dist/index.js`, 0.6 MB) and a preload
+  (0.1 MB); the remaining 100 MB is telemetry (Sentry, PostHog, OpenTelemetry), the Velopack updater and HTTP
+  clients. None of the eleven features (silences, captions, podcast, zoom, B-roll, viral...) appears in the code.
+- **Where the features live:** the window loads the web app at `autocut.com/app`, which talks to their backend.
+  An offline page and a bundled "system report" are the only local UI.
+- **Local powers given to the web app** through the preload bridge: file system and paths, child processes,
+  downloads (FFmpeg/ffprobe fetched from their CDN on first use), clipboard, save dialogs, cookies.
+- **Editor integration:** a Premiere ExtendScript bundle (`ppro-jsx`) is downloaded at runtime and prepared in
+  AppData, and a separate "AutoCut tools installer" is downloaded on Windows; neither ships in the installer.
+
+Consequence for Kerf: the binary holds no algorithms to learn from, so the feature map above (built from their
+public settings) stays the reference. Kerf's design choice remains the opposite of theirs: everything runs
+locally, nothing needs an account or a server.
+
+## CarVinci Resolve macros → Kerf FX
+
+The CarVinci Ultra Speedramping and Ultra MotionBlur 2.0 plugins are `.drfx` bundles holding one Fusion macro
+each, installed as Edit page effects. Observed structure:
+
+| Plugin | How it works (observed) | Kerf FX (design, own implementation) |
+|---|---|---|
+| Speedramping | Ten preset bezier time curves (Anim Curves over the clip duration) each drive a Time Stretcher; a selector slider and buttons pick one, the others pass through. Clip length never changes. | **Kerf Speed Ramp** (OpenFX): ten own curves (slow-fast-slow, fast-slow-fast, speed up, slow down, wave, double wave, boomerang, reverse boomerang, steps, hold in the middle), strength, play backwards, frame blending, and motion blur on the fast parts by blending the frames they skip. |
+| MotionBlur 2.0 | Automatic: Optical Flow into Vector Motion Blur with a strength curve. Manual: Directional Blur (angle, length). Effect mask input. | **Kerf Motion Blur** (OpenFX): automatic mode measures the shot's global motion between neighbouring frames and blurs along it (180-degree shutter at Amount 1); directional mode with angle and length. Per-pixel optical flow is not implemented (pans and tilts only). |
+
+
 
 Observed from the public product page (2026-10-19): a paid After Effects panel with 13 tools in 5 tabs. No
 code or assets were copied; each tool was re-designed for Premiere, After Effects, Resolve and Kerf Studio.
