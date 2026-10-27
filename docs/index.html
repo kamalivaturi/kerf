@@ -86,7 +86,23 @@ h2 { font-size: clamp(28px, 3.4vw, 40px); letter-spacing: -.03em; margin: 0 0 10
 .matrix td:first-child { font-weight: 700; }
 .ok { color: var(--green); font-weight: 800; }
 .dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.dl .card a { display: block; margin-top: 10px; font-weight: 700; color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+.dl .card { display: flex; flex-direction: column; gap: 10px; }
+.dl .card h3 { margin: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.dl .card.you { border-color: color-mix(in srgb, var(--accent) 60%, transparent); box-shadow: var(--shadow); }
+.dl .you-tag { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; padding: 4px 8px; border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-ink); }
+.dl .card p { margin: 0; color: var(--muted); font-size: 14px; }
+.dl .get { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 12px 16px; border-radius: 12px;
+  font-weight: 800; font-size: 15px; white-space: nowrap; text-decoration: none; color: var(--text); border: 1px solid var(--line); background: var(--card-hi); }
+.dl .get.primary { color: var(--on-accent); border-color: transparent; background: linear-gradient(180deg, var(--accent-2), var(--accent)); }
+.dl .get small { font-weight: 600; opacity: .8; white-space: nowrap; }
+.dl .get:hover { transform: translateY(-1px); }
+.dl details { border: 0; padding: 0; margin-top: 2px; }
+.dl details summary { font-size: 14px; color: var(--muted); }
+.dl details a { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; font-weight: 700; color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid var(--line); }
+.dl details a small { color: var(--muted); font-weight: 600; white-space: nowrap; }
+.dl-foot { margin-top: 14px; font-size: 14px; color: var(--muted); }
+.dl-foot a { color: var(--accent-ink); }
 .price { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .price .card { padding: 28px; }
 .price .amount { font-size: 42px; font-weight: 900; letter-spacing: -.03em; margin: 8px 0; }
@@ -184,13 +200,14 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
 
   <section id="download">
     <h2>Download</h2>
-    <p class="sub">Installers, portable builds and host plugins from the latest release. SHA-256 checksums are in every release.</p>
+    <p class="sub">One installer adds Kerf to Premiere Pro, After Effects and DaVinci Resolve. Pick your computer.</p>
     <div class="dl" id="dl-grid">
-      <div class="card"><h3>Windows</h3><p>Installer (.exe), MSI, portable zip</p><a href="https://github.com/kamalivaturi/kerf/releases/latest">Latest release →</a></div>
-      <div class="card"><h3>macOS</h3><p>Apple silicon and Intel .dmg, portable tar.gz</p><a href="https://github.com/kamalivaturi/kerf/releases/latest">Latest release →</a></div>
-      <div class="card"><h3>Linux</h3><p>AppImage, .deb, .rpm, portable tar.gz</p><a href="https://github.com/kamalivaturi/kerf/releases/latest">Latest release →</a></div>
-      <div class="card"><h3>Plugins</h3><p>Premiere .ccx, After Effects panel, Resolve script, Python wheel</p><a href="https://github.com/kamalivaturi/kerf/releases/latest">Latest release →</a></div>
+      <div class="card"><h3>Windows</h3><p>Windows 10 and 11, 64-bit</p><a class="get primary" href="https://github.com/kamalivaturi/kerf/releases/latest">Installer <small>.exe</small></a></div>
+      <div class="card"><h3>macOS</h3><p>macOS 11 or later</p><a class="get primary" href="https://github.com/kamalivaturi/kerf/releases/latest">Apple silicon <small>.dmg</small></a><a class="get" href="https://github.com/kamalivaturi/kerf/releases/latest">Intel <small>.dmg</small></a></div>
+      <div class="card"><h3>Linux</h3><p>For DaVinci Resolve on Linux</p><a class="get primary" href="https://github.com/kamalivaturi/kerf/releases/latest">AppImage <small>x64</small></a></div>
+      <div class="card"><h3>Manual install</h3><p>Not needed with the installer, which adds every panel for you.</p><a class="get" href="https://github.com/kamalivaturi/kerf/releases/latest">Panels &amp; developer files</a></div>
     </div>
+    <p class="dl-foot">Every release lists <a href="https://github.com/kamalivaturi/kerf/releases/latest">SHA-256 checksums</a>. Older versions are on <a href="https://github.com/kamalivaturi/kerf/releases">GitHub</a>.</p>
   </section>
 
   <section id="pricing">
@@ -239,12 +256,34 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
     document.getElementById("ver").textContent = rel.tag_name.replace(/^v/, "");
     const assets = rel.assets || [], main = assets.find((a) => pick[os].test(a.name));
     if (main) { const a = document.getElementById("dl-main"); a.href = main.browser_download_url;
-      document.getElementById("dl-os").textContent = `for ${os === "macos" ? "macOS" : os[0].toUpperCase() + os.slice(1)} · ${(main.size / 1e6).toFixed(0)} MB`; }
+      document.getElementById("dl-os").textContent = `for ${os === "macos" ? "macOS" : os[0].toUpperCase() + os.slice(1)} · ${Math.round(main.size / 1e6)} MB`; }
     const grid = document.getElementById("dl-grid");
-    const cards = groups.map(([title, re]) => {
-      const list = assets.filter((a) => re.test(a.name) && !/SHA256/.test(a.name));
-      if (!list.length) return "";
-      return `<div class="card"><h3>${title}</h3>${list.map((a) => `<a href="${a.browser_download_url}">${a.name} <small style="color:var(--muted)">${(a.size / 1e6).toFixed(0)} MB</small></a>`).join("")}</div>`;
+    const size = (b) => b >= 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`;
+    // Every downloadable file, in plain words. Anything not listed (signatures, updater archives, latest.json) stays hidden.
+    const KINDS = [
+      ["windows", true, /windows-x64-setup\.exe$/, "Installer (.exe)"], ["windows", false, /windows-x64\.msi$/, "MSI (IT deployment)"],
+      ["windows", false, /portable-.*windows-x64\.zip$/, "Portable, no install"],
+      ["macos", true, /macos-arm64\.dmg$/, "Apple silicon"], ["macos", true, /macos-x64\.dmg$/, "Intel"],
+      ["macos", false, /portable-.*macos-arm64\.tar\.gz$/, "Portable, Apple silicon"], ["macos", false, /portable-.*macos-x64\.tar\.gz$/, "Portable, Intel"],
+      ["linux", true, /linux-x64\.AppImage$/, "AppImage"], ["linux", false, /linux-x64\.deb$/, "Debian / Ubuntu (.deb)"],
+      ["linux", false, /linux-x64\.rpm$/, "Fedora / RHEL (.rpm)"], ["linux", false, /portable-.*linux-x64\.tar\.gz$/, "Portable, no install"],
+      ["manual", false, /premiere-.*\.ccx$/, "Premiere Pro panel (.ccx)"], ["manual", false, /aftereffects-.*\.zip$/, "After Effects panel"],
+      ["manual", false, /resolve-.*\.zip$/, "DaVinci Resolve script"], ["manual", false, /\.whl$/, "Python package (.whl)"],
+      ["manual", false, /^kerf-\d[\d.]*\.zip$/, "Engine source (.zip)"],
+    ];
+    const CARDS = { windows: ["Windows", "Windows 10 and 11, 64-bit"], macos: ["macOS", "macOS 11 or later"],
+                    linux: ["Linux", "For DaVinci Resolve on Linux"], manual: ["Manual install", "Not needed with the installer, which adds every panel for you."] };
+    const link = (a, label, cls) => `<a class="${cls}" href="${a.browser_download_url}">${label} <small>${size(a.size)}</small></a>`;
+    const order = [os, ...["windows", "macos", "linux"].filter((o) => o !== os), "manual"];  // your computer first
+    const cards = order.map((key) => {
+      const found = KINDS.filter((k) => k[0] === key)
+        .map(([, primary, re, label]) => ({ primary, label, a: assets.find((x) => re.test(x.name)) })).filter((k) => k.a);
+      if (!found.length) return "";
+      const top = found.filter((k) => k.primary), more = found.filter((k) => !k.primary), you = key === os;
+      const main = top.map((k, i) => link(k.a, k.label, i === 0 ? "get primary" : "get")).join("");
+      const rest = !more.length ? "" : `<details><summary>${key === "manual" ? `Show ${more.length} files` : "More formats"}</summary>${more.map((k) => link(k.a, k.label, "")).join("")}</details>`;
+      return `<div class="card${you ? " you" : ""}"><h3>${CARDS[key][0]}${you ? '<span class="you-tag">Your computer</span>' : ""}</h3>`
+        + `<p>${CARDS[key][1]}</p>${main}${rest}</div>`;
     }).join("");
     if (cards) grid.innerHTML = cards;
   }).catch(() => { /* offline or rate-limited: the static links still work */ });
