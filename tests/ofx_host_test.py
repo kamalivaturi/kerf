@@ -146,7 +146,7 @@ class Effect:
 class Frame:
     """Float RGBA test image: colour bars with a white grid, so moves, zooms and splits all show."""
 
-    def __init__(self, w, h, blank=False):
+    def __init__(self, w, h, blank=False, shift=0):
         self.w, self.h = w, h
         self.buf = (C.c_float * (w * h * 4))()
         if blank:
@@ -155,14 +155,25 @@ class Frame:
         for y in range(h):
             for x in range(w):
                 i = (y * w + x) * 4
-                self.buf[i:i + 4] = [1.0] * 4 if x % 20 == 0 or y % 20 == 0 else [*map(float, bars[x * 6 // w]), 1.0]
+                u = (x - shift) % w  # the picture pans right by `shift` pixels
+                self.buf[i:i + 4] = [1.0] * 4 if u % 20 == 0 or y % 20 == 0 else [*map(float, bars[u * 6 // w]), 1.0]
 
 
-state = {"source": None, "output": None, "depth": "OfxBitDepthFloat"}
+state = {"source": None, "output": None, "depth": "OfxBitDepthFloat", "size": (320, 180)}
+PAN = 3  # source pixels the test picture pans per frame, so time-based effects see real motion
+_frames = {}
+
+
+def source_at(t):
+    """The Source clip's frame at time t (cached): what a host returns for temporal clip access."""
+    key = (*state["size"], int(round(t)))
+    if key not in _frames:
+        _frames[key] = Frame(*state["size"], shift=PAN * key[2])
+    return _frames[key]
 
 
 def _clip_get_image(clip, t, region, out):
-    frame = state["source"] if objects[clip]["name"] == "Source" else state["output"]
+    frame = source_at(t) if objects[clip]["name"] == "Source" else state["output"]
     _write(out, props(OfxImagePropData=C.addressof(frame.buf), OfxImagePropBounds=[0, 0, frame.w, frame.h],
                       OfxImagePropRowBytes=frame.w * 16, OfxImageEffectPropPixelDepth=state["depth"],
                       OfxImageEffectPropComponents="OfxImageComponentRGBA", OfxImagePropPixelAspectRatio=1.0))
@@ -299,7 +310,20 @@ CASES = {
     "RGBSplit": [({}, 0), ({"amount": 200, "angle": -90}, 0)],
     "Vignette": [({}, 0), ({"amount": 1, "size": 0.1, "softness": 0.01, "roundness": 0}, 0)],
     "Letterbox": [({}, 0), ({"aspect": 0.3, "opacity": 0.5}, 0), ({"aspect": 4}, 0)],
+    "SpeedRamp": [({}, 30), ({"curve": 6, "rampBlur": 1}, 60), ({"curve": 8, "smooth": 0, "reverse": 1}, 45),
+                  ({"curve": 0, "strength": 0.5}, 1), ({"curve": 9}, 89)],
+    "MotionBlur": [({}, 20), ({"mode": 1, "length": 120, "angle": 30}, 0), ({"amount": 3}, 89)],
 }
+
+
+def grad(frame, dx, dy):
+    """Mean absolute luma difference to the neighbour at (dx, dy): drops in the direction of a blur."""
+    w, h, b, tot = frame.w, frame.h, frame.buf, 0.0
+    for y in range(4, h - 4, 2):
+        for x in range(4, w - 4, 2):
+            i, j = (y * w + x) * 4, ((y + dy) * w + x + dx) * 4
+            tot += abs(sum(b[i:i + 3]) - sum(b[j:j + 3]))
+    return tot
 SIZES = [(320, 180, 1.0), (160, 90, 0.5), (108, 192, 1.0)]  # 16:9, half-res proxy render, 9:16
 
 
@@ -333,7 +357,8 @@ def main():
             for k, (settings, t) in enumerate(CASES[name]):
                 overrides.clear()
                 overrides.update(settings)
-                state["source"], state["output"] = Frame(w, h), Frame(w, h, blank=True)
+                state["size"] = (w, h)
+                state["source"], state["output"] = source_at(t), Frame(w, h, blank=True)
                 st = call(b"OfxImageEffectActionRender", inst,
                           props(OfxPropTime=float(t), OfxImageEffectPropRenderWindow=[0, 0, w, h],
                                 OfxImageEffectPropRenderScale=[scale, scale]))
@@ -345,6 +370,10 @@ def main():
                     fails.append(f"{label}: NaN/inf in output")
                 elif all(abs(a - b) < 1e-6 for a, b in zip(vals, state["source"].buf)):
                     fails.append(f"{label}: output identical to the input")
+                elif name == "MotionBlur" and k == 0:  # the picture pans sideways: blur must follow it
+                    src, hx, vy = state["source"], grad(out, 1, 0), grad(out, 0, 1)
+                    if not (hx < 0.9 * grad(src, 1, 0) and vy > 0.9 * grad(src, 0, 1)):
+                        fails.append(f"{label}: automatic blur did not follow the horizontal pan")
                 if (w, h) == SIZES[0][:2]:
                     png(out_dir / f"{name}_{k}.png", out)
             state["depth"] = "OfxBitDepthByte"  # a wrong pixel format must be refused, never crash
@@ -356,7 +385,8 @@ def main():
             assert call(b"OfxActionDestroyInstance", inst) == 0
         assert call(b"OfxActionUnload") == 0
         print(f"ok   {name}")
-    png(out_dir / "Source.png", Frame(*SIZES[0][:2]))
+    state["size"] = SIZES[0][:2]
+    png(out_dir / "Source.png", source_at(0))
     print("\n".join(fails) or f"all {n} effects pass; previews in {out_dir}")
     sys.exit(1 if fails else 0)
 

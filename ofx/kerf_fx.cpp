@@ -1,9 +1,11 @@
 // Kerf FX: OpenFX effects for DaVinci Resolve (and any OFX host). Live, keyframeable versions of the Kerf toolkit
-// effects that work on a clip in place: Shake, Zoom (eased), RGB Split, Vignette, Letterbox.
+// effects that work on a clip in place: Shake, Zoom (eased), RGB Split, Vignette, Letterbox, Speed Ramp, Motion Blur.
 // Plain OpenFX C API, 32-bit float RGBA (Resolve's processing format), rows split across CPU threads.
+// Speed Ramp and Motion Blur read other frames of the clip (temporal clip access), so they never change its length.
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <deque>
 #include <thread>
 #include <vector>
 
@@ -14,14 +16,18 @@ static const OfxPropertySuiteV1 *P;
 static const OfxImageEffectSuiteV1 *E;
 static const OfxParameterSuiteV1 *Pa;
 
-enum Kind { SHAKE, ZOOM, SPLIT, VIGNETTE, LETTERBOX, KINDS };
-static const char *LABELS[KINDS] = {"Kerf Shake", "Kerf Zoom", "Kerf RGB Split", "Kerf Vignette", "Kerf Letterbox"};
+enum Kind { SHAKE, ZOOM, SPLIT, VIGNETTE, LETTERBOX, SPEEDRAMP, MOTIONBLUR, KINDS };
+static const char *LABELS[KINDS] = {"Kerf Shake",     "Kerf Zoom",       "Kerf RGB Split", "Kerf Vignette",
+                                    "Kerf Letterbox", "Kerf Speed Ramp", "Kerf Motion Blur"};
 static const char *ABOUT[KINDS] = {
     "Camera shake that moves, rotates and hides its own edges. Keyframe Amplitude for impacts.",
     "Eased zoom in or out at the start or end of the clip, around any point.",
     "Pulls red and blue apart for a glitch / impact look.",
     "Darkens the frame edges.",
-    "Cinema bars for any aspect ratio (2.39, 1.85, 4:3...)."};
+    "Cinema bars for any aspect ratio (2.39, 1.85, 4:3...).",
+    "One-click speed ramps inside the clip (same length): pick a curve, set the strength, blur the fast parts.",
+    "Motion blur from the camera's own movement (automatic), or a directional blur you aim."};
+static bool temporal(int k) { return k == SPEEDRAMP || k == MOTIONBLUR; }
 static const double PI = 3.14159265358979;
 
 // ------------------------------------------------------------------------------------------------ params
@@ -84,6 +90,23 @@ static void describeParams(Kind k, OfxParamSetHandle ps) {
     case LETTERBOX:
       number(ps, "aspect", "Aspect ratio", 2.39, 0.3, 4, "2.39 scope, 1.85 flat, 1.33 for 4:3 pillars");
       number(ps, "opacity", "Opacity", 1, 0, 1, "Bar opacity");
+      break;
+    case SPEEDRAMP:
+      choice(ps, "curve", "Ramp",
+             {"Slow, fast, slow", "Fast, slow, fast", "Speed up", "Slow down", "Wave", "Double wave", "Boomerang",
+              "Reverse boomerang", "Steps", "Hold in the middle"},
+             1, "How speed changes across the clip; the clip keeps its length");
+      number(ps, "strength", "Strength", 1, 0, 1, "0 = normal speed, 1 = the full ramp");
+      toggle(ps, "reverse", "Play backwards", 0, "Run the ramped clip in reverse");
+      toggle(ps, "smooth", "Smooth frames", 1, "Blend neighbouring frames so slow parts don't stutter");
+      number(ps, "rampBlur", "Ramp blur", 0.5, 0, 1, "Motion blur on the fast parts (blends the frames they skip)");
+      break;
+    case MOTIONBLUR:
+      choice(ps, "mode", "Mode", {"Automatic (camera motion)", "Directional"}, 0,
+             "Automatic measures how the shot moves between frames; Directional blurs along an angle you set");
+      number(ps, "amount", "Amount", 1, 0, 3, "1 is a natural 180-degree shutter; keyframe it for whip pans");
+      number(ps, "length", "Length (px)", 40, 0, 400, "Directional mode: blur length, at 1080p");
+      number(ps, "angle", "Angle (deg)", 0, -180, 180, "Directional mode: blur direction");
       break;
     default:
       break;
@@ -173,6 +196,102 @@ static double ease(int kind, double p) {
     case 2: return p < 0.5 ? 4 * p * p * p : 1 - std::pow(-2 * p + 2, 3) / 2;  // ease in-out
     default: return p;
   }
+}
+
+// Speed ramp curves: position in the clip (p, 0..1) -> position in the source (0..1). The slope is the playback
+// speed, so every curve starts at 0 and ends at 1 (the clip keeps its length) except the boomerangs, which come back.
+static double rampCurve(int kind, double p) {
+  p = std::clamp(p, 0.0, 1.0);
+  switch (kind) {
+    case 0: return p - std::sin(2 * PI * p) / (2 * PI);                  // slow, fast, slow
+    case 1: return p + 0.9 * std::sin(2 * PI * p) / (2 * PI);            // fast, slow, fast
+    case 2: return p * p;                                                // speed up
+    case 3: return 1 - (1 - p) * (1 - p);                                // slow down
+    case 4: return p + 0.9 * std::sin(4 * PI * p) / (4 * PI);            // wave
+    case 5: return p + 0.9 * std::sin(8 * PI * p) / (8 * PI);            // double wave
+    case 6: return std::sin(PI * p);                                     // boomerang: forward, then back
+    case 7: return 1 - std::sin(PI * p);                                 // reverse boomerang
+    case 8: {                                                            // steps: dash, settle, dash...
+      double n = 4, i = std::floor(std::min(p * n, n - 1e-9)), f = p * n - i;
+      return (i + f * f * (3 - 2 * f)) / n;
+    }
+    case 9: {                                                            // hold in the middle
+      double d = 2 * p - 1;
+      return 0.5 + 0.5 * d * d * d;
+    }
+    default: return p;
+  }
+}
+
+// Frames of the source clip at other times, fetched once per render and released together.
+struct FrameCache {
+  OfxImageEffectHandle fx;
+  double first, last;
+  std::deque<std::pair<int, Img>> held;  // deque: pointers handed out stay valid as frames are added
+  const Img *at(int f) {
+    f = (int)std::clamp((double)f, first, last);
+    for (auto &h : held)
+      if (h.first == f) return h.second.data ? &h.second : nullptr;
+    Img im;
+    if (!fetch(fx, kOfxImageEffectSimpleSourceClipName, f, im)) im = Img();
+    held.emplace_back(f, im);
+    return im.data ? &held.back().second : nullptr;
+  }
+  ~FrameCache() {
+    for (auto &h : held)
+      if (h.second.h) E->clipReleaseImage(h.second.h);
+  }
+};
+
+// Average of samples along (vx, vy), centred on each pixel: the motion blur kernel.
+static void directional(const Img &src, const Img &dst, const OfxRectI &w, double vx, double vy) {
+  int n = (int)std::clamp(std::hypot(vx, vy) / 1.5, 1.0, 48.0);
+  rows(w.y1, w.y2, [&](int y) {
+    for (int x = w.x1; x < w.x2; x++) {
+      float acc[4] = {0, 0, 0, 0}, s[4];
+      for (int i = 0; i < n; i++) {
+        double u = n == 1 ? 0 : (double)i / (n - 1) - 0.5;
+        sample(src, x + 0.5 + u * vx, y + 0.5 + u * vy, s);
+        for (int c = 0; c < 4; c++) acc[c] += s[c];
+      }
+      float *o = dst.px(x, y);
+      for (int c = 0; c < 4; c++) o[c] = acc[c] / n;
+    }
+  });
+}
+
+// Global motion between two frames: brute-force shift search on small luma thumbnails (pans and tilts).
+static void shiftBetween(const Img &a, const Img &b, double &dx, double &dy) {
+  const int gw = 96, R = 12;
+  int W = a.b.x2 - a.b.x1, H = a.b.y2 - a.b.y1, gh = std::max(8, gw * H / std::max(1, W));
+  auto thumb = [&](const Img &im) {
+    std::vector<float> g(gw * gh, 0);
+    for (int j = 0; j < gh; j++)
+      for (int i = 0; i < gw; i++) {
+        int x = im.b.x1 + (int)((i + 0.5) * W / gw), y = im.b.y1 + (int)((j + 0.5) * H / gh);
+        if (!im.in(x, y)) continue;
+        const float *p = im.px(x, y);
+        g[j * gw + i] = 0.3f * p[0] + 0.59f * p[1] + 0.11f * p[2];
+      }
+    return g;
+  };
+  std::vector<float> ga = thumb(a), gb = thumb(b);
+  double best = 1e30;
+  dx = dy = 0;
+  for (int sy = -R; sy <= R; sy++)
+    for (int sx = -R; sx <= R; sx++) {
+      double err = 0;
+      int cnt = 0;
+      for (int j = R; j < gh - R; j++)
+        for (int i = R; i < gw - R; i++) {
+          err += std::fabs(ga[j * gw + i] - gb[(j + sy) * gw + (i + sx)]);
+          cnt++;
+        }
+      err = cnt ? err / cnt + 1e-4 * (sx * sx + sy * sy) : 1e30;  // tiny bias towards "no motion" on flat frames
+      if (err < best) best = err, dx = sx, dy = sy;
+    }
+  dx *= (double)W / gw;  // a(x) matches b(x + s): the picture moved by +s from a to b
+  dy *= (double)H / gh;
 }
 
 // ------------------------------------------------------------------------------------------------ render
@@ -290,6 +409,77 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
         o[3] = bar ? alpha * keep + op : alpha;  // black bars over the picture
       }
     });
+  } else if (k == SPEEDRAMP || k == MOTIONBLUR) {
+    double first = range[0], last = std::max(range[0], range[1] - 1);  // last frame that exists
+    FrameCache frames{fx, first, last, {}};
+    auto copy = [&](const Img &from) {
+      rows(w.y1, w.y2, [&](int y) {
+        for (int x = w.x1; x < w.x2; x++) {
+          const float *i = from.in(x, y) ? from.px(x, y) : nullptr;
+          float *o = dst.px(x, y);
+          for (int c = 0; c < 4; c++) o[c] = i ? i[c] : 0;
+        }
+      });
+    };
+    if (k == SPEEDRAMP) {
+      double span = last - first, s = num(fx, "strength", t);
+      int curve = pick(fx, "curve", t);
+      bool back = pick(fx, "reverse", t), smooth = pick(fx, "smooth", t);
+      auto pos = [&](double p) {  // clip position -> source position, both 0..1
+        double q = p + s * (rampCurve(curve, p) - p);
+        return back ? 1 - q : q;
+      };
+      if (span < 1) {
+        copy(src);
+      } else {
+        double p = std::clamp((t - first) / span, 0.0, 1.0), e = 0.5 / span;
+        double speed = std::fabs(pos(std::min(1.0, p + e)) - pos(std::max(0.0, p - e))) / (2 * e);
+        double at = first + pos(p) * span, spread = std::min(6.0, num(fx, "rampBlur", t) * std::max(0.0, speed - 1));
+        int n = spread > 0.25 ? 1 + 2 * (int)std::ceil(spread) : 1;
+        std::vector<std::pair<const Img *, float>> taps;  // (frame, weight)
+        for (int i = 0; i < n; i++) {
+          double f = n == 1 ? at : at + spread * ((double)i / (n - 1) - 0.5), f0 = std::floor(f), a = f - f0;
+          if (!smooth) f0 = std::round(f), a = 0;
+          if (const Img *im = frames.at((int)f0)) taps.emplace_back(im, (float)((1 - a) / n));
+          if (a > 1e-3)
+            if (const Img *im = frames.at((int)f0 + 1)) taps.emplace_back(im, (float)(a / n));
+        }
+        if (taps.empty()) {
+          copy(src);
+        } else {
+          float total = 0;
+          for (auto &tp : taps) total += tp.second;
+          rows(w.y1, w.y2, [&](int y) {
+            for (int x = w.x1; x < w.x2; x++) {
+              float acc[4] = {0, 0, 0, 0};
+              for (auto &tp : taps)
+                if (tp.first->in(x, y)) {
+                  const float *i = tp.first->px(x, y);
+                  for (int c = 0; c < 4; c++) acc[c] += i[c] * tp.second;
+                }
+              float *o = dst.px(x, y);
+              for (int c = 0; c < 4; c++) o[c] = acc[c] / total;
+            }
+          });
+        }
+      }
+    } else {
+      double amount = num(fx, "amount", t), vx = 0, vy = 0;
+      if (pick(fx, "mode", t) == 1) {
+        double len = num(fx, "length", t) * k1080 * amount, ang = num(fx, "angle", t) * PI / 180;
+        vx = len * std::cos(ang), vy = len * std::sin(ang);
+      } else {
+        const Img *prev = frames.at((int)std::floor(t) - 1), *next = frames.at((int)std::floor(t) + 1);
+        if (prev && next && prev != next) {
+          double mx, my, gap = std::min(last, std::floor(t) + 1) - std::max(first, std::floor(t) - 1);
+          shiftBetween(*prev, *next, mx, my);
+          vx = mx / std::max(1.0, gap) * 0.5 * amount;  // 180-degree shutter: half a frame's motion
+          vy = my / std::max(1.0, gap) * 0.5 * amount;
+        }
+      }
+      if (std::hypot(vx, vy) < 0.5) copy(src);
+      else directional(src, dst, w, vx, vy);
+    }
   }
   E->clipReleaseImage(src.h);
   E->clipReleaseImage(dst.h);
@@ -311,7 +501,7 @@ static OfxStatus describe(Kind k, OfxImageEffectHandle fx) {
   P->propSetString(p, kOfxImageEffectPluginRenderThreadSafety, 0, kOfxImageEffectRenderFullySafe);
   P->propSetInt(p, kOfxImageEffectPropSupportsMultiResolution, 0, 1);
   P->propSetInt(p, kOfxImageEffectPropSupportsTiles, 0, 0);
-  P->propSetInt(p, kOfxImageEffectPropTemporalClipAccess, 0, 0);
+  P->propSetInt(p, kOfxImageEffectPropTemporalClipAccess, 0, temporal(k) ? 1 : 0);
   P->propSetInt(p, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
   return kOfxStatOK;
 }
@@ -320,6 +510,7 @@ static OfxStatus describeInContext(Kind k, OfxImageEffectHandle fx) {
   OfxPropertySetHandle c;
   E->clipDefine(fx, kOfxImageEffectSimpleSourceClipName, &c);
   P->propSetString(c, kOfxImageEffectPropSupportedComponents, 0, kOfxImageComponentRGBA);
+  P->propSetInt(c, kOfxImageEffectPropTemporalClipAccess, 0, temporal(k) ? 1 : 0);  // reads other frames
   E->clipDefine(fx, kOfxImageEffectOutputClipName, &c);
   P->propSetString(c, kOfxImageEffectPropSupportedComponents, 0, kOfxImageComponentRGBA);
   OfxParamSetHandle ps;
@@ -362,6 +553,8 @@ static OfxPlugin PLUGINS[KINDS] = {
     {kOfxImageEffectPluginApi, 1, "com.kerf.fx.RGBSplit", 1, 0, setHost, entry<SPLIT>},
     {kOfxImageEffectPluginApi, 1, "com.kerf.fx.Vignette", 1, 0, setHost, entry<VIGNETTE>},
     {kOfxImageEffectPluginApi, 1, "com.kerf.fx.Letterbox", 1, 0, setHost, entry<LETTERBOX>},
+    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.SpeedRamp", 1, 0, setHost, entry<SPEEDRAMP>},
+    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.MotionBlur", 1, 0, setHost, entry<MOTIONBLUR>},
 };
 
 extern "C" {

@@ -2,12 +2,17 @@
 
 ## 0.3.2 — 2026-10-27
 
-- **Kerf FX for DaVinci Resolve (new):** five OpenFX effects you drop on any clip in the Edit page (or the Color
+- **Kerf FX for DaVinci Resolve (new):** seven OpenFX effects you drop on any clip in the Edit page (or the Color
   and Fusion pages), with live preview and Resolve's own keyframes. Find them in Effects › OpenFX › Kerf after
   restarting Resolve:
   - **Kerf Shake:** camera shake that moves, tilts and hides its own edges (amplitude, frequency, rotation, axis, seed).
   - **Kerf Zoom:** eased zoom in or out at the start or end of a clip, around any point.
   - **Kerf RGB Split**, **Kerf Vignette** and **Kerf Letterbox** (any aspect: 2.39, 1.85, 4:3 pillars).
+  - **Kerf Speed Ramp:** ten one-click ramps inside the clip without changing its length (slow-fast-slow,
+    fast-slow-fast, speed up, slow down, wave, double wave, boomerang, reverse boomerang, steps, hold in the
+    middle), with strength, play backwards, smooth frames and motion blur on the fast parts.
+  - **Kerf Motion Blur:** automatic blur that measures the shot's own pans and tilts between frames, or a
+    directional blur you aim; keyframe Amount for whip pans.
   Settings in pixels are "at 1080p" and scale with the timeline, so the look is the same in 4K, 720p or 9:16.
   Installed for your user only (no admin rights needed).
 - The Resolve window's Shakes tab points to Kerf FX for live, keyframeable versions.
