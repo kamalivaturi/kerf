@@ -20,6 +20,8 @@ DEFAULTS = dict(
     whisper_model="auto",              # auto = large-v3-turbo on GPU, small on CPU; or any faster-whisper id / fine-tuned folder
     whisper_device="auto",
     anthropic_api_key="", openai_api_key="", gemini_api_key="", elevenlabs_api_key="", pexels_api_key="",
+    speech_server_url="http://localhost:3900/v1",  # OpenAI-compatible speech API: VoiceStudio's local default
+    speech_api_key="",                             # only for remote servers (OpenAI etc.); local VoiceStudio needs none
     theme="auto",
     auto_update="on",                  # Kerf Studio: download new releases in the background, install on quit
     follow_editors="on",               # engine (and Kerf Studio) stop ~1 min after the last editor closes

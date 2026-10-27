@@ -310,3 +310,47 @@ def test_voiceover_voices_and_plain_errors():
             raise AssertionError("expected a plain 'needs input' error")
         except ValueError:
             pass
+
+
+def test_voiceover_speech_server_request_and_errors(tmp_path, monkeypatch):
+    """The 'speech server' engine speaks through an OpenAI-compatible /audio/speech (VoiceStudio by default)."""
+    import http.server
+    import io
+    import threading
+    import wave as wav
+    from kerf import settings
+    got = {}
+
+    class Fake(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            got["path"], got["auth"] = self.path, self.headers.get("Authorization")
+            got["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            buf = io.BytesIO()
+            with wav.open(buf, "wb") as w:  # 0.5 s of quiet tone at 24 kHz
+                w.setnchannels(1), w.setsampwidth(2), w.setframerate(24000), w.writeframes(b"\x10\x00" * 12000)
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.end_headers()
+            self.wfile.write(buf.getvalue())
+
+        def log_message(self, *a):
+            pass
+
+    srv = http.server.HTTPServer(("127.0.0.1", 0), Fake)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    real = settings.get
+    monkeypatch.setattr(settings, "get", lambda k: {"speech_server_url": f"http://127.0.0.1:{srv.server_port}/v1",
+                                                   "speech_api_key": ""}.get(k, real(k)))
+    tl = dict(name="vo", fps=30, width=1920, height=1080, playhead=1.5, video=[[]], audio=[[]])
+    r = features.run("voiceover", tl, dict(text="Hello  there", engine="speech server", server_voice="my-clone",
+                                           style="calm", speed=1.2))
+    srv.shutdown()
+    assert got["path"] == "/v1/audio/speech" and got["auth"] is None
+    assert got["body"] == dict(input="Hello there", voice="my-clone", response_format="wav", speed=1.2, instructions="calm")
+    assert abs(r["report"]["seconds"] - 0.5) < 0.05 and r["report"]["at"] == 1.5 and r["report"]["voice"] == "my-clone"
+    monkeypatch.setattr(settings, "get", lambda k: {"speech_server_url": "http://127.0.0.1:9/v1"}.get(k, real(k)))
+    try:  # nothing listening: a plain "start VoiceStudio" message, not a crash
+        features.run("voiceover", tl, dict(text="hi", engine="speech server"))
+        raise AssertionError("expected a plain error")
+    except ValueError as e:
+        assert "Start VoiceStudio" in str(e)

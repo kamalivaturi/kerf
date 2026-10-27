@@ -106,6 +106,17 @@ Taken into Kerf (design, own code): **Voiceover** (`kerf/voice.py`) uses the sam
 narration. Kerf already covers captions, music-to-video (beat edit) and talking-head recuts; HTML-composition
 rendering and the agent skills are outside Kerf's editor-panel scope.
 
+## VoiceStudio (open source, AGPL-3.0)
+
+Read from its public repository (github.com/debpalash/VoiceStudio): an Electron app over a Python FastAPI backend
+for local voice cloning, voice design, dubbing, dictation and transcription, with many TTS engines (default
+OmniVoice). Its backend listens on loopback port 3900 without a key and exposes an OpenAI-compatible
+`POST /v1/audio/speech` (input, voice or voice-profile id, speed, instructions, response_format).
+
+Kerf (MIT) copies none of its code: AGPL code cannot go into Kerf. Instead Voiceover's **speech server** engine
+talks to that documented HTTP interface, so a VoiceStudio install (or OpenAI, or any compatible server) can speak
+Kerf voiceovers, including in your own cloned voice.
+
 ## 360 Tool (360mediaedits.com) → Kerf Toolkit
 
 Observed from the public product page (2026-10-19): a paid After Effects panel with 13 tools in 5 tabs. No

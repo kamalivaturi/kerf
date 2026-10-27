@@ -430,6 +430,7 @@ const SETTING_FIELDS: [string, string, string[]?][] = [
   ["gemini_model", "Gemini model"], ["gemini_api_key", "Gemini API key"],
   ["local_llm_url", "Local LLM URL (Ollama…)"], ["local_llm_model", "Local model"],
   ["elevenlabs_api_key", "ElevenLabs API key"], ["pexels_api_key", "Pexels API key"],
+  ["speech_server_url", "Speech server (VoiceStudio, OpenAI…)"], ["speech_api_key", "Speech server key (if needed)"],
   ["whisper_model", "Whisper model or fine-tuned path"], ["whisper_device", "Whisper device", ["auto", "cuda", "cpu"]],
   ["auto_update", "Automatic updates", ["on", "off"]],
   ["follow_editors", "Run only while Premiere, After Effects or Resolve is open", ["on", "off"]],

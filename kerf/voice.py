@@ -6,15 +6,17 @@
 from __future__ import annotations
 
 import copy
+import json
 import tarfile
 import time
+import urllib.error
 import urllib.request
 import wave
 from functools import lru_cache
 
 import numpy as np
 
-from . import media
+from . import media, settings
 from .timeline import Clip, add_track
 
 MODEL = "kokoro-int8-multi-lang-v1_0"
@@ -28,12 +30,16 @@ VOICES = ("af_alloy,af_aoede,af_bella,af_heart,af_jessica,af_kore,af_nicole,af_n
 LANGS = dict(a="US English", b="UK English", e="Spanish", f="French", h="Hindi", i="Italian", j="Japanese",
              p="Portuguese", z="Mandarin")
 
-VOICE_DEFAULTS = dict(text="", voice="af_heart", speed=1.0, at="playhead", volume_db=0.0)
-VOICE_CHOICES = dict(voice=VOICES, at=["playhead", "start"])
+VOICE_DEFAULTS = dict(text="", engine="kokoro", voice="af_heart", server_voice="default", server_model="", style="",
+                      speed=1.0, at="playhead", volume_db=0.0)
+VOICE_CHOICES = dict(engine=["kokoro", "speech server"], voice=VOICES, at=["playhead", "start"])
 VOICE_HELP = ("Speaks your script with a natural offline voice and adds it on a new audio track, at the playhead or "
               "the start. 54 voices: af_/am_ US English, bf_/bm_ UK English, ef_/em_ Spanish, ff_ French, hf_/hm_ "
               "Hindi, if_/im_ Italian, jf_/jm_ Japanese, pf_/pm_ Portuguese, zf_/zm_ Mandarin (f = female, m = male). "
-              "speed 0.5 to 2. The first voiceover downloads the voice model (132 MB) once.")
+              "speed 0.5 to 2. The first voiceover downloads the voice model (132 MB) once. "
+              "engine 'speech server' uses an OpenAI-compatible speech API instead (Settings > Speech server): "
+              "VoiceStudio on this computer by default, so server_voice can be one of your cloned voice profiles; "
+              "style passes a delivery hint such as 'calm and warm'; server_model is only needed by OpenAI (tts-1).")
 
 
 def voice_label(v):
@@ -85,12 +91,46 @@ def speak(text, out, voice="af_heart", speed=1.0, volume_db=0.0):
     return samples.size / audio.sample_rate
 
 
+def speak_server(text, out, voice="default", speed=1.0, style="", model="", volume_db=0.0):
+    """Same as speak(), through an OpenAI-compatible POST {speech_server_url}/audio/speech (VoiceStudio, OpenAI...)."""
+    text = " ".join(str(text).split())
+    if not text:
+        raise ValueError("Type the words to speak in 'text'")
+    base = str(settings.get("speech_server_url") or "").rstrip("/")
+    if not base:
+        raise ValueError("Set the Speech server in Settings (VoiceStudio: http://localhost:3900/v1)")
+    body = dict(input=text, voice=voice or "default", response_format="wav", speed=min(4.0, max(0.25, float(speed))))
+    if model:
+        body["model"] = model
+    if style:
+        body["instructions"] = style
+    headers = {"Content-Type": "application/json"}
+    if settings.get("speech_api_key"):
+        headers["Authorization"] = f"Bearer {settings.get('speech_api_key')}"
+    req = urllib.request.Request(f"{base}/audio/speech", json.dumps(body).encode(), headers)
+    raw = out.with_name(out.stem + " (server).wav")
+    try:
+        with urllib.request.urlopen(req, timeout=600) as r:
+            raw.write_bytes(r.read())
+    except urllib.error.HTTPError as e:
+        raise ValueError(f"The speech server refused it ({e.code}): {e.read().decode('utf-8', 'replace')[:300]}") from e
+    except urllib.error.URLError as e:
+        raise ValueError(f"Can't reach the speech server at {base}. Start VoiceStudio (or change Speech server in "
+                         f"Settings), then try again.") from e
+    media.ffmpeg("-y", "-i", raw, "-af", f"volume={float(volume_db)}dB", "-ac", "1", out)  # clean header, gain
+    raw.unlink(missing_ok=True)
+    return media.probe(str(out))["duration"]
+
+
 def voiceover(tl, p, ctx):
     out = ctx.out_dir / f"{tl.name} - voiceover {time.strftime('%Y%m%d-%H%M%S')}.wav"
-    seconds = speak(p["text"], out, p["voice"], p["speed"], p["volume_db"])
+    if p["engine"] == "speech server":
+        seconds = speak_server(p["text"], out, p["server_voice"], p["speed"], p["style"], p["server_model"], p["volume_db"])
+    else:
+        seconds = speak(p["text"], out, p["voice"], p["speed"], p["volume_db"])
     at = tl.playhead if p["at"] == "playhead" else 0.0
     res = copy.deepcopy(tl)
     add_track(res, "audio", [Clip(str(out), 0.0, seconds, at)])
     res.name = f"{tl.name} - Voiceover"
-    return dict(timeline=res, files=[str(out)],
-                report=dict(voice=voice_label(p["voice"]), seconds=round(seconds, 2), at=round(at, 2)))
+    who = p["server_voice"] if p["engine"] == "speech server" else voice_label(p["voice"])
+    return dict(timeline=res, files=[str(out)], report=dict(voice=who, seconds=round(seconds, 2), at=round(at, 2)))
