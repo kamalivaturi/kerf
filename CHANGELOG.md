@@ -21,6 +21,9 @@
   Or switch the engine to **speech server** to use VoiceStudio on your computer (your cloned voices) or any
   OpenAI-compatible speech API; set it under Settings > Speech server.
 - The Resolve window's Shakes tab points to Kerf FX for live, keyframeable versions.
+- **Kerf lives only inside your editors:** the installer no longer leaves Desktop or Start menu shortcuts
+  (Kerf has no window of its own; old Kerf Studio shortcuts are removed), and the engine no longer serves
+  a browser version of the panel.
 - Like Kerf? You can now [buy me a coffee](https://buymeacoffee.com/kamalivaturi) (also on the website and GitHub).
 - Every Kerf FX build is rendered in a test OpenFX host (all effects, extreme settings, half-resolution and 9:16
   frames) before it ships.

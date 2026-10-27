@@ -23,7 +23,6 @@ from . import REPO, __version__, captions, features, hosts, license, media, mogr
 from .timeline import Timeline
 
 PORT = 7878
-UI_DIR = Path(__file__).resolve().parent.parent / "ui" / "dist"
 TOKEN_FILE = media.HOME / "token"
 TOKEN = ""
 
@@ -119,8 +118,9 @@ class Handler(BaseHTTPRequestHandler):
         q = {k: v[0] for k, v in parse_qs(u.query).items()}
         if u.path == "/health":
             return self._send(200, dict(ok=True, version=__version__))
-        if u.path == "/" or u.path.startswith("/app"):
-            return self._static(u.path)
+        if u.path == "/" or u.path.startswith("/app"):  # no browser app: Kerf lives inside the editors
+            return self._send(404, dict(error="Kerf runs inside Premiere Pro, After Effects and DaVinci Resolve: "
+                                              "open the Kerf panel there."))
         img = u.path == "/mogrt/media" and secrets.compare_digest(q.get("token", ""), TOKEN)  # <img> can't send headers
         if not img and not self._guard():
             return
@@ -189,23 +189,6 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", ctype)
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Cache-Control", "max-age=3600")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def _static(self, path):
-        """Standalone mode: the same UI as the Premiere panel, served at http://127.0.0.1:7878/app/."""
-        rel = path[len("/app"):].lstrip("/") if path.startswith("/app") else ""
-        f = (UI_DIR / (rel or "index.html")).resolve()
-        if UI_DIR.resolve() not in f.parents or not f.is_file():
-            f = UI_DIR / "index.html"
-        if not f.is_file():
-            return self._send(404, dict(error="UI not built: run `npm run build` in ui/"))
-        body = f.read_bytes()
-        if f.name == "index.html":  # hand the token only to our own page, served from our own origin
-            body = body.replace(b"</head>", f"<script>window.KERF_TOKEN={json.dumps(TOKEN)}</script></head>".encode())
-        self.send_response(200)
-        self.send_header("Content-Type", mimetypes.guess_type(f.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

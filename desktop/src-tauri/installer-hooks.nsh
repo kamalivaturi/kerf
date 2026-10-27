@@ -5,6 +5,13 @@
   IfFileExists "$LOCALAPPDATA\Kerf Studio\uninstall.exe" 0 +2
     ExecWait '"$LOCALAPPDATA\Kerf Studio\uninstall.exe" /S'
   ExecWait '"$INSTDIR\kerf.exe" --install-panels'
+  ; Kerf has no window of its own: no Desktop or Start menu shortcuts (it's opened from the editors' panels)
+  Delete "$DESKTOP\Kerf.lnk"
+  Delete "$SMPROGRAMS\Kerf.lnk"
+  Delete "$SMPROGRAMS\Kerf\Kerf.lnk"
+  RMDir "$SMPROGRAMS\Kerf"
+  Delete "$DESKTOP\Kerf Studio.lnk"
+  Delete "$SMPROGRAMS\Kerf Studio.lnk"
 !macroend
 
 !macro NSIS_HOOK_POSTUNINSTALL
