@@ -245,12 +245,12 @@ struct FrameCache {
 
 // Average of samples along (vx, vy), centred on each pixel: the motion blur kernel.
 static void directional(const Img &src, const Img &dst, const OfxRectI &w, double vx, double vy) {
-  int n = (int)std::clamp(std::hypot(vx, vy) / 1.5, 1.0, 48.0);
+  int n = (int)std::clamp(std::ceil(std::hypot(vx, vy) / 1.5) + 1, 2.0, 48.0);  // >= 2 taps: short blurs still blur
   rows(w.y1, w.y2, [&](int y) {
     for (int x = w.x1; x < w.x2; x++) {
       float acc[4] = {0, 0, 0, 0}, s[4];
       for (int i = 0; i < n; i++) {
-        double u = n == 1 ? 0 : (double)i / (n - 1) - 0.5;
+        double u = (double)i / (n - 1) - 0.5;
         sample(src, x + 0.5 + u * vx, y + 0.5 + u * vy, s);
         for (int c = 0; c < 4; c++) acc[c] += s[c];
       }

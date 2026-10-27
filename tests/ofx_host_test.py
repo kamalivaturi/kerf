@@ -311,7 +311,7 @@ CASES = {
     "Vignette": [({}, 0), ({"amount": 1, "size": 0.1, "softness": 0.01, "roundness": 0}, 0)],
     "Letterbox": [({}, 0), ({"aspect": 0.3, "opacity": 0.5}, 0), ({"aspect": 4}, 0)],
     "SpeedRamp": [({}, 30), ({"curve": 6, "rampBlur": 1}, 60), ({"curve": 8, "smooth": 0, "reverse": 1}, 45),
-                  ({"curve": 0, "strength": 0.5}, 1), ({"curve": 9}, 89)],
+                  ({"curve": 0, "strength": 0.5}, 1), ({"curve": 9}, 30)],  # clip ends map to themselves
     "MotionBlur": [({}, 20), ({"mode": 1, "length": 120, "angle": 30}, 0), ({"amount": 3}, 89)],
 }
 
