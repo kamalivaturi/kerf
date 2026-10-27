@@ -297,3 +297,16 @@ if __name__ == "__main__":
         print("ok ", t.__name__)
     shutil.rmtree(TMP, ignore_errors=True)
     print(f"{len(tests)} passed")
+
+
+def test_voiceover_voices_and_plain_errors():
+    from kerf import voice
+    assert len(voice.VOICES) == 54 and voice.VOICES.index("af_heart") == 3  # the model's own speaker order
+    assert voice.voice_label("bm_george") == "George (UK English, male)"
+    tl = dict(name="vo", fps=30, width=1920, height=1080, video=[[]], audio=[[]])
+    for bad in (dict(text=""), dict(text="hi", voice="zz_nobody")):  # rejected before the model is touched
+        try:
+            features.run("voiceover", tl, bad)
+            raise AssertionError("expected a plain 'needs input' error")
+        except ValueError:
+            pass

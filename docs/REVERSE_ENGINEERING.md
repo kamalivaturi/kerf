@@ -93,7 +93,20 @@ each, installed as Edit page effects. Observed structure:
 | Speedramping | Ten preset bezier time curves (Anim Curves over the clip duration) each drive a Time Stretcher; a selector slider and buttons pick one, the others pass through. Clip length never changes. | **Kerf Speed Ramp** (OpenFX): ten own curves (slow-fast-slow, fast-slow-fast, speed up, slow down, wave, double wave, boomerang, reverse boomerang, steps, hold in the middle), strength, play backwards, frame blending, and motion blur on the fast parts by blending the frames they skip. |
 | MotionBlur 2.0 | Automatic: Optical Flow into Vector Motion Blur with a strength curve. Manual: Directional Blur (angle, length). Effect mask input. | **Kerf Motion Blur** (OpenFX): automatic mode measures the shot's global motion between neighbouring frames and blurs along it (180-degree shutter at Amount 1); directional mode with angle and length. Per-pixel optical flow is not implemented (pans and tilts only). |
 
+## HyperFrames desktop (installer, static analysis 2026-10-27)
 
+Observed from the NSIS installer's files without running it: an Electron app (`hyperframes-desktop` 0.1.0) with a
+local Hono server, the HyperFrames HTML-to-video packages (`@hyperframes/core`, studio server, inspector, lint),
+an agent runtime (DeepSeek `dsh` tools, MCP SDK), `sharp` for images, bundled Node and FFmpeg, and Datadog telemetry.
+It ships ten agent "skills" (embedded captions, faceless explainer, general video, motion graphics, music to video,
+PR to video, product launch video, Remotion to HyperFrames, slideshow, talking-head recut) and an offline voice:
+the open Kokoro v1.0 int8 model from the public sherpa-onnx releases, run on-device.
+
+Taken into Kerf (design, own code): **Voiceover** (`kerf/voice.py`) uses the same open model and runtime for offline
+narration. Kerf already covers captions, music-to-video (beat edit) and talking-head recuts; HTML-composition
+rendering and the agent skills are outside Kerf's editor-panel scope.
+
+## 360 Tool (360mediaedits.com) → Kerf Toolkit
 
 Observed from the public product page (2026-10-19): a paid After Effects panel with 13 tools in 5 tabs. No
 code or assets were copied; each tool was re-designed for Premiere, After Effects, Resolve and Kerf Studio.

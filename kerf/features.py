@@ -17,7 +17,7 @@ import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ai, broll, camera, captions, download, enhance, license, media, motion, render, silence, sound, speech, tools
+from . import ai, broll, camera, captions, download, enhance, license, media, motion, render, silence, sound, speech, tools, voice
 from .timeline import Timeline, to_xmeml
 
 
@@ -83,6 +83,10 @@ for _f in [
     Feature("sfx", "Sound effects", sound.sfx, sound.SFX_DEFAULTS, sound.SFX_CHOICES, sound.SFX_HELP, group="Audio",
             presets={k.replace("_", " ").title(): dict(sound=k) for k in sound.SFX}),
     Feature("dub", "Translate & dub", sound.dub, sound.DUB_DEFAULTS, {}, sound.DUB_HELP, group="Audio"),
+    Feature("voiceover", "Voiceover (offline voice)", voice.voiceover, voice.VOICE_DEFAULTS, voice.VOICE_CHOICES,
+            voice.VOICE_HELP, group="Audio",
+            presets={"Warm narrator (US)": dict(voice="af_heart"), "Deep narrator (US)": dict(voice="am_michael"),
+                     "British narrator": dict(voice="bm_george"), "Fast explainer": dict(voice="af_bella", speed=1.15)}),
     Feature("beat_sync", "Beat edit (music video)", sound.beat_sync, sound.BEAT_DEFAULTS, {}, sound.BEAT_HELP,
             group="Repurpose", presets={"Every beat": dict(every=1), "Every 2 beats": dict(every=2),
                                         "Every bar (4)": dict(every=4)}),

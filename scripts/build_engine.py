@@ -56,6 +56,7 @@ def main():
     args = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--name", "kerf-engine",
             "--distpath", str(DIST), "--workpath", str(ROOT / "build" / "pyinstaller"), "--specpath", str(ROOT / "build"),
             "--collect-data", "faster_whisper", "--collect-binaries", "ctranslate2", "--collect-binaries", "onnxruntime",
+            "--collect-binaries", "sherpa_onnx", "--collect-submodules", "sherpa_onnx",
             "--collect-submodules", "yt_dlp", "--copy-metadata", "yt_dlp"]
     for heavy in EXCLUDE:  # not used by Kerf; keeps a dev machine's extra packages out of the bundle
         args += ["--exclude-module", heavy]

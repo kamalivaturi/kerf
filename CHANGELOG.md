@@ -15,6 +15,9 @@
     directional blur you aim; keyframe Amount for whip pans.
   Settings in pixels are "at 1080p" and scale with the timeline, so the look is the same in 4K, 720p or 9:16.
   Installed for your user only (no admin rights needed).
+- **Voiceover (offline voice, new):** type a script and Kerf speaks it with one of 54 natural voices in nine
+  languages (Kokoro v1.0, Apache-2.0, run locally with sherpa-onnx), on a new audio track at the playhead.
+  No account or API key; the voice model downloads once (132 MB).
 - The Resolve window's Shakes tab points to Kerf FX for live, keyframeable versions.
 - Like Kerf? You can now [buy me a coffee](https://buymeacoffee.com/kamalivaturi) (also on the website and GitHub).
 - Every Kerf FX build is rendered in a test OpenFX host (all effects, extreme settings, half-resolution and 9:16
