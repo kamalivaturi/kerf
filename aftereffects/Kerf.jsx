@@ -3,7 +3,13 @@
     in ExtendScript; AI tools (beats, quick mask, captions) call the local Kerf engine (python -m kerf serve).
     ExtendScript is ES3: no let/const, arrow functions or Array.map. */
 (function kerfPanel(thisObj) {
-    var PORT = 7878, ENGINE = "127.0.0.1:" + PORT;
+    function home() { return $.getenv("KERF_HOME_DIR") || (Folder("~").fsName + "/.kerf"); }
+    function locator() {  // the engine's locator (kerf/server.py LOCATOR): port, token file, helper
+        var f = new File(home() + "/engine.json"), t;
+        if (!f.exists) { return {}; }
+        f.open("r"); t = f.read(); f.close();
+        try { return eval("(" + t + ")"); } catch (e) { return {}; }  // written by our own engine
+    }
     var S = { every: 1, amount: 120, zdur: 0.6, axis: "hv", amp: 28, freq: 11, rot: 1.5, dur: 0.45, decay: 0.7, flash: false };
     var status;
 
@@ -43,7 +49,7 @@
         return "{" + out.join(",") + "}";
     }
     function token() {
-        var f = new File(Folder("~").fsName + "/.kerf/token");
+        var f = new File(locator().token_file || home() + "/token");
         if (!f.exists) { throw new Error("Kerf engine not set up: start it once (start-kerf)."); }
         f.open("r"); var t = f.read(); f.close();
         return t.replace(/\s+/g, "");
@@ -51,7 +57,7 @@
     function http(method, path, body, timeout) {
         var s = new Socket(), payload = body === undefined ? "" : json(body), raw = "", i;
         s.timeout = timeout || 3600;
-        if (!s.open(ENGINE, "BINARY")) { throw new Error("Can't reach the Kerf engine: install Kerf (or run start-kerf), and enable Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network."); }
+        if (!s.open("127.0.0.1:" + (locator().port || 7878), "BINARY")) { throw new Error("Can't reach the Kerf engine: install Kerf (or run start-kerf), and enable Preferences > Scripting & Expressions > Allow Scripts to Write Files and Access Network."); }
         s.write(method + " " + path + " HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nX-Kerf-Token: " + token() +
                 "\r\nContent-Length: " + payload.length + "\r\n\r\n" + payload);
         while (!s.eof) { raw += s.read(65536); }
@@ -440,7 +446,8 @@
     var live;
     function startStudio() {  // start the Kerf helper (it runs the engine) when the engine isn't running
         var win = $.os.indexOf("Windows") >= 0;
-        var f = win ? new File($.getenv("LOCALAPPDATA") + "/Kerf/kerf.exe") : new Folder("/Applications/Kerf.app");
+        var h = locator().helper, f = h ? (win ? new File(h) : new Folder(h)) :
+            win ? new File($.getenv("LOCALAPPDATA") + "/Kerf/kerf.exe") : new Folder("/Applications/Kerf.app");
         if (!f.exists) { return false; }
         system.callSystem(win ? 'cmd /c start "" "' + f.fsName + '"' : 'open -g "' + f.fsName + '"');
         return true;
@@ -618,6 +625,7 @@
             },
             live: function () { try { return json(liveState()); } catch (e) { return "{}"; } },
             token: function () { try { return token(); } catch (e) { return ""; } },
+            locate: function () { return json(locator()); },
             launch: function () { return startStudio() ? "1" : ""; }
         };
         return;

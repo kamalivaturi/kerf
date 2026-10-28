@@ -100,6 +100,9 @@ fn start_engine(dir: PathBuf) -> std::io::Result<Child> {
     }
     let mut cmd = Command::new(&exe);
     cmd.args(["serve", "--follow-editors"]).current_dir(&dir).env("KERF_STUDIO", "1"); // engine: "Kerf updates itself"
+    if let Ok(me) = std::env::current_exe() {
+        cmd.env("KERF_HELPER", me); // written to the engine's locator, so every panel starts this same helper
+    }
     quiet(&mut cmd).spawn()
 }
 

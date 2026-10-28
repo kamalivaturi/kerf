@@ -24,6 +24,7 @@ from .timeline import Timeline
 
 PORT = 7878
 TOKEN_FILE = media.HOME / "token"
+LOCATOR = media.HOME / "engine.json"  # port, token file and helper: the one place every panel looks
 TOKEN = ""
 
 
@@ -203,4 +204,7 @@ def serve(port=PORT, follow=False):
     print(f"Kerf {__version__} listening on http://127.0.0.1:{port}  (token in {TOKEN_FILE})", flush=True)
     if follow:
         hosts.follow()  # Kerf only runs alongside Premiere Pro, After Effects or Resolve
-    ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
+    srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)  # bound first: a second engine never rewrites the locator
+    LOCATOR.write_text(json.dumps(dict(port=srv.server_port, token_file=str(TOKEN_FILE),
+                                       helper=os.environ.get("KERF_HELPER", ""), version=__version__)))
+    srv.serve_forever()

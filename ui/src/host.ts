@@ -48,6 +48,7 @@ export interface Host {
   apply(res: RunResult): Promise<string[]>; // returns human-readable notes
   outDir(): Promise<string | undefined>;
   readToken(): Promise<string>;
+  locate?(): Promise<{ port?: number; helper?: string; token_file?: string }>; // the engine's locator (kerf/server.py LOCATOR)
   insertMogrt(path: string): Promise<string>; // at the playhead, on a new top track
   tools?: HostTools;
   projectKey?(): Promise<string>; // per-project UI layouts // NLE-side actions (Premiere): selection-based tools the engine can't do from files
@@ -392,10 +393,16 @@ function premiere(): Host {
       const [project] = await active();
       return project.path ? project.path.replace(/[\\/][^\\/]+$/, "") + "/Kerf" : undefined;
     },
+    async locate() {
+      const os = req!("os"), fs = req!("fs"), sep = os.platform?.() === "win32" ? "\\" : "/";
+      try { return JSON.parse(String(await fs.readFile(`${os.homedir()}${sep}.kerf${sep}engine.json`, { encoding: "utf-8" }))); }
+      catch { return {}; } // before the engine's first start
+    },
     async readToken() {
       const os = req!("os"), fs = req!("fs");
       const sep = os.platform?.() === "win32" ? "\\" : "/";
-      return String(await fs.readFile(`${os.homedir()}${sep}.kerf${sep}token`, { encoding: "utf-8" })).trim();
+      const file = (await this.locate!()).token_file || `${os.homedir()}${sep}.kerf${sep}token`;
+      return String(await fs.readFile(file, { encoding: "utf-8" })).trim();
     },
     async pickFile() {
       const f = await uxp.storage.localFileSystem.getFileForOpening();
@@ -404,7 +411,7 @@ function premiere(): Host {
     async launchEngine(kerfHome) {
       const os = req!("os"), win = os.platform?.() === "win32";
       // the Kerf helper (set up by the Kerf installer) starts the engine; else a source checkout's start script
-      const helper = win ? `${os.homedir()}\\AppData\\Local\\Kerf\\kerf.exe` : "/Applications/Kerf.app";
+      const helper = (await this.locate!()).helper || (win ? `${os.homedir()}\\AppData\\Local\\Kerf\\kerf.exe` : "/Applications/Kerf.app");
       if (await uxp.shell.openPath(helper).then((r: unknown) => !r, () => false)) return;
       await uxp.shell.openPath(win ? `${kerfHome}\\start-kerf.cmd` : `${kerfHome}/start-kerf.command`);
     },
@@ -516,6 +523,7 @@ function aftereffects(): Host {
       },
     },
     async live() { try { return JSON.parse(await es("KerfAE.live()")); } catch { return {}; } },
+    async locate() { try { return JSON.parse(await es("KerfAE.locate()")); } catch { return {}; } },
     async projectKey() { return (await this.live!()).project || "untitled"; },
     async readTimeline() { throw new Error("After Effects tools work on the selected layers of the open composition."); },
     async apply(res) {

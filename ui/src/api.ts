@@ -1,7 +1,12 @@
 // Client for the local Kerf engine (python -m kerf serve). Every call except /health carries the token.
 import { host, IN_CEP } from "./host";
 
-const BASE = __UXP__ || IN_CEP || import.meta.env.DEV ? "http://127.0.0.1:7878" : "";
+// The engine's port comes from its locator file (kerf/server.py LOCATOR); same origin when the engine serves the page.
+const IN_PANEL = __UXP__ || IN_CEP || import.meta.env.DEV;
+let base: Promise<string> | null = null;
+const BASE = () => base ??= !IN_PANEL ? Promise.resolve("")
+  : (host.locate?.() ?? Promise.resolve({ port: undefined })).catch(() => ({ port: undefined }))
+      .then((l: { port?: number }) => `http://127.0.0.1:${l.port || 7878}`);
 let token = "";
 
 export const store = {
@@ -17,7 +22,7 @@ async function headers(): Promise<Record<string, string>> {
 async function parse(r: Response) {
   const j = await r.json().catch(() => ({}));
   if (!r.ok) {
-    if (r.status === 401) token = ""; // engine restarted with a new token: re-read next time
+    if (r.status === 401) { token = ""; base = null; } // engine restarted (new token, maybe a new port): re-read
     throw new Error(j.error || `${r.status} ${r.statusText}`);
   }
   return j;
@@ -25,18 +30,18 @@ async function parse(r: Response) {
 
 export const api = {
   async get(path: string) {
-    return parse(await fetch(BASE + path, { headers: await headers() }));
+    return parse(await fetch((await BASE()) + path, { headers: await headers() }));
   },
   async post(path: string, body: unknown) {
-    return parse(await fetch(BASE + path, { method: "POST", headers: await headers(), body: JSON.stringify(body) }));
+    return parse(await fetch((await BASE()) + path, { method: "POST", headers: await headers(), body: JSON.stringify(body) }));
   },
   async mediaUrl(id: string, kind: "gif" | "mp4" | "png") {
     await headers();
-    return `${BASE}/mogrt/media?id=${encodeURIComponent(id)}&kind=${kind}&token=${encodeURIComponent(token)}`;
+    return `${await BASE()}/mogrt/media?id=${encodeURIComponent(id)}&kind=${kind}&token=${encodeURIComponent(token)}`;
   },
   async health(): Promise<{ ok: boolean; version: string } | null> {
     try {
-      const r = await fetch(BASE + "/health");
+      const r = await fetch((await BASE()) + "/health");
       return r.ok ? r.json() : null;
     } catch {
       return null;

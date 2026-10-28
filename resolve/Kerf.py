@@ -14,15 +14,28 @@ import urllib.parse
 import urllib.request
 
 KERF_HOME = os.environ.get("KERF_HOME", r"C:\Kerf")  # replaced by the installer
-ENGINE = "http://127.0.0.1:7878"
-TOKEN_FILE = os.path.join(os.path.expanduser("~"), ".kerf", "token")
+HOME = os.environ.get("KERF_HOME_DIR") or os.path.join(os.path.expanduser("~"), ".kerf")
+
+
+def locator():
+    """The engine's locator (kerf/server.py LOCATOR): port, token file, helper. Defaults before the first start."""
+    try:
+        with open(os.path.join(HOME, "engine.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def engine():
+    return f"http://127.0.0.1:{locator().get('port', 7878)}"
 
 
 # ------------------------------------------------------------------ engine
 
 def call(path, body=None, timeout=3600):
-    token = open(TOKEN_FILE).read().strip() if os.path.exists(TOKEN_FILE) else ""
-    req = urllib.request.Request(ENGINE + path, json.dumps(body).encode() if body is not None else None,
+    token_file = locator().get("token_file") or os.path.join(HOME, "token")
+    token = open(token_file).read().strip() if os.path.exists(token_file) else ""
+    req = urllib.request.Request(engine() + path, json.dumps(body).encode() if body is not None else None,
                                  {"Content-Type": "application/json", "X-Kerf-Token": token})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -33,7 +46,7 @@ def call(path, body=None, timeout=3600):
 
 def alive():
     try:
-        urllib.request.urlopen(ENGINE + "/health", timeout=2)
+        urllib.request.urlopen(engine() + "/health", timeout=2)
         return True
     except Exception:
         return False
@@ -41,8 +54,8 @@ def alive():
 
 def engine_command():
     """The Kerf helper if installed (runs the engine, keeps Kerf updated), a bundled engine, else Python + source."""
-    app = (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kerf", "kerf.exe") if os.name == "nt"
-           else "/Applications/Kerf.app" if sys.platform == "darwin" else "/usr/bin/kerf")
+    app = locator().get("helper") or (os.path.join(os.environ.get("LOCALAPPDATA", ""), "Kerf", "kerf.exe") if os.name == "nt"
+                                      else "/Applications/Kerf.app" if sys.platform == "darwin" else "/usr/bin/kerf")
     if os.path.exists(app):
         return (["open", "-g", app] if app.endswith(".app") else [app]), os.path.dirname(app) or "/"
     exe = "kerf-engine.exe" if os.name == "nt" else "kerf-engine"

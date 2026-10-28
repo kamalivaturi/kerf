@@ -409,3 +409,20 @@ def test_editor_actions_are_one_list():
     declared = {a for acts in features.EDITORS.values() for a in acts}
     assert asked and asked <= declared, asked - declared
     assert {n for n, d in features.describe().items() if d["toolkit"]} == set(features.TOOLKIT) & set(features.REGISTRY)
+
+
+def test_engine_writes_its_locator(monkeypatch):
+    """Every panel finds the engine through one locator file: the port it really bound, token file, helper."""
+    import threading
+    import urllib.request
+    from kerf import server
+    server.LOCATOR.unlink(missing_ok=True)
+    monkeypatch.setenv("KERF_HELPER", "/opt/kerf/helper")
+    threading.Thread(target=server.serve, args=(0,), daemon=True).start()  # port 0: the OS picks one
+    for _ in range(100):
+        if server.LOCATOR.exists():
+            break
+        threading.Event().wait(0.05)
+    loc = json.loads(server.LOCATOR.read_text())
+    assert loc["helper"] == "/opt/kerf/helper" and loc["token_file"] == str(server.TOKEN_FILE) and loc["port"] > 0
+    assert urllib.request.urlopen(f"http://127.0.0.1:{loc['port']}/health", timeout=5).status == 200
