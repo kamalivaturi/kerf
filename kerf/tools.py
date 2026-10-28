@@ -161,7 +161,7 @@ def shake_events(tl, p, track):
     elif on == "beats":
         from .sound import beats
         if not p["music"]:
-            raise ValueError("on=beats needs `music` (the song file)")
+            raise ValueError("Shaking on the beat needs the song: choose it in Music, then apply the shake.")
         ts = beats(p["music"])[0][::max(1, int(p["every"]))]
     elif on == "playhead":
         ts = [tl.playhead]
@@ -430,8 +430,9 @@ def beat_markers(tl, p, ctx):
     else:
         ti = parse_tracks(p["track"])[0]
         tr = tl.audio[ti] if ti < len(tl.audio) else []
+        tr = tr or next((t for t in tl.audio if t), [])  # music is often on A2: take the first track that has a clip
         if not tr:
-            raise ValueError("no clip on that audio track: set `music`")
+            raise ValueError("There's no music on this timeline yet. Put the song on an audio track, then place beat markers.")
         c = tr[0]
         src, start, a, b = c.path, c.start, c.src_in, c.src_out
     bt, bpm = beats(src)
