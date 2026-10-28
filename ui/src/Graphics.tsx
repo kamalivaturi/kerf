@@ -161,7 +161,7 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
     setBusy(true); setMsg(label);
     try {
       const r = await fn();
-      setMsg(typeof r === "string" ? r : r?.built !== undefined ? `Built ${r.built}/${r.requested}${r.failed?.length ? ` · ${r.failed.length} failed` : ""}` : "Done");
+      setMsg(typeof r === "string" ? r : r?.built !== undefined ? `Built ${r.built}/${r.requested}${r.failed?.length ? `, ${r.failed.length} failed` : ""}` : "Done");
       load();
     } catch (e) { setMsg((e as Error).message); } finally { setBusy(false); }
   }
@@ -174,7 +174,7 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
   if (!info) return <section className="card fade"><h2>{t("graphics")}<button className="ghost close" onClick={onClose} aria-label="Close">✕</button></h2><p className="help">{msg || "…"}</p></section>;
   return (
     <section className="card graphics fade">
-      <h2>{t("graphics")} <small className="help">{info.catalog.length} templates · {info.library.length} built</small>
+      <h2>{t("graphics")} <small className="help">{info.catalog.length} templates, {info.library.length} built</small>
         <button className="ghost close" onClick={onClose} aria-label="Close">✕</button></h2>
       {!sel && <>
         <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("searchTemplates")} aria-label="Search templates" /></div>
@@ -187,7 +187,7 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
             <button key={s.id} className="mg-card" onMouseEnter={() => setHover(s.id)} onMouseLeave={() => setHover("")}
               onClick={() => { setSel(s); setO({}); setSaveName(""); setMsg(""); }} title={s.name}>
               {urls[s.id] ? <img src={urls[s.id]} alt="" width={150} /> : s.anim ? <LivePreview s={s} width={150} playing={hover === s.id} /> : <div className="mg-stage imported">MOGRT</div>}
-              <span className="mg-name">{s.anim_name ? `${s.anim_name} · ${s.look_name}` : s.name}</span>
+              <span className="mg-name">{s.anim_name ? `${s.anim_name}, ${s.look_name}` : s.name}</span>
               {built[s.id] && <em className="tier">built</em>}
             </button>
           ))}
@@ -195,7 +195,7 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
         </div>
         <div className="row"><input value={imp} onChange={(e) => setImp(e.target.value)} placeholder="Import a .mogrt you own: C:\…\template.mogrt" aria-label="MOGRT path" />
           {host.pickFile && <button className="ghost" onClick={async () => { const p = await host.pickFile!(); if (p) setImp(p); }}>…</button>}
-          <button className="ghost" disabled={!imp || busy} onClick={() => run("Importing", () => api.post("/mogrt/import", { path: imp }).then((e) => `Imported “${e.name}” · ${e.controls} editable controls`))}>Import</button></div>
+          <button className="ghost" disabled={!imp || busy} onClick={() => run("Importing", () => api.post("/mogrt/import", { path: imp }).then((e) => `Imported “${e.name}” with ${e.controls} editable controls`))}>Import</button></div>
         <div className="actions">
           {!info.library.some((e) => e.source === "pack") && <button className="primary" disabled={busy}
             onClick={() => run("Downloading the Kerf MOGRT pack (194 templates with previews)…", () => api.post("/mogrt/install-pack", {}).then((r) => `Installed ${r.installed} templates`))}>Install the Kerf MOGRT pack</button>}

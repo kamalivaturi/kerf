@@ -51,7 +51,7 @@ function useRunner(hasMedia: boolean, onNeedMedia: () => void) {
   async function guard(label: string, fn: () => Promise<string | string[] | void>) {
     if (busy) return;
     setBusy(label);
-    try { const r = await fn(); if (r) say(Array.isArray(r) ? r.join(" · ") || "Done" : r); }
+    try { const r = await fn(); if (r) say(Array.isArray(r) ? r.join("; ") || "Done" : r); }
     catch (e) { say((e as Error).message, false); } finally { setBusy(""); }
   }
   const run = (feature: string, params: P, label = feature) => {
@@ -180,7 +180,7 @@ function ScriptsHub({ r }: { r: Runner }) {
   const shown = list.filter((s) => !needle || s.name.toLowerCase().includes(needle))
     .sort((a, b) => Number(fav.includes(b.path)) - Number(fav.includes(a.path)) || a.name.localeCompare(b.name));
   return <section className="tk-card">
-    <div className="tk-head"><span className="tk-label">Your scripts</span><small>{list.length} installed · ★ pins to the top</small></div>
+    <div className="tk-head"><span className="tk-label">Your scripts</span><small>{list.length} installed; the star pins one to the top</small></div>
     <input className="script-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your scripts and panels" aria-label="Search scripts" />
     <div className="script-list">{shown.map((s) => <div key={s.path} className="script-row">
       <button className="script-run" disabled={!!r.busy} onClick={() => r.act("runScript", s.name, { path: s.path }, () => {})} title={s.path}>
@@ -256,7 +256,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
     shakes: <section className="tk-card">
       <span className="tk-label">Shakes</span>
       {axisRow}
-      <button className="tk-btn primary block grow top-gap" disabled={busy} onClick={shake}>{I.bolt} APPLY SHAKE</button>
+      <button className="tk-btn primary block grow top-gap" disabled={busy} onClick={shake}>{I.bolt} Apply shake</button>
     </section>,
     stabzoom: <section className="tk-card tk-split two">
       <div><span className="tk-label">Stabilizer</span>
@@ -325,7 +325,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
       {has("align") && <section className="tk-card"><span className="tk-label">Align & distribute</span>
         <div className="tk-row wrap">{([["Left", "left"], ["H centre", "hcenter"], ["Right", "right"], ["Top", "top"], ["V centre", "vcenter"], ["Bottom", "bottom"],
           ["Distribute H", "dist_h"], ["Distribute V", "dist_v"]] as [string, string][]).map(([l, m]) =>
-          <button key={m} className="tk-btn" disabled={busy} onClick={() => r.act("align", `Align ${l}`, { mode: m }, () => {})}>{l.toUpperCase()}</button>)}</div>
+          <button key={m} className="tk-btn" disabled={busy} onClick={() => r.act("align", `Align ${l}`, { mode: m }, () => {})}>{l}</button>)}</div>
         <p className="help">Aligns the selected layers to the composition (distribute needs three or more).</p></section>}
       {has("layout") && <section className="tk-card"><span className="tk-label">Align & distribute</span>
         <div className="tk-row wrap">
@@ -333,7 +333,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
           <label className="tk-field small">Scale %<input type="number" value={Number(s.scale)} onChange={(e) => set("scale", +e.target.value)} /></label>
           <label className="tk-field small">Margin %<input type="number" value={Number(s.margin)} onChange={(e) => set("margin", +e.target.value)} /></label></div>
         <div className="tk-row wrap">{["align_left", "align_right", "align_top", "align_bottom", "distribute_horizontal", "distribute_vertical", "grid"].map((a) =>
-          <button key={a} className="tk-btn" disabled={busy} onClick={() => r.run("layout", { arrange: a, tracks: s.tracks, scale: a.startsWith("dist") || a === "grid" ? 0 : s.scale, margin: s.margin }, a)}>{a.replace("_", " ").toUpperCase()}</button>)}</div>
+          <button key={a} className="tk-btn" disabled={busy} onClick={() => r.run("layout", { arrange: a, tracks: s.tracks, scale: a.startsWith("dist") || a === "grid" ? 0 : s.scale, margin: s.margin }, a)}>{a[0].toUpperCase() + a.slice(1).replace(/_/g, " ")}</button>)}</div>
         <p className="help">Anchor (Tools tab) moves the anchor point of the selected clips in Premiere; elsewhere it places the clips on these tracks at that spot.</p>
       </section>}
     </>}
@@ -352,7 +352,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
         {([["Impact", { axis: "all", amplitude: 40, duration: .35 }], ["Handheld", { on: "whole", axis: "hv", amplitude: 6, frequency: 1.5, rotation: .4, zoom: 104 }],
           ["Earthquake", { axis: "all", amplitude: 70, frequency: 18, duration: 1.2, decay: .3 }], ["Reset", SHAKE]] as [string, P][]).map(([n, v]) =>
           <button key={n} className="tk-mini" onClick={() => Object.entries(v).forEach(([k, x]) => set(k, x))}>{n}</button>)}
-        <button className="tk-btn primary grow" disabled={busy} onClick={shake}>{I.bolt} APPLY SHAKE</button>
+        <button className="tk-btn primary grow" disabled={busy} onClick={shake}>{I.bolt} Apply shake</button>
       </div>
     </section>}
     {(r.busy || r.toast) && <div className={`tk-toast${r.toast && !r.busy && !r.toast.ok ? " bad" : ""}`} role="status">

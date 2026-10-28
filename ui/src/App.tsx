@@ -415,11 +415,11 @@ const EDITORS: Record<string, string> = { premiere: "Premiere Pro", aftereffects
 
 function LiveChips({ live, engine }: { live: HostStatus | null; engine: string }) {
   const run = live?.running || [];
-  if (!run.length) return <span className="pill status idle" title={`Engine ${engine} · no editor open`}><i />{EDITOR_NAME[host.name]}</span>;
+  if (!run.length) return <span className="pill status idle" title={`Engine ${engine}, no editor open`}><i />{EDITOR_NAME[host.name]}</span>;
   return <span className="live-chips">{run.map((h) => {
     const s = live!.live[h];
-    const what = s?.sequence ? `${s.sequence} · ${s.timecode ?? ""}` : s?.project || "";
-    const tip = [EDITORS[h], s?.project, s?.sequence, s?.width && `${s.width}×${s.height}`, s?.fps && `${+s.fps.toFixed(3)} fps`, s?.timecode].filter(Boolean).join(" · ");
+    const what = s?.sequence ? `${s.sequence}, ${s.timecode ?? ""}` : s?.project || "";
+    const tip = [EDITORS[h], s?.project, s?.sequence, s?.width && `${s.width}×${s.height}`, s?.fps && `${+s.fps.toFixed(3)} fps`, s?.timecode].filter(Boolean).join(", ");
     return <span key={h} className="pill status ok live" title={tip}><i />{EDITORS[h] || h}{what && <small>{what}</small>}</span>;
   })}</span>;
 }
@@ -477,7 +477,7 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
         <div className="actions"><button className="primary" onClick={save}>{saved ? "Saved ✓" : "Save settings"}</button></div>
         <p className="help">Keys stay on this computer (~/.kerf/settings.json).</p>
         <h2>Licence</h2>
-        <p className="help">{String(lic.edition ?? "…")} · {String(lic.plan ?? "…")}{lic.expires ? ` · renews ${String(lic.expires).slice(0, 10)}` : ""}{lic.key ? ` · ${lic.key}` : ""}</p>
+        <p className="help">{String(lic.edition ?? "…")}, {String(lic.plan ?? "…")}{lic.expires ? `, renews ${String(lic.expires).slice(0, 10)}` : ""}{lic.key ? `, ${lic.key}` : ""}</p>
         <div className="presets">
           <input value={licKey} onChange={(e) => setLicKey(e.target.value)} placeholder="Licence key" aria-label="Licence key" />
           <button className="primary" disabled={!licKey.trim()} onClick={async () => { try { setLic(await api.post("/license/activate", { key: licKey })); setLicKey(""); setLicMsg("Activated ✓"); } catch (e) { setLicMsg((e as Error).message); } }}>Activate</button>
