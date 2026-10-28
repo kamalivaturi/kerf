@@ -201,10 +201,17 @@ class Handler(BaseHTTPRequestHandler):
 def serve(port=PORT, follow=False):
     global TOKEN
     TOKEN = token()
-    print(f"Kerf {__version__} listening on http://127.0.0.1:{port}  (token in {TOKEN_FILE})", flush=True)
     if follow:
         hosts.follow()  # Kerf only runs alongside Premiere Pro, After Effects or Resolve
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)  # bound first: a second engine never rewrites the locator
+    print(f"Kerf {__version__} listening on http://127.0.0.1:{srv.server_port}  (token in {TOKEN_FILE})", flush=True)
     LOCATOR.write_text(json.dumps(dict(port=srv.server_port, token_file=str(TOKEN_FILE),
                                        helper=os.environ.get("KERF_HELPER", ""), version=__version__)))
-    srv.serve_forever()
+    try:
+        srv.serve_forever()
+    finally:  # a clean stop takes its locator along, so panels fall back to the default port, not a dead one
+        try:
+            if json.loads(LOCATOR.read_text()).get("port") == srv.server_port:
+                LOCATOR.unlink()
+        except (OSError, ValueError):
+            pass
