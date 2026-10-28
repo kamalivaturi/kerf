@@ -14,13 +14,8 @@
   Delete "$SMPROGRAMS\Kerf Studio.lnk"
 !macroend
 
-!macro NSIS_HOOK_POSTUNINSTALL
-  RMDir /r "$APPDATA\Adobe\CEP\extensions\com.kerf.aftereffects"
-  Delete "$APPDATA\Blackmagic Design\DaVinci Resolve\Support\Fusion\Scripts\Utility\Kerf.py"
-  Delete "$PROFILE\.kerf\panels-version"
-  Delete "$PROFILE\.kerf\ofx-version"
-  RMDir /r "$LOCALAPPDATA\Kerf\OFX"
-  ; OFX_PLUGIN_PATH: take out only Kerf's folder, keep other plugins' folders, drop the variable if nothing is left
-  nsExec::Exec `powershell -NoProfile -NonInteractive -Command "$$d = Join-Path $$env:LOCALAPPDATA 'Kerf\OFX'; $$v = [Environment]::GetEnvironmentVariable('OFX_PLUGIN_PATH', 'User'); if ($$v) { $$p = @($$v -split ';' | Where-Object { $$_ -and $$_.TrimEnd('\') -ne $$d }); [Environment]::SetEnvironmentVariable('OFX_PLUGIN_PATH', $$(if ($$p) { $$p -join ';' } else { $$null }), 'User') }"`
-  Pop $0
+!macro NSIS_HOOK_PREUNINSTALL
+  ; the helper takes Kerf out of every editor with the same paths it installed to (kerf.exe --remove-panels):
+  ; the Premiere plugin, the After Effects panel, the Resolve script, Kerf FX and its OFX_PLUGIN_PATH entry
+  ExecWait '"$INSTDIR\kerf.exe" --remove-panels'
 !macroend

@@ -257,6 +257,57 @@ fn install_panels(res: &Path, version: &str, force: bool) {
     }
 }
 
+/// Takes Kerf out of every editor: the exact mirror of install_panels, with the same paths. Run by the uninstaller.
+fn remove_panels() {
+    if let Some((agent, _)) = adobe_installer() {
+        // ponytail: UPIA removes by the plugin's manifest name ("Kerf"); confirm on a machine with Creative Cloud
+        let _ = quiet(Command::new(agent).arg(if cfg!(windows) { "/remove" } else { "--remove" }).arg("Kerf")).status();
+    }
+    if let Some(dir) = cep_extensions() {
+        let _ = fs::remove_dir_all(dir.join("com.kerf.aftereffects"));
+    }
+    if let Some(dir) = resolve_scripts() {
+        let _ = fs::remove_file(dir.join("Kerf.py"));
+    }
+    if let Some(dir) = ofx_dir() {
+        remove_ofx_path(&dir);
+        let _ = fs::remove_dir_all(&dir);
+    }
+    if let Some(k) = kerf_dir() {
+        for m in ["panels-version", "ofx-version"] {
+            let _ = fs::remove_file(k.join(m));
+        }
+    }
+}
+
+/// Takes the Kerf FX folder out of the user's OFX_PLUGIN_PATH, keeping every other plugin's folder.
+fn remove_ofx_path(dir: &Path) {
+    let d = dir.to_string_lossy().to_string();
+    if cfg!(windows) {
+        let script = concat!(
+            "$d = $env:KERF_OFX_DIR; $v = [Environment]::GetEnvironmentVariable('OFX_PLUGIN_PATH', 'User'); ",
+            "if ($v) { $p = @($v -split ';' | Where-Object { $_ -and $_.TrimEnd('\\') -ne $d }); ",
+            "[Environment]::SetEnvironmentVariable('OFX_PLUGIN_PATH', $(if ($p) { $p -join ';' } else { $null }), 'User') }",
+        );
+        let _ = quiet(Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .env("KERF_OFX_DIR", &d)).status();
+    } else if cfg!(target_os = "macos") {
+        let current = Command::new("launchctl").args(["getenv", "OFX_PLUGIN_PATH"]).output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
+        let rest: Vec<&str> = current.split(':').filter(|p| !p.is_empty() && *p != d).collect();
+        let _ = if rest.is_empty() {
+            quiet(Command::new("launchctl").args(["unsetenv", "OFX_PLUGIN_PATH"])).status()
+        } else {
+            quiet(Command::new("launchctl").args(["setenv", "OFX_PLUGIN_PATH", &rest.join(":")])).status()
+        };
+        if let Some(h) = home() {
+            let _ = fs::remove_file(h.join("Library/LaunchAgents/com.kerf.ofx-path.plist"));
+        }
+    } else if let Some(h) = home() {
+        let _ = fs::remove_file(h.join(".config/environment.d/kerf-ofx.conf"));
+    }
+}
+
 fn marked(name: &str, version: &str) -> bool {
     kerf_dir().and_then(|k| fs::read_to_string(k.join(name)).ok()).as_deref() == Some(version)
 }
@@ -268,6 +319,10 @@ fn mark(name: &str, version: &str) {
 }
 
 fn main() {
+    if std::env::args().any(|a| a == "--remove-panels") {
+        remove_panels(); // run by the uninstaller: no window, no engine
+        return;
+    }
     let install_only = std::env::args().any(|a| a == "--install-panels"); // run by the installer
     let child = Arc::new(Mutex::new(None));
     tauri::Builder::default()
