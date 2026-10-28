@@ -5,6 +5,10 @@
 - **DaVinci Resolve is Kerf FX only.** Kerf in Resolve is the seven Kerf FX effects (Effects › OpenFX › Kerf), with
   Resolve's own keyframes and live preview. The Workspace › Scripts › Kerf window is gone: updating Kerf removes it.
   Timeline features (silences, captions, AI edits) are in the Premiere Pro and After Effects panels.
+- **Kerf FX shows up in DaVinci Resolve 21.** Resolve 21 lists OpenFX plugins only from the standard folder
+  (Windows `C:\Program Files\Common Files\OFX\Plugins`, macOS `/Library/OFX/Plugins`, Linux `/usr/OFX/Plugins`), not
+  from `OFX_PLUGIN_PATH`. Kerf FX now installs there, with one admin prompt per new Kerf FX version; the old per-user
+  copy and its `OFX_PLUGIN_PATH` entry are removed, so Resolve sees one Kerf FX.
 
 ## 0.3.2 — 2026-10-27
 

@@ -16,6 +16,7 @@
 
 !macro NSIS_HOOK_PREUNINSTALL
   ; the helper takes Kerf out of every editor with the same paths it installed to (kerf.exe --remove-panels):
-  ; the Premiere plugin, the After Effects panel, Kerf FX and its OFX_PLUGIN_PATH entry (and any old Resolve script)
+  ; the Premiere plugin, the After Effects panel and Kerf FX in the standard OFX folder (one admin prompt), plus
+  ; anything older versions left: the per-user Kerf FX, its OFX_PLUGIN_PATH entry and the Resolve script
   ExecWait '"$INSTDIR\kerf.exe" --remove-panels'
 !macroend

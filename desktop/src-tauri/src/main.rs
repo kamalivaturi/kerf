@@ -171,9 +171,22 @@ fn remove_desktop_shortcut() {
     }
 }
 
-/// Kerf FX, the OpenFX effects for Resolve's Edit, Color and Fusion pages. The standard OFX folders need admin
-/// rights, so Kerf FX lives in a per-user folder that Resolve finds through OFX_PLUGIN_PATH.
-fn ofx_dir() -> Option<PathBuf> {
+/// Kerf FX, the OpenFX effects for Resolve's Edit, Color and Fusion pages, live in the standard OFX folder: Resolve 21
+/// lists plugins only from there (it ignores OFX_PLUGIN_PATH). Writing it needs admin rights, asked once per version.
+fn ofx_dir() -> PathBuf {
+    if cfg!(windows) {
+        let common = std::env::var_os("CommonProgramFiles").map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from(r"C:\Program Files\Common Files"));
+        common.join(r"OFX\Plugins")
+    } else if cfg!(target_os = "macos") {
+        PathBuf::from("/Library/OFX/Plugins")
+    } else {
+        PathBuf::from("/usr/OFX/Plugins")
+    }
+}
+
+/// Where Kerf 0.3.2 put Kerf FX (per user, found through OFX_PLUGIN_PATH). Taken out so Resolve sees one Kerf FX.
+fn old_ofx_dir() -> Option<PathBuf> {
     if cfg!(windows) {
         std::env::var_os("LOCALAPPDATA").map(|a| PathBuf::from(a).join(r"Kerf\OFX"))
     } else if cfg!(target_os = "macos") {
@@ -183,40 +196,61 @@ fn ofx_dir() -> Option<PathBuf> {
     }
 }
 
-/// Adds the Kerf FX folder to the user's OFX_PLUGIN_PATH for apps started from now on (Resolve reads it at launch).
-/// Reads the live user value each time, never this process's environment, which may be stale or hold the machine value.
-fn add_ofx_path(dir: &Path) {
-    let d = dir.to_string_lossy().to_string();
-    if cfg!(windows) {
-        // user scope, tells Explorer; unlike setx it never truncates long values (the folder travels via the env)
-        let script = concat!(
-            "$d = $env:KERF_OFX_DIR; $v = [Environment]::GetEnvironmentVariable('OFX_PLUGIN_PATH', 'User'); ",
-            "$p = @(if ($v) { $v -split ';' | Where-Object { $_ } }); ",
-            "if ($p -notcontains $d) { [Environment]::SetEnvironmentVariable('OFX_PLUGIN_PATH', (@($p) + $d) -join ';', 'User') }",
-        );
-        let _ = quiet(Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .env("KERF_OFX_DIR", &d)).status();
-    } else if cfg!(target_os = "macos") {
-        let current = Command::new("launchctl").args(["getenv", "OFX_PLUGIN_PATH"]).output()
-            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
-        if current.split(':').any(|p| p == d) {
-            return;
-        }
-        let value = if current.is_empty() { d.clone() } else { format!("{current}:{d}") };
-        // apps launched from the Dock only see launchd's environment: set it now and at every login
-        let _ = quiet(Command::new("launchctl").args(["setenv", "OFX_PLUGIN_PATH", &value])).status();
-        if let Some(agents) = home().map(|h| h.join("Library/LaunchAgents")) {
-            let value = value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"); // plist is XML
-            let plist = format!(
-                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>com.kerf.ofx-path</string><key>ProgramArguments</key><array><string>launchctl</string><string>setenv</string><string>OFX_PLUGIN_PATH</string><string>{value}</string></array><key>RunAtLoad</key><true/></dict></plist>\n"
-            );
-            let _ = fs::create_dir_all(&agents).and_then(|_| fs::write(agents.join("com.kerf.ofx-path.plist"), plist));
-        }
-    } else if let Some(conf) = home().map(|h| h.join(".config/environment.d")) {
-        // environment.d expands the value at login, so other folders set elsewhere are kept as they are then
-        let line = format!("OFX_PLUGIN_PATH=${{OFX_PLUGIN_PATH:+$OFX_PLUGIN_PATH:}}{d}\n");
-        let _ = fs::create_dir_all(&conf).and_then(|_| fs::write(conf.join("kerf-ofx.conf"), line));
+fn remove_old_ofx() {
+    if let Some(dir) = old_ofx_dir() {
+        remove_ofx_path(&dir);
+        let _ = fs::remove_dir_all(&dir);
     }
+}
+
+/// Puts the bundle in the OFX folder: copied beside the old one, then swapped, so a bundle locked by a running
+/// Resolve stays usable and the swap is retried on the next start. True once the new Kerf FX is in place.
+fn swap_ofx(fx: &Path, dir: &Path) -> bool {
+    let (dest, new, old) = (dir.join("KerfFX.ofx.bundle"), dir.join("KerfFX.ofx.bundle.new"), dir.join("KerfFX.ofx.bundle.old"));
+    let _ = fs::create_dir_all(dir);
+    let _ = fs::remove_dir_all(&new);
+    let _ = fs::remove_dir_all(&old);
+    let ok = copy_dir(fx, &new).is_ok() && (!dest.exists() || fs::rename(&dest, &old).is_ok()) && fs::rename(&new, &dest).is_ok();
+    if !ok && !dest.exists() && old.exists() {
+        let _ = fs::rename(&old, &dest); // put the previous Kerf FX back
+    }
+    let _ = fs::remove_dir_all(if ok { &old } else { &new });
+    ok
+}
+
+/// Takes Kerf FX (only its own bundle) out of the OFX folder other plugins share. True when it is gone.
+fn remove_ofx_bundle() -> bool {
+    let dir = ofx_dir();
+    for b in ["KerfFX.ofx.bundle", "KerfFX.ofx.bundle.new", "KerfFX.ofx.bundle.old"] {
+        let _ = fs::remove_dir_all(dir.join(b));
+    }
+    !dir.join("KerfFX.ofx.bundle").exists()
+}
+
+/// Exit code of an admin-only step that failed but should be retried (a running Resolve holds the bundle).
+const RETRY: i32 = 3;
+
+/// Runs this helper again with admin rights for one step (--install-ofx / --remove-ofx) and waits. Some(code) when
+/// the step ran; None when the person declined the admin prompt or it could not be shown.
+fn elevated(args: &[&str]) -> Option<i32> {
+    let me = std::env::current_exe().ok()?.to_string_lossy().to_string();
+    let code = if cfg!(windows) {
+        // the arguments travel through the environment, so paths with spaces or quotes need no escaping
+        let script = "try { $p = Start-Process -FilePath $env:KERF_ME -ArgumentList $env:KERF_ARGS -Verb RunAs -Wait -PassThru; \
+                      exit $p.ExitCode } catch { exit 99 }";
+        let quoted: Vec<String> = args.iter().map(|a| format!("\"{a}\"")).collect();
+        quiet(Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .env("KERF_ME", &me).env("KERF_ARGS", quoted.join(" "))).status().ok()?.code()?
+    } else if cfg!(target_os = "macos") {
+        let q = |a: &str| format!("'{}'", a.replace('\'', "'\\''")); // sh quoting inside AppleScript's string
+        let sh = std::iter::once(q(&me)).chain(args.iter().map(|a| q(a))).collect::<Vec<_>>().join(" ");
+        let apple = format!("do shell script \"{}\" with administrator privileges", sh.replace('\\', "\\\\").replace('"', "\\\""));
+        Command::new("osascript").args(["-e", &apple]).status().ok()?.code()?
+    } else {
+        Command::new("pkexec").arg(&me).args(args).status().ok()?.code()?
+    };
+    // 99 (Windows), 1 (macOS, cancelled) and 126/127 (pkexec) mean the step never ran
+    if [99, 126, 127].contains(&code) || (cfg!(target_os = "macos") && code == 1) { None } else { Some(code) }
 }
 
 /// Puts (or refreshes) the Kerf panel in every editor on this machine, once per Kerf version unless forced.
@@ -239,19 +273,20 @@ fn install_panels(res: &Path, version: &str, force: bool) {
         mark("panels-version", version);
     }
     let fx = p.join("KerfFX.ofx.bundle");
-    if let (Some(dir), true, true) = (ofx_dir(), fx.is_dir(), force || !marked("ofx-version", version)) {
-        // Resolve: Effects > OpenFX > Kerf (after Resolve restarts). Copy beside the old bundle, then swap, so a
-        // bundle locked by a running Resolve stays usable and the swap is retried on the next start.
-        let (dest, new, old) = (dir.join("KerfFX.ofx.bundle"), dir.join("KerfFX.ofx.bundle.new"), dir.join("KerfFX.ofx.bundle.old"));
-        let _ = fs::remove_dir_all(&new);
-        let _ = fs::remove_dir_all(&old);
-        let ok = copy_dir(&fx, &new).is_ok() && (!dest.exists() || fs::rename(&dest, &old).is_ok()) && fs::rename(&new, &dest).is_ok();
-        if !ok && !dest.exists() && old.exists() {
-            let _ = fs::rename(&old, &dest); // put the previous Kerf FX back
-        }
-        let _ = fs::remove_dir_all(if ok { &old } else { &new });
-        if ok {
-            add_ofx_path(&dir);
+    let due = force || !(marked("ofx-version", version) || marked("ofx-asked", version));
+    if fx.is_dir() && due {
+        // Resolve: Effects > OpenFX > Kerf (after Resolve restarts). The OFX folder usually needs admin rights: try
+        // as this user first, then ask once. A declined prompt waits for the next version or a reinstall.
+        let done = swap_ofx(&fx, &ofx_dir()) || match elevated(&["--install-ofx", &fx.to_string_lossy()]) {
+            Some(0) => true,
+            Some(_) => false, // ran but couldn't swap (Resolve open): try again on the next start
+            None => {
+                mark("ofx-asked", version);
+                false
+            }
+        };
+        if done {
+            remove_old_ofx();
             mark("ofx-version", version);
         }
     }
@@ -269,18 +304,18 @@ fn remove_panels() {
     if let Some(dir) = resolve_scripts() {
         let _ = fs::remove_file(dir.join("Kerf.py"));
     }
-    if let Some(dir) = ofx_dir() {
-        remove_ofx_path(&dir);
-        let _ = fs::remove_dir_all(&dir);
+    if !remove_ofx_bundle() {
+        let _ = elevated(&["--remove-ofx"]); // the OFX folder needs admin rights
     }
+    remove_old_ofx();
     if let Some(k) = kerf_dir() {
-        for m in ["panels-version", "ofx-version"] {
+        for m in ["panels-version", "ofx-version", "ofx-asked"] {
             let _ = fs::remove_file(k.join(m));
         }
     }
 }
 
-/// Takes the Kerf FX folder out of the user's OFX_PLUGIN_PATH, keeping every other plugin's folder.
+/// Takes 0.3.2's Kerf FX folder out of the user's OFX_PLUGIN_PATH, keeping every other plugin's folder.
 fn remove_ofx_path(dir: &Path) {
     let d = dir.to_string_lossy().to_string();
     if cfg!(windows) {
@@ -319,6 +354,15 @@ fn mark(name: &str, version: &str) {
 }
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--install-ofx") {
+        // the one admin step, run elevated by install_panels: copy Kerf FX into the OFX folder
+        let ok = args.get(i + 1).is_some_and(|src| swap_ofx(Path::new(src), &ofx_dir()));
+        std::process::exit(if ok { 0 } else { RETRY });
+    }
+    if args.iter().any(|a| a == "--remove-ofx") {
+        std::process::exit(if remove_ofx_bundle() { 0 } else { RETRY }); // elevated by remove_panels
+    }
     if std::env::args().any(|a| a == "--remove-panels") {
         remove_panels(); // run by the uninstaller: no window, no engine
         return;
