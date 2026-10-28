@@ -207,12 +207,12 @@ export default function App() {
   if (!engine) return <Offline onRetry={connect} prefs={prefs} setPrefs={setPrefs} />;
 
   const NAV_ALL: [View, string, JSX.Element][] = [
-    ["tools", "Tools", <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>],
-    ["graphs", "Graphs", <svg viewBox="0 0 24 24"><path d="M3 20c4 0 5-16 9-16s5 16 9 16" /></svg>],
-    ["motion", "Motion", <svg viewBox="0 0 24 24"><path d="M4 8h12l-3-3M20 16H8l3 3" /><circle cx="4" cy="16" r="1.5" /></svg>],
-    ["shakes", "Shakes", <svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>],
-    ["edit", "Edit", <svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" /></svg>],
-    ["graphics", "Graphics", <svg viewBox="0 0 24 24"><path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" /></svg>],
+    ["tools", "Tools", <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="2" /><rect x="14" y="3" width="7" height="7" rx="2" /><rect x="3" y="14" width="7" height="7" rx="2" /><rect x="14" y="14" width="7" height="7" rx="2" /></svg>],
+    ["graphs", "Graphs", <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 20c4 0 5-16 9-16s5 16 9 16" /></svg>],
+    ["motion", "Motion", <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h12l-3-3M20 16H8l3 3" /><circle cx="4" cy="16" r="1.5" /></svg>],
+    ["shakes", "Shakes", <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z" /></svg>],
+    ["edit", "Edit", <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4zM18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" /></svg>],
+    ["graphics", "Graphics", <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 3 8l9 5 9-5zM3 13l9 5 9-5M3 17.5l9 5 9-5" /></svg>],
   ];
   const NAV = NAV_ALL.filter(([k]) => !(["graphs", "edit", "graphics"] as View[]).includes(k) || host.has(k)); // only what this editor supports
   if (!NAV.some(([k]) => k === view)) setTimeout(() => goView("tools"), 0);
@@ -222,7 +222,9 @@ export default function App() {
       <header className="top">
         <div className="brand"><span className="wordmark">kerf</span></div>
         <LiveChips live={live} engine={engine} />
-        {([["news", "✦", t("whatsNew")], ["history", "⟲", t("history")], ["settings", "⚙", t("settings")]] as const).map(([k, icon, tip]) =>
+        {([["news", <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h16v14H4zM8 9h8M8 13h5" /></svg>, t("whatsNew")],
+          ["history", <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5M12 7v5l3 2" /></svg>, t("history")],
+          ["settings", <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>, t("settings")]] as const).map(([k, icon, tip]) =>
           <button key={k} className={`pill icon ${panel === k ? "on" : ""}`} onClick={() => setPanel(panel === k ? "" : k)} aria-label={tip} title={tip}>{icon}</button>)}
         <button className="pill icon" onClick={() => openHelp()} aria-label={t("help")} title={t("help")}>?</button>
         <span className="pill ver">v{engine}</span>
@@ -234,7 +236,7 @@ export default function App() {
       </nav>
 
       {update && <div className="banner">{update.auto
-        ? <>Kerf {update.latest} is downloading in the background and installs after you close your editors. <a href={update.url} target="_blank" rel="noreferrer">What's new</a></>
+        ? <>Kerf {update.latest} is downloading in the background and installs after you close your editors. <a href={update.url} target="_blank" rel="noreferrer">What’s new</a></>
         : <>Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></>}</div>}
       {live && !live.running.length && live.exit_in != null && <div className="banner wait" role="status">
         <span>Kerf runs alongside Premiere Pro, After Effects or DaVinci Resolve. Open one, or Kerf closes in {live.exit_in}s.</span>
@@ -311,7 +313,7 @@ function Form({ f, params, setParams }: { f: Feature; params: Params; setParams:
           return <label key={k} className={`${cls} check`}><input type="checkbox" checked={!!v} onChange={(e) => set(k, e.target.checked)} />{label(k)}</label>;
         if (f.choices[k])
           return <label key={k} className={cls}>{label(k)}<select value={String(v)} onChange={(e) => set(k, e.target.value)}>
-            {f.choices[k].map((c) => <option key={c} value={c}>{c || "—"}</option>)}</select></label>;
+            {f.choices[k].map((c) => <option key={c} value={c}>{c || "Default"}</option>)}</select></label>;
         if (LONG.has(k))
           return <label key={k} className={`${cls} col`}>{label(k)}<textarea rows={k === "prompt" || k === "urls" ? 4 : 3} value={String(v)} onChange={(e) => set(k, e.target.value)}
             placeholder={k === "prompt" ? "e.g. Cut the dead air, add bold yellow captions, punch-in zooms, and make a vertical Short"
@@ -381,7 +383,7 @@ function Result({ res, notes, onUse }: { res: RunResult; notes: string[]; onUse?
     <div className="result fade">
       {notes.map((n) => <div key={n} className="note">✓ {n}</div>)}
       {onUse && res.imports?.map((p) => (
-        <div key={p} className="use"><span>{p.split(/[\\/]/).pop()}</span><button className="ghost" onClick={() => onUse(p)}>Use in Kerf →</button></div>
+        <div key={p} className="use"><span>{p.split(/[\\/]/).pop()}</span><button className="ghost" onClick={() => onUse(p)}>Use in Kerf</button></div>
       ))}
       {res.text && <div className="textout"><pre>{res.text}</pre>
         <button className="ghost" onClick={() => navigator.clipboard?.writeText(res.text!)}>Copy</button></div>}
@@ -530,7 +532,7 @@ function Offline({ onRetry, prefs, setPrefs }: { onRetry: () => void; prefs: Pre
       <header className="top"><div className="brand"><span className="logo">K</span> Kerf</div>
         <span className="status bad">● engine offline</span><ThemePicker prefs={prefs} set={setPrefs} /></header>
       <main className="card fade">
-        <h2>Kerf isn't running</h2>
+        <h2>Kerf isn’t running</h2>
         <p className="help">Kerf does its work in a small local engine on this computer. If it didn't start, install Kerf (one installer adds the engine and the panels for Premiere Pro, After Effects and Resolve), then click Retry.</p>
         <p className="help"><a href="https://github.com/kamalivaturi/kerf/releases/latest" onClick={(e) => { e.preventDefault(); openHelp("https://github.com/kamalivaturi/kerf/releases/latest"); }}>Download Kerf</a></p>
         {host.launchEngine
