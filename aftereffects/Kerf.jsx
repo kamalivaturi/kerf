@@ -449,7 +449,8 @@
         var h = locator().helper, f = h ? (win ? new File(h) : new Folder(h)) :
             win ? new File($.getenv("LOCALAPPDATA") + "/Kerf/kerf.exe") : new Folder("/Applications/Kerf.app");
         if (!f.exists) { return false; }
-        system.callSystem(win ? 'cmd /c start "" "' + f.fsName + '"' : 'open -g "' + f.fsName + '"');
+        if (win) { return f.execute(); }  // no cmd in between: nothing flashes on screen
+        system.callSystem('open -g "' + f.fsName + '"');
         return true;
     }
     function liveState() {

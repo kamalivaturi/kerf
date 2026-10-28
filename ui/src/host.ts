@@ -410,9 +410,12 @@ function premiere(): Host {
     },
     async launchEngine(kerfHome) {
       const os = req!("os"), win = os.platform?.() === "win32";
-      // the Kerf helper (set up by the Kerf installer) starts the engine; else a source checkout's start script
+      // the Kerf helper starts the engine with no window: through the kerf:// link the installer registers (UXP
+      // won't open an .exe directly), else its path, else a source checkout's start script (no console either)
+      const ok = (r: unknown) => !r;
+      if (await uxp.shell.openExternal("kerf://start").then(ok, () => false)) return;
       const helper = (await this.locate!()).helper || (win ? `${os.homedir()}\\AppData\\Local\\Kerf\\kerf.exe` : "/Applications/Kerf.app");
-      if (await uxp.shell.openPath(helper).then((r: unknown) => !r, () => false)) return;
+      if (await uxp.shell.openPath(helper).then(ok, () => false)) return;
       await uxp.shell.openPath(win ? `${kerfHome}\\start-kerf.cmd` : `${kerfHome}/start-kerf.command`);
     },
   };

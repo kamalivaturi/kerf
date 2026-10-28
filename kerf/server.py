@@ -195,7 +195,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def log_message(self, fmt, *args):
-        sys.stderr.write("kerf: " + fmt % args + "\n")
+        if sys.stderr:  # none under pythonw (no console)
+            sys.stderr.write("kerf: " + fmt % args + "\n")
 
 
 def serve(port=PORT, follow=False):

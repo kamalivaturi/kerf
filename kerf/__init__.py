@@ -1,5 +1,7 @@
 """Kerf: free, open-source AI editing assistant for Premiere Pro, After Effects and DaVinci Resolve."""
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 __version__ = "0.3.2"
@@ -7,5 +9,12 @@ __version__ = "0.3.2"
 _BIN = Path(__file__).resolve().parent.parent / "bin"
 if _BIN.is_dir():
     os.environ["PATH"] = str(_BIN) + os.pathsep + os.environ.get("PATH", "")
+if sys.platform == "win32":  # the engine runs without a console: never let ffmpeg & co. open one each
+    _popen_init = subprocess.Popen.__init__
+
+    def _no_console(self, *args, creationflags=0, **kwargs):
+        _popen_init(self, *args, creationflags=creationflags | subprocess.CREATE_NO_WINDOW, **kwargs)
+
+    subprocess.Popen.__init__ = _no_console
 # GitHub "owner/repo" used by the in-panel update checker.
 REPO = os.environ.get("KERF_REPO", "kamalivaturi/kerf")

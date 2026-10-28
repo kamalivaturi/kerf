@@ -5,6 +5,10 @@
   IfFileExists "$LOCALAPPDATA\Kerf Studio\uninstall.exe" 0 +2
     ExecWait '"$LOCALAPPDATA\Kerf Studio\uninstall.exe" /S'
   ExecWait '"$INSTDIR\kerf.exe" --install-panels'
+  ; kerf://start opens the windowless helper: how the Premiere panel starts the engine (it can't open an .exe)
+  WriteRegStr HKCU "Software\Classes\kerf" "" "URL:Kerf"
+  WriteRegStr HKCU "Software\Classes\kerf" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\kerf\shell\open\command" "" '"$INSTDIR\kerf.exe" "%1"'
   ; Kerf has no window of its own: no Desktop or Start menu shortcuts (it's opened from the editors' panels)
   Delete "$DESKTOP\Kerf.lnk"
   Delete "$SMPROGRAMS\Kerf.lnk"
@@ -19,4 +23,5 @@
   ; the Premiere plugin, the After Effects panel and Kerf FX in the standard OFX folder (one admin prompt), plus
   ; anything older versions left: the per-user Kerf FX, its OFX_PLUGIN_PATH entry and the Resolve script
   ExecWait '"$INSTDIR\kerf.exe" --remove-panels'
+  DeleteRegKey HKCU "Software\Classes\kerf"
 !macroend

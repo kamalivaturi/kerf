@@ -8,7 +8,7 @@
   "requiredPermissions": {
     "localFileSystem": "fullAccess",
     "network": { "domains": "all" },
-    "launchProcess": { "schemes": ["https"], "extensions": [".cmd", ".command", ".exe", ".app"] },
+    "launchProcess": { "schemes": ["https", "kerf"], "extensions": [".cmd", ".command", ".exe", ".app"] },
     "clipboard": "readAndWrite"
   },
   "entrypoints": [
