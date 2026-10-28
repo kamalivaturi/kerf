@@ -517,10 +517,11 @@ function InEditorOnly() {
 }
 
 function Offline({ onRetry, prefs, setPrefs }: { onRetry: () => void; prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void }) {
-  const [starting, setStarting] = useState(!!host.launchEngine);
-  useEffect(() => { // open the panel = Kerf starts; the parent keeps polling and switches over when the engine answers
-    if (!host.launchEngine) return;
-    host.launchEngine(store.get("kerfHome", "C:\\Kerf")).catch(() => {});
+  const [starting, setStarting] = useState(true);
+  useEffect(() => { // the parent keeps polling and switches over when the engine answers
+    // Kerf's login watcher starts the engine when the editor opens. Premiere asks permission before a panel opens
+    // any app or link, so its panel only waits; After Effects starts Kerf itself (it never asks).
+    if (host.launchEngine && !IN_UXP) host.launchEngine(store.get("kerfHome", "C:\\Kerf")).catch(() => {});
     const t = setTimeout(() => setStarting(false), 25000);
     return () => clearTimeout(t);
   }, []);

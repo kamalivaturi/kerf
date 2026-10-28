@@ -1,6 +1,6 @@
 // Kerf: the background helper the installer sets up. It has no window: it puts the Kerf panels into Premiere Pro,
 // After Effects and DaVinci Resolve, runs the local engine while an editor is open, and keeps Kerf up to date.
-// The panels start it when they open; it quits (installing any downloaded update) after the editors close.
+// A windowless login watcher starts it when an editor opens; it quits (installing any update) after they close.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::{
     fs,
@@ -55,6 +55,74 @@ async fn update_loop(app: tauri::AppHandle) {
 
 fn engine_up() -> bool {
     TcpStream::connect_timeout(&"127.0.0.1:7878".parse().unwrap(), Duration::from_millis(300)).is_ok()
+}
+
+/// Kerf's login watcher (kerf --watch): no window, no engine of its own. When Premiere Pro or After Effects opens and
+/// Kerf isn't running, it starts this helper, so the panels find Kerf ready and never launch anything themselves
+/// (Premiere asks permission whenever a panel opens an app or a link). The engine still stops after the editors close.
+fn watch() {
+    // one watcher per user: the port is the lock, released when the process ends
+    let Ok(_lock) = std::net::TcpListener::bind("127.0.0.1:7877") else { return };
+    loop {
+        if editor_open() && !engine_up() {
+            if let Ok(me) = std::env::current_exe() {
+                let _ = quiet(&mut Command::new(me)).spawn();
+            }
+            std::thread::sleep(Duration::from_secs(30)); // let the engine come up before looking again
+        }
+        std::thread::sleep(Duration::from_secs(5));
+    }
+}
+
+fn editor_open() -> bool {
+    if cfg!(windows) {
+        quiet(Command::new("tasklist").args(["/fo", "csv", "/nh"])).output()
+            .map(|o| {
+                let s = String::from_utf8_lossy(&o.stdout).to_lowercase();
+                s.contains("\"adobe premiere pro") || s.contains("\"afterfx.exe\"")
+            })
+            .unwrap_or(false)
+    } else {
+        Command::new("pgrep").args(["-if", "Adobe Premiere Pro|After Effects"]).output()
+            .map(|o| o.status.success()).unwrap_or(false)
+    }
+}
+
+/// Starts the watcher at every login and right now (Windows: the user's Run key; macOS: a LaunchAgent). Linux has
+/// no Premiere Pro or After Effects, and Resolve's Kerf FX needs no engine, so there is nothing to watch there.
+fn install_watcher() {
+    let Ok(me) = std::env::current_exe() else { return };
+    if cfg!(windows) {
+        let value = format!("\"{}\" --watch", me.to_string_lossy());
+        let _ = quiet(Command::new("reg").args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "/v", "Kerf",
+            "/t", "REG_SZ", "/d", &value, "/f"])).status();
+    } else if cfg!(target_os = "macos") {
+        if let Some(agents) = home().map(|h| h.join("Library/LaunchAgents")) {
+            let exe = me.to_string_lossy().replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"); // plist is XML
+            let plist = format!(
+                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>com.kerf.watch</string><key>ProgramArguments</key><array><string>{exe}</string><string>--watch</string></array><key>RunAtLoad</key><true/></dict></plist>\n"
+            );
+            let _ = fs::create_dir_all(&agents).and_then(|_| fs::write(agents.join("com.kerf.watch.plist"), plist));
+        }
+    } else {
+        return;
+    }
+    let _ = quiet(Command::new(&me).arg("--watch")).spawn(); // a second one exits at once (the lock)
+}
+
+/// The mirror of install_watcher: no login entry, and nothing of Kerf's left running, so its files can go.
+fn remove_watcher() {
+    if cfg!(windows) {
+        let _ = quiet(Command::new("reg").args(["delete", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "/v", "Kerf", "/f"])).status();
+        let me = format!("PID ne {}", std::process::id());
+        let _ = quiet(Command::new("taskkill").args(["/F", "/IM", "kerf.exe", "/FI", &me])).status();
+        let _ = quiet(Command::new("taskkill").args(["/F", "/IM", "kerf-engine.exe"])).status();
+    } else if cfg!(target_os = "macos") {
+        if let Some(h) = home() {
+            let _ = fs::remove_file(h.join("Library/LaunchAgents/com.kerf.watch.plist"));
+        }
+        let _ = Command::new("pkill").args(["-f", "kerf --watch"]).status();
+    }
 }
 
 fn io_err(e: impl ToString) -> std::io::Error {
@@ -270,6 +338,7 @@ fn install_panels(res: &Path, version: &str, force: bool) {
         if let Some(dir) = resolve_scripts() {
             let _ = fs::remove_file(dir.join("Kerf.py")); // Kerf in Resolve is Kerf FX only now: drop the old script window
         }
+        install_watcher();
         mark("panels-version", version);
     }
     let fx = p.join("KerfFX.ofx.bundle");
@@ -294,6 +363,7 @@ fn install_panels(res: &Path, version: &str, force: bool) {
 
 /// Takes Kerf out of every editor: the exact mirror of install_panels, with the same paths. Run by the uninstaller.
 fn remove_panels() {
+    remove_watcher();
     if let Some((agent, _)) = adobe_installer() {
         // ponytail: UPIA removes by the plugin's manifest name ("Kerf"); confirm on a machine with Creative Cloud
         let _ = quiet(Command::new(agent).arg(if cfg!(windows) { "/remove" } else { "--remove" }).arg("Kerf")).status();
@@ -362,6 +432,10 @@ fn main() {
     }
     if args.iter().any(|a| a == "--remove-ofx") {
         std::process::exit(if remove_ofx_bundle() { 0 } else { RETRY }); // elevated by remove_panels
+    }
+    if args.iter().any(|a| a == "--watch") {
+        watch(); // the login watcher: no window, no engine; it returns only if another watcher already runs
+        return;
     }
     if std::env::args().any(|a| a == "--remove-panels") {
         remove_panels(); // run by the uninstaller: no window, no engine
