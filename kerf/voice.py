@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 import shutil
+import sys
 import tarfile
 import threading
 import time
@@ -50,6 +51,7 @@ def voice_label(v):
 
 
 _download = threading.Lock()  # the engine serves requests on threads: one download at a time
+_infer = threading.Lock()  # one shared native OfflineTts: never run two generate() calls on it at once
 
 
 def _extract(tar, to):
@@ -83,6 +85,9 @@ def _tts():
     try:
         import sherpa_onnx
     except ImportError as e:
+        if getattr(sys, "frozen", False):  # the installed engine: pip advice would be useless
+            raise RuntimeError("This Kerf install is missing its voice engine. Reinstall Kerf, and report a bug "
+                               "if Voiceover still fails.") from e
         raise RuntimeError("Voiceover needs the sherpa-onnx package: pip install sherpa-onnx") from e
     d = model_dir()
     kokoro = sherpa_onnx.OfflineTtsKokoroModelConfig(
@@ -99,7 +104,9 @@ def speak(text, out, voice="af_heart", speed=1.0, volume_db=0.0):
         raise ValueError("Type the words to speak in 'text'")
     if voice not in VOICES:
         raise ValueError(f"Unknown voice '{voice}'. Pick one of: {', '.join(VOICES)}")
-    audio = _tts().generate(text, sid=VOICES.index(voice), speed=min(2.0, max(0.5, float(speed))))
+    tts = _tts()
+    with _infer:
+        audio = tts.generate(text, sid=VOICES.index(voice), speed=min(2.0, max(0.5, float(speed))))
     samples = np.asarray(audio.samples, dtype=np.float32) * 10 ** (float(volume_db) / 20)
     if not samples.size:
         raise ValueError("The voice produced no audio for that text")
@@ -130,20 +137,29 @@ def speak_server(text, out, voice="default", speed=1.0, style="", model="", volu
     req = urllib.request.Request(f"{base}/audio/speech", json.dumps(body).encode(), headers)
     raw = out.with_name(out.stem + " (server).wav")
     try:
-        with urllib.request.urlopen(req, timeout=600) as r:
-            raw.write_bytes(r.read())
-    except urllib.error.HTTPError as e:
-        raise ValueError(f"The speech server refused it ({e.code}): {e.read().decode('utf-8', 'replace')[:300]}") from e
-    except urllib.error.URLError as e:
-        raise ValueError(f"Can't reach the speech server at {base}. Start VoiceStudio (or change Speech server in "
-                         f"Settings), then try again.") from e
-    media.ffmpeg("-y", "-i", raw, "-af", f"volume={float(volume_db)}dB", "-ac", "1", out)  # clean header, gain
-    raw.unlink(missing_ok=True)
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                raw.write_bytes(r.read())
+        except urllib.error.HTTPError as e:
+            raise ValueError(f"The speech server refused it ({e.code}): {e.read().decode('utf-8', 'replace')[:300]}") from e
+        except urllib.error.URLError as e:
+            raise ValueError(f"Can't reach the speech server at {base}. Start VoiceStudio (or change Speech server in "
+                             f"Settings), then try again.") from e
+        try:
+            media.ffmpeg("-y", "-i", raw, "-af", f"volume={float(volume_db)}dB", "-ac", "1", out)  # clean header, gain
+        except Exception as e:
+            raise ValueError(f"The speech server at {base} didn't send back audio. Check Speech server in Settings.") from e
+    finally:
+        raw.unlink(missing_ok=True)  # also when the reply wasn't audio
     return media.probe(str(out))["duration"]
 
 
 def voiceover(tl, p, ctx):
-    out = ctx.out_dir / f"{tl.name} - voiceover {time.strftime('%Y%m%d-%H%M%S')}.wav"
+    stem, n = f"{tl.name} - voiceover {time.strftime('%Y%m%d-%H%M%S')}", 1
+    out = ctx.out_dir / f"{stem}.wav"
+    while out.exists():  # two voiceovers in the same second must not share a file (media.probe caches by path)
+        n += 1
+        out = ctx.out_dir / f"{stem} ({n}).wav"
     if p["engine"] == "speech server":
         seconds = speak_server(p["text"], out, p["server_voice"], p["speed"], p["style"], p["server_model"], p["volume_db"])
     else:

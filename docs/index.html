@@ -333,7 +333,7 @@ footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
     if (main) { const a = document.getElementById("dl-main"); a.href = main.browser_download_url;
       document.getElementById("dl-os").textContent = `for ${os === "macos" ? "macOS" : os[0].toUpperCase() + os.slice(1)}, ${Math.round(main.size / 1e6)} MB`; }
     const grid = document.getElementById("dl-grid");
-    const size = (b) => b >= 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`;
+    const size = (b) => b >= 1e6 ? `${Math.round(b / 1e6)} MB` : b >= 1e3 ? `${Math.round(b / 1e3)} KB` : `${b} bytes`;
     // Every downloadable file, in plain words. Anything not listed (signatures, updater archives, latest.json) stays hidden.
     const KINDS = [
       ["windows", true, /windows-x64-setup\.exe$/, "Installer (.exe)"], ["windows", false, /windows-x64\.msi$/, "MSI (IT deployment)"],
@@ -352,7 +352,7 @@ footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
     const order = [os, ...["windows", "macos", "linux"].filter((o) => o !== os), "manual"];  // your computer first
     const cards = order.map((key) => {
       const found = KINDS.filter((k) => k[0] === key)
-        .map(([, primary, re, label]) => ({ primary, label, a: assets.find((x) => re.test(x.name)) })).filter((k) => k.a);
+        .map(([, primary, re, label]) => ({ primary, label, a: assets.find((x) => x.size > 0 && re.test(x.name)) }))  // an empty upload is a broken file: never offer it.filter((k) => k.a);
       if (!found.length) return "";
       const top = found.filter((k) => k.primary), more = found.filter((k) => !k.primary), you = key === os;
       const main = top.map((k, i) => link(k.a, k.label, i === 0 ? "get primary" : "get")).join("");

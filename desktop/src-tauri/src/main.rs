@@ -181,75 +181,86 @@ fn ofx_dir() -> Option<PathBuf> {
 }
 
 /// Adds the Kerf FX folder to the user's OFX_PLUGIN_PATH for apps started from now on (Resolve reads it at launch).
+/// Reads the live user value each time, never this process's environment, which may be stale or hold the machine value.
 fn add_ofx_path(dir: &Path) {
     let d = dir.to_string_lossy().to_string();
-    let current = std::env::var("OFX_PLUGIN_PATH").unwrap_or_default();
-    let sep = if cfg!(windows) { ';' } else { ':' };
-    if current.split(sep).any(|p| p == d) {
-        return;
-    }
-    let value = if current.is_empty() { d.clone() } else { format!("{current}{sep}{d}") };
     if cfg!(windows) {
-        // user scope, tells Explorer; unlike setx it never truncates long values (the value travels via the env)
-        let script = "[Environment]::SetEnvironmentVariable('OFX_PLUGIN_PATH', $env:KERF_OFX_PATH, 'User')";
+        // user scope, tells Explorer; unlike setx it never truncates long values (the folder travels via the env)
+        let script = concat!(
+            "$d = $env:KERF_OFX_DIR; $v = [Environment]::GetEnvironmentVariable('OFX_PLUGIN_PATH', 'User'); ",
+            "$p = @(if ($v) { $v -split ';' | Where-Object { $_ } }); ",
+            "if ($p -notcontains $d) { [Environment]::SetEnvironmentVariable('OFX_PLUGIN_PATH', (@($p) + $d) -join ';', 'User') }",
+        );
         let _ = quiet(Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script])
-            .env("KERF_OFX_PATH", &value)).status();
+            .env("KERF_OFX_DIR", &d)).status();
     } else if cfg!(target_os = "macos") {
-        let value = value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"); // plist is XML
+        let current = Command::new("launchctl").args(["getenv", "OFX_PLUGIN_PATH"]).output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string()).unwrap_or_default();
+        if current.split(':').any(|p| p == d) {
+            return;
+        }
+        let value = if current.is_empty() { d.clone() } else { format!("{current}:{d}") };
         // apps launched from the Dock only see launchd's environment: set it now and at every login
         let _ = quiet(Command::new("launchctl").args(["setenv", "OFX_PLUGIN_PATH", &value])).status();
         if let Some(agents) = home().map(|h| h.join("Library/LaunchAgents")) {
+            let value = value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"); // plist is XML
             let plist = format!(
                 "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\"><dict><key>Label</key><string>com.kerf.ofx-path</string><key>ProgramArguments</key><array><string>launchctl</string><string>setenv</string><string>OFX_PLUGIN_PATH</string><string>{value}</string></array><key>RunAtLoad</key><true/></dict></plist>\n"
             );
             let _ = fs::create_dir_all(&agents).and_then(|_| fs::write(agents.join("com.kerf.ofx-path.plist"), plist));
         }
     } else if let Some(conf) = home().map(|h| h.join(".config/environment.d")) {
-        let _ = fs::create_dir_all(&conf).and_then(|_| fs::write(conf.join("kerf-ofx.conf"), format!("OFX_PLUGIN_PATH={value}\n")));
+        // environment.d expands the value at login, so other folders set elsewhere are kept as they are then
+        let line = format!("OFX_PLUGIN_PATH=${{OFX_PLUGIN_PATH:+$OFX_PLUGIN_PATH:}}{d}\n");
+        let _ = fs::create_dir_all(&conf).and_then(|_| fs::write(conf.join("kerf-ofx.conf"), line));
     }
 }
 
 /// Puts (or refreshes) the Kerf panel in every editor on this machine, once per Kerf version unless forced.
+/// Kerf FX keeps its own marker: a bundle locked by a running Resolve retries alone, not the Adobe installs.
 fn install_panels(res: &Path, version: &str, force: bool) {
-    let marker = kerf_dir().map(|k| k.join("panels-version"));
-    if !force && marker.as_ref().and_then(|m| fs::read_to_string(m).ok()).as_deref() == Some(version) {
-        return;
-    }
     let p = res.join("panels");
-    let ccx = p.join("kerf-premiere.ccx");
-    if let (Some((agent, flag)), true) = (adobe_installer(), ccx.is_file()) {
-        let _ = quiet(Command::new(agent).arg(flag).arg(&ccx)).status(); // Premiere Pro
-    }
-    if let Some(dir) = cep_extensions() {
-        let dest = dir.join("com.kerf.aftereffects"); // After Effects
-        let _ = fs::remove_dir_all(&dest);
-        let _ = copy_dir(&p.join("com.kerf.aftereffects"), &dest);
-    }
-    if let Some(dir) = resolve_scripts() {
-        let _ = fs::create_dir_all(&dir).and_then(|_| fs::copy(p.join("Kerf.py"), dir.join("Kerf.py")).map(|_| ()));
+    if force || !marked("panels-version", version) {
+        let ccx = p.join("kerf-premiere.ccx");
+        if let (Some((agent, flag)), true) = (adobe_installer(), ccx.is_file()) {
+            let _ = quiet(Command::new(agent).arg(flag).arg(&ccx)).status(); // Premiere Pro
+        }
+        if let Some(dir) = cep_extensions() {
+            let dest = dir.join("com.kerf.aftereffects"); // After Effects
+            let _ = fs::remove_dir_all(&dest);
+            let _ = copy_dir(&p.join("com.kerf.aftereffects"), &dest);
+        }
+        if let Some(dir) = resolve_scripts() {
+            let _ = fs::create_dir_all(&dir).and_then(|_| fs::copy(p.join("Kerf.py"), dir.join("Kerf.py")).map(|_| ()));
+        }
+        mark("panels-version", version);
     }
     let fx = p.join("KerfFX.ofx.bundle");
-    let mut ok = true;
-    if let (Some(dir), true) = (ofx_dir(), fx.is_dir()) {
+    if let (Some(dir), true, true) = (ofx_dir(), fx.is_dir(), force || !marked("ofx-version", version)) {
         // Resolve: Effects > OpenFX > Kerf (after Resolve restarts). Copy beside the old bundle, then swap, so a
         // bundle locked by a running Resolve stays usable and the swap is retried on the next start.
         let (dest, new, old) = (dir.join("KerfFX.ofx.bundle"), dir.join("KerfFX.ofx.bundle.new"), dir.join("KerfFX.ofx.bundle.old"));
         let _ = fs::remove_dir_all(&new);
         let _ = fs::remove_dir_all(&old);
-        ok = copy_dir(&fx, &new).is_ok() && (!dest.exists() || fs::rename(&dest, &old).is_ok()) && fs::rename(&new, &dest).is_ok();
+        let ok = copy_dir(&fx, &new).is_ok() && (!dest.exists() || fs::rename(&dest, &old).is_ok()) && fs::rename(&new, &dest).is_ok();
         if !ok && !dest.exists() && old.exists() {
             let _ = fs::rename(&old, &dest); // put the previous Kerf FX back
         }
         let _ = fs::remove_dir_all(if ok { &old } else { &new });
         if ok {
             add_ofx_path(&dir);
+            mark("ofx-version", version);
         }
     }
-    if let (Some(m), true) = (marker, ok) {
-        if let Some(parent) = m.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        let _ = fs::write(m, version);
+}
+
+fn marked(name: &str, version: &str) -> bool {
+    kerf_dir().and_then(|k| fs::read_to_string(k.join(name)).ok()).as_deref() == Some(version)
+}
+
+fn mark(name: &str, version: &str) {
+    if let Some(k) = kerf_dir() {
+        let _ = fs::create_dir_all(&k).and_then(|_| fs::write(k.join(name), version));
     }
 }
 

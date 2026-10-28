@@ -441,8 +441,8 @@
         try {
             var st = liveState();
             http("POST", "/host/heartbeat", { host: "aftereffects", state: st }, 2);
-            if (live) { live.text = "\u25CF " + st.project + (st.sequence ? "  \u00B7  " + st.sequence + "  \u00B7  " + st.timecode : ""); }
-        } catch (e) { try { if (live) { live.text = "\u25CB Kerf engine not running"; } } catch (e2) { /* panel closed */ } }
+            if (live) { live.text = st.project + (st.sequence ? ", " + st.sequence + ", " + st.timecode : ""); }
+        } catch (e) { try { if (live) { live.text = "Kerf engine not running"; } } catch (e2) { /* panel closed */ } }
     };
 
     // ------------------------------------------------------------ UI
@@ -462,6 +462,11 @@
     function build(thisObj) {
         var win = thisObj instanceof Panel ? thisObj : new Window("palette", "Kerf", undefined, { resizeable: true });
         win.orientation = "column"; win.alignChildren = ["fill", "top"]; win.margins = 8; win.spacing = 6;
+        var mark = win.add("statictext", undefined, "kerf");  // the Kerf wordmark, as in the HTML panel
+        try {
+            mark.graphics.font = ScriptUI.newFont("Arial Black", "BOLDITALIC", 20);
+            mark.graphics.foregroundColor = mark.graphics.newPen(mark.graphics.PenType.SOLID_COLOR, [1, 0.42, 0.17, 1], 1);
+        } catch (e) { /* fonts and pens are optional: the plain label still reads */ }
         win.minimumSize = [280, 200];  // may be shorter than its content: the view scrolls
         // the tabs sit in a clipping view with a scrollbar, so a short docked panel can still reach everything
         var body = win.add("group"); body.orientation = "row"; body.alignment = ["fill", "fill"]; body.alignChildren = ["fill", "fill"]; body.spacing = 2;
@@ -470,80 +475,80 @@
         var sb = body.add("scrollbar", undefined, 0, 0, 0); sb.alignment = ["right", "fill"]; sb.preferredSize.width = 14;
         var tabs = view.add("tabbedpanel"); tabs.alignChildren = ["fill", "top"];
         tabs.minimumSize = [200, 60];  // let the layout give the view less than the full height
-        var tMain = tabs.add("tab", undefined, "MAIN"), tGraphs = tabs.add("tab", undefined, "GRAPHS"), tMotion = tabs.add("tab", undefined, "MOTION"),
-            tShakes = tabs.add("tab", undefined, "SHAKES"), tAI = tabs.add("tab", undefined, "AI");
+        var tMain = tabs.add("tab", undefined, "Tools"), tGraphs = tabs.add("tab", undefined, "Graphs"), tMotion = tabs.add("tab", undefined, "Motion"),
+            tShakes = tabs.add("tab", undefined, "Shakes"), tAI = tabs.add("tab", undefined, "Edit");
 
-        // MAIN
+        // TOOLS
         var row = tMain.add("group"); row.alignChildren = ["fill", "top"];
-        var pa = group(row, "ANCHOR", "column"), gr = null, n = 0;
+        var pa = group(row, "Anchor", "column"), gr = null, n = 0;
         each([["↖", 0, 0], ["↑", .5, 0], ["↗", 1, 0], ["←", 0, .5], ["●", .5, .5], ["→", 1, .5], ["↙", 0, 1], ["↓", .5, 1], ["↘", 1, 1]], function (g) {
             if (n++ % 3 === 0) { gr = pa.add("group"); gr.spacing = 2; }
             btn(gr, g[0], act("Anchor", function () { return anchor(g[1], g[2]); })).preferredSize = [30, 26];
         });
-        var pl = group(row, "ADD LAYER", "column");
-        btn(pl, "NULL", act("Null", function () { return addNull(false); }));
-        btn(pl, "NULL + PARENT", act("Null + parent", function () { return addNull(true); }), "Parents the selected layers to a new null");
-        btn(pl, "ADJUSTMENT", act("Adjustment", function () { return addSolid(true); }));
-        btn(pl, "SOLID…", act("Solid", function () { return addSolid(false); }));
-        var pb = group(row, "BEATS", "column");
-        btn(pb, "PLACE BEATS", act("Beats", placeBeats), "Select the music layer");
-        btn(pb, "CLEAR", act("Clear beats", clearBeats));
+        var pl = group(row, "Add layer", "column");
+        btn(pl, "Null", act("Null", function () { return addNull(false); }));
+        btn(pl, "Null + parent", act("Null + parent", function () { return addNull(true); }), "Parents the selected layers to a new null");
+        btn(pl, "Adjustment", act("Adjustment", function () { return addSolid(true); }));
+        btn(pl, "Solid…", act("Solid", function () { return addSolid(false); }));
+        var pb = group(row, "Beats", "column");
+        btn(pb, "Place beats", act("Beats", placeBeats), "Select the music layer");
+        btn(pb, "Clear", act("Clear beats", clearBeats));
         var ev = pb.add("dropdownlist", undefined, ["Every beat", "Every 2", "Every 4 (bar)", "Every 8"]); ev.selection = 0;
         ev.onChange = function () { S.every = [1, 2, 4, 8][ev.selection.index]; };
 
         var row2 = tMain.add("group"); row2.alignChildren = ["fill", "top"];
-        btn(group(row2, "STABILIZER"), "STABILIZE", act("Stabilize", stabilize), "Pre-comps each layer and adds Warp Stabilizer");
-        var pz = group(row2, "ZOOM", "column");
+        btn(group(row2, "Stabilizer"), "Stabilize", act("Stabilize", stabilize), "Pre-comps each layer and adds Warp Stabilizer");
+        var pz = group(row2, "Zoom", "column");
         each(["in", "out"], function (dir) {
-            var z = pz.add("group"); z.add("statictext", undefined, dir.toUpperCase());
+            var z = pz.add("group"); z.add("statictext", undefined, dir === "in" ? "Zoom in" : "Zoom out");
             each(["in", "out"], function (side) { btn(z, "ease " + side, act("Zoom " + dir, function () { return zoom(dir, side); })); });
         });
-        btn(tMain, "QUICK MASK — DRAW A MASK, THEN CLICK", act("Quick mask", quickMask), "Draw a rectangle mask on the footage layer to limit the region (optional)");
-        var pu = group(tMain, "UTILITIES");
-        btn(pu, "FRAME → DESKTOP", act("Frame export", frameExport)); btn(pu, "SORT PROJECT", act("Sort project", sortProject));
-        var pf = group(tMain, "FX PRESETS");
+        btn(tMain, "Quick mask: draw a mask, then click", act("Quick mask", quickMask), "Draw a rectangle mask on the footage layer to limit the region (optional)");
+        var pu = group(tMain, "Utilities");
+        btn(pu, "Save frame to Desktop", act("Frame export", frameExport)); btn(pu, "Sort project", act("Sort project", sortProject));
+        var pf = group(tMain, "FX presets");
         var fxName = pf.add("edittext", undefined, "My look"); fxName.preferredSize.width = 110;
-        btn(pf, "COPY FX", act("Copy FX", function () { return copyFx(fxName.text); }));
+        btn(pf, "Copy FX", act("Copy FX", function () { return copyFx(fxName.text); }));
         var fxList = pf.add("dropdownlist", undefined, []); fxList.preferredSize.width = 120;
-        btn(pf, "↻", function () {
+        btn(pf, "Refresh", function () {
             try { var r = http("GET", "/fx"); fxList.removeAll(); each(r.presets, function (p) { fxList.add("item", p); }); say(r.presets.length + " presets"); } catch (e) { say(e.message); }
         });
-        btn(pf, "APPLY", act("Apply FX", function () { return fxList.selection ? applyFx(fxList.selection.text) : "Pick a preset (↻ to refresh)"; }));
+        btn(pf, "Apply FX", act("Apply FX", function () { return fxList.selection ? applyFx(fxList.selection.text) : "Pick a preset (Refresh lists them)"; }));
 
         // GRAPHS
-        var pv = group(tGraphs, "VALUE (selected keyframes)");
+        var pv = group(tGraphs, "Value (selected keyframes)");
         each(["Ease out", "Ease in", "Ease in/out", "Snappy", "Linear"], function (nm) { btn(pv, nm, act("Value curve", function () { return valueCurve(nm); })); });
-        var pspd = group(tGraphs, "SPEED (time remap on selected layers)");
+        var pspd = group(tGraphs, "Speed (time remap on selected layers)");
         each([["Ease in", "ease_in"], ["Ease out", "ease_out"], ["Speedramp", "speedramp"], ["Ease in/out", "ease_in_out"], ["Linear", "linear"]], function (k) {
             btn(pspd, k[0], act("Speed curve", function () { return speedCurve(k[1]); }));
         });
 
         // MOTION
-        var pal = group(tMotion, "ALIGN TO COMP");
+        var pal = group(tMotion, "Align to comp");
         each([["Left", "left"], ["H centre", "hcenter"], ["Right", "right"], ["Top", "top"], ["V centre", "vcenter"], ["Bottom", "bottom"]], function (a) {
             btn(pal, a[0], act("Align", function () { return align(a[1]); }));
         });
-        var pdi = group(tMotion, "DISTRIBUTE");
+        var pdi = group(tMotion, "Distribute");
         btn(pdi, "Horizontal", act("Distribute", function () { return align("dist_h"); })); btn(pdi, "Vertical", act("Distribute", function () { return align("dist_v"); }));
-        var pzs = group(tMotion, "ZOOM SETTINGS", "column");
+        var pzs = group(tMotion, "Zoom settings", "column");
         sliderRow(pzs, "Amount %", "amount", 101, 200); sliderRow(pzs, "Duration s", "zdur", 0.1, 5);
 
         // SHAKES
-        var pax = group(tShakes, "AXIS");
+        var pax = group(tShakes, "Axis");
         each([["Vertical", "vertical"], ["Horizontal", "horizontal"], ["HV", "hv"], ["Scale", "scale"], ["All", "all"], ["Custom", "custom"]], function (a) {
             var r = pax.add("radiobutton", undefined, a[0]); r.value = a[1] === S.axis; r.onClick = function () { S.axis = a[1]; };
         });
-        var psl = group(tShakes, "SETTINGS", "column");
+        var psl = group(tShakes, "Settings", "column");
         sliderRow(psl, "Amplitude px", "amp", 0, 150); sliderRow(psl, "Frequency Hz", "freq", 1, 30); sliderRow(psl, "Rotation °", "rot", 0, 15);
         sliderRow(psl, "Duration s", "dur", 0.1, 5); sliderRow(psl, "Decay", "decay", 0, 1);
         var fl = psl.add("checkbox", undefined, "Flash on hit"); fl.onClick = function () { S.flash = fl.value; };
-        btn(tShakes, "⚡ APPLY SHAKE AT PLAYHEAD", act("Shake", shake));
+        btn(tShakes, "Apply shake at the playhead", act("Shake", shake));
 
         // AI
-        var pai = group(tAI, "KERF ENGINE", "column");
-        btn(pai, "CAPTIONS FOR SELECTED LAYER", act("Captions", captions));
-        btn(pai, "ALL AI FEATURES (Kerf panel)", act("Kerf panel", openPanel));
-        btn(pai, "CHECK ENGINE", function () { try { http("GET", "/settings"); say("Engine OK"); } catch (e) { say(e.message); } });
+        var pai = group(tAI, "Kerf engine", "column");
+        btn(pai, "Captions for the layer", act("Captions", captions));
+        btn(pai, "All AI features (Kerf panel)", act("Kerf panel", openPanel));
+        btn(pai, "Check engine", function () { try { http("GET", "/settings"); say("Engine OK"); } catch (e) { say(e.message); } });
 
         status = win.add("statictext", undefined, "Ready", { truncate: "end" });
         live = win.add("statictext", undefined, "", { truncate: "end" });
@@ -552,13 +557,15 @@
         var flow = [row, row2];  // side-by-side groups stack when the docked panel is narrow
         function scroll() {  // the layout can't clip, so the scroll area is placed by hand after each resize
             var m = win.margins, w = win.size[0] - m[0] - m[2], foot = status.size[1] + live.size[1] + 2 * win.spacing;
-            var h = Math.max(60, win.size[1] - m[1] - m[3] - foot), over = Math.max(0, fullH - h), sw = over > 0 ? 16 : 0;
-            body.location = [m[0], m[1]]; body.size = [w, h];
+            var top = m[1] + mark.size[1] + win.spacing;  // below the wordmark
+            var h = Math.max(60, win.size[1] - top - m[3] - foot), over = Math.max(0, fullH - h), sw = over > 0 ? 16 : 0;
+            mark.location = [m[0], m[1]];
+            body.location = [m[0], top]; body.size = [w, h];
             view.location = [0, 0]; view.size = [w - sw, h];
             sb.visible = over > 0; sb.location = [w - 14, 0]; sb.size = [14, h];
             sb.maxvalue = over; if (sb.value > over) { sb.value = over; }
             tabs.size = [w - sw, Math.max(fullH, h)]; tabs.location = [0, -sb.value];
-            status.location = [m[0], m[1] + h + win.spacing]; status.size = [w, status.size[1]];
+            status.location = [m[0], top + h + win.spacing]; status.size = [w, status.size[1]];
             live.location = [m[0], status.location[1] + status.size[1] + win.spacing]; live.size = [w, live.size[1]];
         }
         var laidOut = false, fullH = 0;  // fullH: the tabs' natural height, measured after a full layout

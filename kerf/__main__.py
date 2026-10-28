@@ -15,6 +15,7 @@ def main(argv=None):
     s.add_argument("--follow-editors", action="store_true",
                    help="stop a minute after the last Premiere Pro / After Effects / Resolve closes")
     sub.add_parser("features", help="list features and their default settings")
+    sub.add_parser("check", help="import the native packages a frozen engine must bundle (release smoke test)")
     r = sub.add_parser("run", help="run a feature on a media file or timeline JSON")
     r.add_argument("feature")
     src = r.add_mutually_exclusive_group(required=True)
@@ -42,6 +43,11 @@ def main(argv=None):
         params = features.get_preset(a.feature, a.preset) if a.preset else {}
         params.update(kv.split("=", 1) for kv in a.set)
         print(json.dumps(features.run_batch(a.feature, files, params, a.out, a.render), indent=1))
+    elif a.cmd == "check":
+        import importlib
+        for mod in ("sherpa_onnx",):  # Voiceover: a missing native library only shows when someone uses it
+            importlib.import_module(mod)
+        print("ok")
     elif a.cmd == "features":
         print(json.dumps(features.describe(), indent=1, default=str))
     else:

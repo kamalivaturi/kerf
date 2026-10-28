@@ -173,6 +173,8 @@ def source_at(t):
 
 
 def _clip_get_image(clip, t, region, out):
+    if objects[clip]["name"] == "Source" and state.get("no_source"):  # a General-context node with nothing wired in
+        return FAILED
     frame = source_at(t) if objects[clip]["name"] == "Source" else state["output"]
     _write(out, props(OfxImagePropData=C.addressof(frame.buf), OfxImagePropBounds=[0, 0, frame.w, frame.h],
                       OfxImagePropRowBytes=frame.w * 16, OfxImageEffectPropPixelDepth=state["depth"],
@@ -342,47 +344,56 @@ def main():
         entry = MAIN(plug.mainEntry)
         call = lambda action, h=None, args=None: entry(action, h, args, None)  # noqa: E731
         assert call(b"OfxActionLoad") == 0, f"{name}: load"
-        desc = new(Effect())
-        assert call(b"OfxActionDescribe", desc) == 0, f"{name}: describe"
-        assert "OfxImageEffectContextFilter" in objects[objects[desc].props]["OfxImageEffectPropSupportedContexts"]
-        assert call(b"OfxImageEffectActionDescribeInContext", desc,
-                    props(OfxImageEffectPropContext="OfxImageEffectContextFilter")) == 0, f"{name}: describe in context"
-        for w, h, scale in SIZES:
-            inst = new(Effect())
-            e = objects[inst]
-            e.params, e.clips = objects[desc].params, objects[desc].clips
-            objects[e.props].update(OfxImageEffectPropProjectExtent=[w / scale, h / scale],
-                                    OfxImageEffectPropContext=["OfxImageEffectContextFilter"])
-            assert call(b"OfxActionCreateInstance", inst) == 0, f"{name}: create instance"
-            for k, (settings, t) in enumerate(CASES[name]):
-                overrides.clear()
-                overrides.update(settings)
-                state["size"] = (w, h)
-                state["source"], state["output"] = source_at(t), Frame(w, h, blank=True)
-                st = call(b"OfxImageEffectActionRender", inst,
-                          props(OfxPropTime=float(t), OfxImageEffectPropRenderWindow=[0, 0, w, h],
-                                OfxImageEffectPropRenderScale=[scale, scale]))
-                out, label = state["output"], f"{name} {w}x{h} case {k}"
-                vals = list(out.buf)
-                if st != 0:
-                    fails.append(f"{label}: render returned {st}")
-                elif not all(math.isfinite(v) for v in vals):
-                    fails.append(f"{label}: NaN/inf in output")
-                elif all(abs(a - b) < 1e-6 for a, b in zip(vals, state["source"].buf)):
-                    fails.append(f"{label}: output identical to the input")
-                elif name == "MotionBlur" and k == 0:  # the picture pans sideways: blur must follow it
-                    src, hx, vy = state["source"], grad(out, 1, 0), grad(out, 0, 1)
-                    if not (hx < 0.9 * grad(src, 1, 0) and vy > 0.9 * grad(src, 0, 1)):
-                        fails.append(f"{label}: automatic blur did not follow the horizontal pan")
-                if (w, h) == SIZES[0][:2]:
-                    png(out_dir / f"{name}_{k}.png", out)
-            state["depth"] = "OfxBitDepthByte"  # a wrong pixel format must be refused, never crash
-            st = call(b"OfxImageEffectActionRender", inst, props(OfxPropTime=0.0, OfxImageEffectPropRenderWindow=[0, 0, w, h],
-                                                                OfxImageEffectPropRenderScale=[scale, scale]))
-            state["depth"] = "OfxBitDepthFloat"
-            if st != IMAGE_FORMAT:
-                fails.append(f"{name}: 8-bit image gave status {st}, expected kOfxStatErrImageFormat")
-            assert call(b"OfxActionDestroyInstance", inst) == 0
+        for ctx in ("OfxImageEffectContextFilter", "OfxImageEffectContextGeneral"):  # Edit/Color pages, Fusion page
+            desc = new(Effect())  # a fresh descriptor per context, as hosts do
+            assert call(b"OfxActionDescribe", desc) == 0, f"{name}: describe"
+            assert ctx in objects[objects[desc].props]["OfxImageEffectPropSupportedContexts"], f"{name}: no {ctx}"
+            assert call(b"OfxImageEffectActionDescribeInContext", desc, props(OfxImageEffectPropContext=ctx)) == 0, (
+                f"{name}: describe in {ctx}")
+            short = ctx.rsplit("Context", 1)[1]
+            for w, h, scale in SIZES:
+                inst = new(Effect())
+                e = objects[inst]
+                e.params, e.clips = objects[desc].params, objects[desc].clips
+                objects[e.props].update(OfxImageEffectPropProjectExtent=[w / scale, h / scale],
+                                        OfxImageEffectPropContext=[ctx])
+                assert call(b"OfxActionCreateInstance", inst) == 0, f"{name}: create instance"
+                for k, (settings, t) in enumerate(CASES[name]):
+                    overrides.clear()
+                    overrides.update(settings)
+                    state["size"] = (w, h)
+                    state["source"], state["output"] = source_at(t), Frame(w, h, blank=True)
+                    st = call(b"OfxImageEffectActionRender", inst,
+                              props(OfxPropTime=float(t), OfxImageEffectPropRenderWindow=[0, 0, w, h],
+                                    OfxImageEffectPropRenderScale=[scale, scale]))
+                    out, label = state["output"], f"{name} {short} {w}x{h} case {k}"
+                    vals = list(out.buf)
+                    if st != 0:
+                        fails.append(f"{label}: render returned {st}")
+                    elif not all(math.isfinite(v) for v in vals):
+                        fails.append(f"{label}: NaN/inf in output")
+                    elif all(abs(a - b) < 1e-6 for a, b in zip(vals, state["source"].buf)):
+                        fails.append(f"{label}: output identical to the input")
+                    elif name == "MotionBlur" and k == 0:  # the picture pans sideways: blur must follow it
+                        src, hx, vy = state["source"], grad(out, 1, 0), grad(out, 0, 1)
+                        if not (hx < 0.9 * grad(src, 1, 0) and vy > 0.9 * grad(src, 0, 1)):
+                            fails.append(f"{label}: automatic blur did not follow the horizontal pan")
+                    if (w, h) == SIZES[0][:2] and short == "Filter":
+                        png(out_dir / f"{name}_{k}.png", out)
+                state["depth"] = "OfxBitDepthByte"  # a wrong pixel format must be refused, never crash
+                st = call(b"OfxImageEffectActionRender", inst, props(OfxPropTime=0.0, OfxImageEffectPropRenderWindow=[0, 0, w, h],
+                                                                    OfxImageEffectPropRenderScale=[scale, scale]))
+                state["depth"] = "OfxBitDepthFloat"
+                if st != IMAGE_FORMAT:
+                    fails.append(f"{name}: 8-bit image gave status {st}, expected kOfxStatErrImageFormat")
+                if short == "General":  # nothing connected to Source: refuse the frame, never crash
+                    state["no_source"] = True
+                    st = call(b"OfxImageEffectActionRender", inst, props(OfxPropTime=0.0, OfxImageEffectPropRenderWindow=[0, 0, w, h],
+                                                                        OfxImageEffectPropRenderScale=[scale, scale]))
+                    state["no_source"] = False
+                    if st != FAILED:
+                        fails.append(f"{name}: render with no Source gave status {st}, expected kOfxStatFailed")
+                assert call(b"OfxActionDestroyInstance", inst) == 0
         assert call(b"OfxActionUnload") == 0
         print(f"ok   {name}")
     state["size"] = SIZES[0][:2]

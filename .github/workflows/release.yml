@@ -60,10 +60,11 @@ jobs:
         run: |
           E=engine-dist/kerf-engine/kerf-engine; [ -f "$E.exe" ] && E="$E.exe"
           "$E" --version
+          "$E" check
           "$E" serve --port 7899 > engine-smoke.log 2>&1 & PID=$!
           ok=0; for i in $(seq 1 60); do curl -sf http://127.0.0.1:7899/health && ok=1 && break; sleep 2; done
           [ $ok = 1 ] || { cat engine-smoke.log; exit 1; }
-          curl -sf -o /dev/null http://127.0.0.1:7899/app/
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:7899/app/)" = 404 ]  # no browser app since 0.3
           kill $PID 2>/dev/null || true
           if [ "$RUNNER_OS" = Windows ]; then taskkill //F //IM kerf-engine.exe || true; fi
       - name: Portable archive

@@ -233,22 +233,33 @@ TOOLKIT = {"speed_ramp", "zoom_move", "layout", "camera_shake", "stabilize", "ad
            "quick_mask", "project_sort"}  # these have their own tabs; Edit lists the rest
 COLORS = [("Black", "#000000"), ("White", "#FFFFFF"), ("Kerf orange", "#FF6B2C"), ("Blue", "#3D7CFF"), ("Green", "#13B07A")]
 FORM_ROWS = 7  # settings shown as controls; the rest are under "More settings"
+# The Kerf panel's tokens (ui/src/styles.scss), so the Resolve window reads as the same product.
+INK, MUTED, ACCENT, ACCENT_HOVER, ACCENT_INK = "#f3ece7", "#a59a92", "#ff6b2c", "#ff8a4c", "#1a0f08"
+PAPER, PAPER2, PAPER3, RULE, RULE_STRONG, HOVER, PRESS = "#121110", "#1a1817", "#242120", "#2e2a28", "#403a36", "#2c2826", "#34302d"
 STYLE = (
-    "QWidget { color: #f3ece7; font-size: 12px; }"
-    "QPushButton { background: #2a221d; border: 1px solid #3d322b; border-radius: 9px; padding: 8px 10px; font-weight: bold; }"
-    "QPushButton:hover { border-color: #ff6b2c; } QPushButton:pressed { background: #3a2c23; }"
-    "QPushButton:disabled { color: #6f645d; border-color: #2a221d; }"
-    "QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QTreeWidget { background: #1b1512; border: 1px solid #3d322b;"
-    " border-radius: 7px; padding: 4px 6px; }"
-    "QLineEdit:focus, QComboBox:focus, QTextEdit:focus { border-color: #ff6b2c; }"
-    "QTabBar::tab { background: transparent; color: #a59a92; padding: 9px 16px; font-weight: bold; border-bottom: 2px solid transparent; }"
-    "QTabBar::tab:selected { color: #f3ece7; border-bottom: 2px solid #ff6b2c; }"
-    "QSlider::groove:horizontal { height: 4px; background: #3d322b; border-radius: 2px; }"
-    "QSlider::handle:horizontal { background: #ff6b2c; width: 14px; margin: -6px 0; border-radius: 7px; }"
-    "QCheckBox::indicator:checked { background: #ff6b2c; border-radius: 3px; }"
+    f"QWidget {{ color: {INK}; font-size: 13px; }}"
+    f"QWidget#KerfWin {{ background: {PAPER}; }}"
+    f"QPushButton {{ background: {PAPER3}; border: 1px solid {RULE}; border-radius: 6px; padding: 8px 12px; font-weight: 600; }}"
+    f"QPushButton:hover {{ background: {HOVER}; }} QPushButton:pressed {{ background: {PRESS}; }}"
+    f"QPushButton:focus {{ border-color: {ACCENT}; }}"
+    f"QPushButton:disabled {{ color: {MUTED}; background: {PAPER2}; border-color: {RULE}; }}"
+    f"QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox, QTextEdit, QTreeWidget {{ background: {PAPER}; border: 1px solid {RULE};"
+    f" border-radius: 6px; padding: 5px 8px; selection-background-color: {ACCENT}; selection-color: {ACCENT_INK}; }}"
+    f"QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QTextEdit:focus {{ border-color: {ACCENT}; }}"
+    f"QComboBox QAbstractItemView {{ background: {PAPER2}; border: 1px solid {RULE_STRONG}; }}"
+    f"QTabBar::tab {{ background: transparent; color: {MUTED}; padding: 9px 14px; font-weight: 600; border-bottom: 2px solid transparent; }}"
+    f"QTabBar::tab:hover {{ color: {INK}; }}"
+    f"QTabBar::tab:selected {{ color: {INK}; border-bottom: 2px solid {ACCENT}; }}"
+    f"QSlider::groove:horizontal {{ height: 4px; background: {RULE_STRONG}; border-radius: 2px; }}"
+    f"QSlider::sub-page:horizontal {{ background: {ACCENT}; border-radius: 2px; }}"
+    f"QSlider::handle:horizontal {{ background: {ACCENT}; width: 14px; margin: -5px 0; border-radius: 7px; }}"
+    f"QCheckBox::indicator {{ width: 14px; height: 14px; border: 1px solid {RULE_STRONG}; border-radius: 3px; background: {PAPER}; }}"
+    f"QCheckBox::indicator:checked {{ background: {ACCENT}; border-color: {ACCENT}; }}"
+    f"QScrollBar:vertical {{ background: {PAPER}; width: 10px; }} QScrollBar::handle:vertical {{ background: {RULE_STRONG}; border-radius: 4px; }}"
 )
-PRIMARY = ("QPushButton { background: #ff6b2c; color: #1a0f08; border: none; border-radius: 9px; padding: 9px 12px; font-weight: bold; }"
-           " QPushButton:hover { background: #ff8a4f; } QPushButton:disabled { background: #5a3a2a; color: #a59a92; }")
+PRIMARY = (f"QPushButton {{ background: {ACCENT}; color: {ACCENT_INK}; border: 1px solid {ACCENT}; border-radius: 6px; padding: 8px 12px;"
+           f" font-weight: 600; }} QPushButton:hover {{ background: {ACCENT_HOVER}; border-color: {ACCENT_HOVER}; }}"
+           f" QPushButton:disabled {{ background: {PAPER3}; color: {MUTED}; }}")
 
 
 def geometry(w=480, h=820):
@@ -272,11 +283,11 @@ def main():
         return
     feats = call("/features")["features"]
     edit_names = sorted((n for n in feats if n not in TOOLKIT), key=lambda k: (feats[k]["group"], feats[k]["title"]))
-    dot, sep, ell = "\u25cf", "  \u00b7  ", "\u2026"
+    ell = "\u2026"
 
     def head(text):
-        return ui.Label({"Text": text.upper(), "Weight": 0,
-                         "StyleSheet": "color: #a59a92; font-weight: bold; letter-spacing: 2px; padding-top: 8px;"})
+        return ui.Label({"Text": text, "Weight": 0,  # the panel's card heads: sentence case, one step up
+                         "StyleSheet": f"color: {INK}; font-size: 14px; font-weight: 700; padding-top: 10px;"})
 
     def btn(id_, text, primary=False, tip=""):
         return ui.Button({"ID": id_, "Text": text, "ToolTip": tip, **({"StyleSheet": PRIMARY} if primary else {})})
@@ -291,36 +302,36 @@ def main():
 
     tools = ui.VGroup({"Spacing": 6}, [
         head("Add layer"),
-        row(btn("LNull", "NULL", tip="Transparent placeholder layer at the playhead"), btn("LSolid", "SOLID"),
+        row(btn("LNull", "Null", tip="Transparent placeholder layer at the playhead"), btn("LSolid", "Solid"),
             ui.ComboBox({"ID": "LColor", "Weight": 0})),
-        row(btn("LBars", "BARS 2.39"), btn("LVig", "VIGNETTE")),
+        row(btn("LBars", "Bars 2.39"), btn("LVig", "Vignette")),
         head("Beats"),
-        row(btn("Beats", "PLACE BEAT MARKERS", True), ui.Label({"Text": "every", "Weight": 0}),
+        row(btn("Beats", "Place beat markers", True), ui.Label({"Text": "every", "Weight": 0}),
             ui.SpinBox({"ID": "Every", "Minimum": 1, "Maximum": 16, "Value": 1, "Weight": 0})),
         head("Speed ramp (clip under the playhead)"),
-        row(btn("SpIn", "EASE IN"), btn("SpOut", "EASE OUT")),
-        row(btn("SpRamp", "SPEED RAMP"), btn("SpBoth", "IN / OUT")),
+        row(btn("SpIn", "Ease in"), btn("SpOut", "Ease out")),
+        row(btn("SpRamp", "Speed ramp"), btn("SpBoth", "In and out")),
         head("Stabilizer"),
-        row(btn("Stab", "STABILIZE CLIP"), ui.Label({"Text": "Smoothness", "Weight": 0}),
+        row(btn("Stab", "Stabilize clip"), ui.Label({"Text": "Smoothness", "Weight": 0}),
             ui.Slider({"ID": "Smooth", "Minimum": 10, "Maximum": 100, "Value": 50, "Orientation": "Horizontal"}),
             ui.Label({"ID": "SmoothV", "Weight": 0, "MinimumSize": [40, 0]})),
         head("Quick mask (offline AI cutout)"),
-        row(btn("Mask", "CUT OUT SUBJECT", True), ui.ComboBox({"ID": "MaskModel", "Weight": 0})),
+        row(btn("Mask", "Cut out subject", True), ui.ComboBox({"ID": "MaskModel", "Weight": 0})),
         head("Utilities"),
-        row(btn("Frame", "FRAME \u2192 DESKTOP"), btn("Sort", "SORT MEDIA POOL")),
+        row(btn("Frame", "Save frame to Desktop"), btn("Sort", "Sort media pool")),
         ui.VGap(0, 1),
     ])
     motion = ui.VGroup({"Spacing": 6}, [
         head("Zoom (eased, at the playhead)"),
         slider("ZAmt", "Amount %", 101, 200, 120), slider("ZDur", "Duration s", 10, 500, 60),
-        row(btn("ZInIn", "Zoom in \u00b7 ease in"), btn("ZInOut", "Zoom in \u00b7 ease out", True)),
-        row(btn("ZOutIn", "Zoom out \u00b7 ease in"), btn("ZOutOut", "Zoom out \u00b7 ease out")),
+        row(btn("ZInIn", "Zoom in, ease in"), btn("ZInOut", "Zoom in, ease out", True)),
+        row(btn("ZOutIn", "Zoom out, ease in"), btn("ZOutOut", "Zoom out, ease out")),
         head("Place & align clips"),
         row(ui.Label({"Text": "Arrange", "Weight": 0}), ui.ComboBox({"ID": "Arrange"})),
         row(ui.Label({"Text": "Tracks", "Weight": 0}), ui.LineEdit({"ID": "LTracks", "Text": "2"})),
         row(ui.Label({"Text": "Scale %", "Weight": 0}), ui.SpinBox({"ID": "LScale", "Minimum": 0, "Maximum": 400, "Value": 35}),
             ui.Label({"Text": "Margin %", "Weight": 0}), ui.SpinBox({"ID": "LMargin", "Minimum": 0, "Maximum": 40, "Value": 4})),
-        row(btn("Layout", "APPLY LAYOUT", True,
+        row(btn("Layout", "Apply layout", True,
                 "Picture-in-picture, grids and alignment build a new timeline; Scale 0 = fit")),
         ui.VGap(0, 1),
     ])
@@ -331,9 +342,9 @@ def main():
         slider("SAmp", "Amplitude px", 0, 120, 28), slider("SFreq", "Frequency Hz", 1, 30, 11),
         slider("SRot", "Rotation \u00b0", 0, 100, 15), slider("SDur", "Duration s", 10, 300, 45),
         slider("SDecay", "Decay", 0, 100, 70),
-        row(btn("PImpact", "IMPACT"), btn("PHand", "HANDHELD"), btn("PQuake", "EARTHQUAKE")),
-        row(btn("Shake", "\u26a1 APPLY SHAKE", True)),
-        ui.Label({"Text": "Live, keyframeable shake, zoom, RGB split, vignette and bars on any clip: Edit page \u203a Effects \u203a OpenFX \u203a Kerf.", "WordWrap": True, "Weight": 0, "StyleSheet": "color: #a59a92;"}),
+        row(btn("PImpact", "Impact"), btn("PHand", "Handheld"), btn("PQuake", "Earthquake")),
+        row(btn("Shake", "Apply shake", True)),
+        ui.Label({"Text": "Live, keyframeable shake, zoom, RGB split, vignette and bars on any clip: Edit page, Effects, OpenFX, Kerf.", "WordWrap": True, "Weight": 0, "StyleSheet": f"color: {MUTED};"}),
         ui.VGap(0, 1),
     ])
     form = []
@@ -343,7 +354,7 @@ def main():
     edit = ui.VGroup({"Spacing": 6}, [
         row(ui.Label({"Text": "Feature", "Weight": 0}), ui.ComboBox({"ID": "Feature"})),
         ui.Label({"ID": "Help", "WordWrap": True, "Weight": 0, "MinimumSize": [200, 56], "Alignment": {"AlignTop": True},
-                  "StyleSheet": "color: #a59a92;"}),
+                  "StyleSheet": f"color: {MUTED};"}),
         row(ui.ComboBox({"ID": "Preset"}), ui.LineEdit({"ID": "PresetName", "PlaceholderText": "Save settings as" + ell}),
             ui.Button({"ID": "SavePreset", "Text": "Save", "Weight": 0})),
         *form,
@@ -358,8 +369,8 @@ def main():
                          ui.VGroup({"Spacing": 8}, [
         ui.HGroup({"Weight": 0}, [
             ui.Label({"Text": "kerf", "Weight": 0,
-                      "StyleSheet": "color: #ff6b2c; font-size: 24px; font-weight: 900; font-style: italic; padding-right: 10px;"}),
-            ui.Label({"ID": "Live", "StyleSheet": "color: #57d68d;"})]),
+                      "StyleSheet": f"color: {ACCENT}; font-size: 24px; font-weight: 900; font-style: italic; padding-right: 10px;"}),
+            ui.Label({"ID": "Live", "StyleSheet": f"color: {MUTED};"})]),
         ui.TabBar({"ID": "Tabs", "Weight": 0}),
         ui.Stack({"ID": "Pages"}, [tools, motion, shakes, edit]),
         ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 0, "MinimumSize": [200, 64], "PlaceholderText": "Results appear here."}),
@@ -380,7 +391,7 @@ def main():
                 it[combo].AddItem(v)
     it["Axis"].CurrentText, it["On"].CurrentText = "hv", "playhead"
     for n in edit_names:
-        it["Feature"].AddItem(feats[n]["group"] + sep + feats[n]["title"])
+        it["Feature"].AddItem(feats[n]["group"] + ": " + feats[n]["title"])
     state = {"items": [], "params": {}, "keys": [], "loading": False}
 
     # ---------------------------------------------------------------- running a feature
@@ -569,8 +580,8 @@ def main():
 
     def beat(ev=None):
         s = heartbeat()
-        it["Live"].Text = (dot + " " + s["project"] + (sep + s["sequence"] + sep + s["timecode"] if s.get("sequence") else "")) if s \
-            else "\u25cb Kerf engine not reachable"
+        it["Live"].Text = ", ".join([s["project"]] + ([s["sequence"], s["timecode"]] if s.get("sequence") else [])) if s \
+            else "Kerf engine not reachable"
 
     try:  # live project / timeline / playhead while the Kerf window is open
         timer = ui.Timer({"ID": "KerfBeat", "Interval": 1000})

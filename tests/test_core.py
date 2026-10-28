@@ -325,6 +325,11 @@ def test_voiceover_speech_server_request_and_errors(tmp_path, monkeypatch):
         def do_POST(self):
             got["path"], got["auth"] = self.path, self.headers.get("Authorization")
             got["body"] = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if got.get("html"):  # a misconfigured server: an error page with status 200
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b"<html>Not found</html>")
+                return
             buf = io.BytesIO()
             with wav.open(buf, "wb") as w:  # 0.5 s of quiet tone at 24 kHz
                 w.setnchannels(1), w.setsampwidth(2), w.setframerate(24000), w.writeframes(b"\x10\x00" * 12000)
@@ -344,10 +349,19 @@ def test_voiceover_speech_server_request_and_errors(tmp_path, monkeypatch):
     tl = dict(name="vo", fps=30, width=1920, height=1080, playhead=1.5, video=[[]], audio=[[]])
     r = features.run("voiceover", tl, dict(text="Hello  there", engine="speech server", server_voice="my-clone",
                                            style="calm", speed=1.2))
-    srv.shutdown()
     assert got["path"] == "/v1/audio/speech" and got["auth"] is None
     assert got["body"] == dict(input="Hello there", voice="my-clone", response_format="wav", speed=1.2, instructions="calm")
     assert abs(r["report"]["seconds"] - 0.5) < 0.05 and r["report"]["at"] == 1.5 and r["report"]["voice"] == "my-clone"
+    again = features.run("voiceover", tl, dict(text="Hello", engine="speech server"))  # same second: its own file
+    assert again["files"][0] != r["files"][0] and Path(r["files"][0]).is_file()
+    got["html"] = True
+    try:  # not audio: a plain message, and the raw reply is not left behind
+        features.run("voiceover", tl, dict(text="hi", engine="speech server"))
+        raise AssertionError("expected a plain error")
+    except ValueError as e:
+        assert "didn't send back audio" in str(e)
+    assert not list(Path(r["files"][0]).parent.glob("*(server).wav"))
+    srv.shutdown()
     monkeypatch.setattr(settings, "get", lambda k: {"speech_server_url": "http://127.0.0.1:9/v1"}.get(k, real(k)))
     try:  # nothing listening: a plain "start VoiceStudio" message, not a crash
         features.run("voiceover", tl, dict(text="hi", engine="speech server"))
