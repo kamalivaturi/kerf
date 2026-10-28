@@ -291,7 +291,33 @@ def run(name, timeline, params=None, out_dir=None, host=None):
         res["xml"].append(str(path))
     res["feature"] = name
     res["sequence_names"] = [t.name for t in tls]
+    res["steps"] = steps(res)
     return res
+
+
+def steps(res):
+    """The one way a Result is applied: an ordered list of edits every editor adapter performs with its own API.
+
+    Ops: sort {plan} | insert {path, at, duration} | import {files, what: media|captions} | timeline {xml, name}
+    | markers {markers: [{t, name}], kind: "chapter"} | mogrt {path, param, pages}. Adapters skip what their editor
+    can't do and say so; they never interpret the Result keys themselves."""
+    if res.get("sort"):
+        return [dict(op="sort", plan=res["sort"])]  # sorting the bins is the whole job
+    out = []
+    if res.get("insert"):
+        out.append(dict(op="insert", **res["insert"]))
+    if res.get("imports"):
+        out.append(dict(op="import", files=list(res["imports"]), what="media"))
+    names = res.get("sequence_names") or []
+    for i, xml in enumerate(res.get("xml") or []):
+        out.append(dict(op="timeline", xml=xml, name=names[i] if i < len(names) else Path(xml).stem))
+    if res.get("srt"):
+        out.append(dict(op="import", files=[res["srt"]], what="captions"))
+    if res.get("markers"):
+        out.append(dict(op="markers", markers=res["markers"], kind="chapter"))
+    if res.get("mogrt"):
+        out.append(dict(op="mogrt", **res["mogrt"]))
+    return out
 
 
 def run_batch(name, paths, params=None, out_dir=None, render_after=False):

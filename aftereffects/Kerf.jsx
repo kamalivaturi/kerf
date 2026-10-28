@@ -209,6 +209,22 @@
         importAbove(path, l, start === undefined || start === null ? l.inPoint : start).name = name;
         return name + " added above " + l.name;
     }
+    // Result steps (kerf/features.py steps) that After Effects can perform
+    function importFiles(paths) {
+        var i;
+        for (i = 0; i < paths.length; i++) { app.project.importFile(new ImportOptions(new File(paths[i]))); }
+        return "Imported " + paths.length + " file(s) into the project";
+    }
+    function placeFile(path, name, at) {
+        var c = comp(), nl = c.layers.add(app.project.importFile(new ImportOptions(new File(path))));
+        nl.startTime = at; nl.name = name;
+        return name + " added at " + at.toFixed(2) + " s";
+    }
+    function compMarkers(list) {
+        var c = comp(), i;
+        for (i = 0; i < list.length; i++) { c.markerProperty.setValueAtTime(list[i].t, new MarkerValue(list[i].name)); }
+        return "Added " + list.length + " chapter marker(s)";
+    }
     // Scripts hub: the user's own installed scripts and ScriptUI panels, run from Kerf (nothing is copied or bundled)
     function listScripts() {
         var base = Folder.appPackage.fsName + "/Scripts", dirs = [[base, false], [base + "/ScriptUI Panels", true]], out = [], i, j, fs, n;
@@ -588,6 +604,7 @@
             beats: placeBeats, clearBeats: clearBeats, stabilize: stabilize, zoom: zoom, mask: quickMask, frameExport: frameExport,
             sortProject: sortProject, copyFx: copyFx, applyFx: applyFx, valueCurve: valueCurve, speedCurve: speedCurve, shake: shake,
             align: align, captions: captions, clipInfo: clipInfo, addMarkers: addMarkers, addLayer: addLayer,
+            importFiles: importFiles, placeFile: placeFile, compMarkers: compMarkers,
             listScripts: listScripts, runScript: runScript };
         $.global.KerfAE = {
             call: function (name, settings, args) {  // settings: the panel's values for S; returns JSON {ok, text}

@@ -368,3 +368,14 @@ def test_voiceover_speech_server_request_and_errors(tmp_path, monkeypatch):
         raise AssertionError("expected a plain error")
     except ValueError as e:
         assert "Start VoiceStudio" in str(e)
+
+
+def test_result_steps_are_one_ordered_list():
+    """Every editor applies these steps; the Result keys themselves are never read by the adapters."""
+    res = dict(insert=dict(path="a.mov", at=1.0, duration=2.0), imports=["b.mp4"], xml=["x.xml"], sequence_names=["Cut"],
+               srt="c.srt", markers=[dict(t=1.0, name="Intro")], mogrt=dict(path="m.mogrt", param="Text", pages=[]))
+    assert [s["op"] for s in features.steps(res)] == ["insert", "import", "timeline", "import", "markers", "mogrt"]
+    assert features.steps(res)[2] == dict(op="timeline", xml="x.xml", name="Cut")
+    assert features.steps(dict(sort={"bins": {}}, xml=["x.xml"])) == [dict(op="sort", plan={"bins": {}})]
+    r = features.run("silences", str(VIDEO))
+    assert r["steps"] and all(s["op"] == "timeline" for s in r["steps"])

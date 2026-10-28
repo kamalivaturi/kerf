@@ -13,7 +13,17 @@ export const timecode = (s: number, fps: number) => {
 /** The open editor sequence/comp/timeline with a known frame size, if any editor reports one. */
 export const liveSequence = (live?: Record<string, Live>) =>
   Object.entries(live || {}).map(([host, s]) => ({ host, ...s })).find((s) => s.width && s.height && s.fps);
+// How a Result is applied (kerf/features.py steps): every editor adapter performs these, in order, with its own API.
+export type Step =
+  | { op: "sort"; plan: { bins: Record<string, string[]>; sequences: string; other: string } }
+  | { op: "insert"; path: string; at: number; duration: number }
+  | { op: "import"; files: string[]; what: "media" | "captions" }
+  | { op: "timeline"; xml: string; name: string }
+  | { op: "markers"; markers: { t: number; name: string }[]; kind: "chapter" }
+  | { op: "mogrt"; path: string; param: string; pages: { start: number; end: number; text: string }[] };
+
 export type RunResult = {
+  steps?: Step[];
   xml?: string[]; sequence_names?: string[]; files?: string[]; imports?: string[]; srt?: string; text?: string;
   markers?: { t: number; name: string }[]; report?: Record<string, unknown>;
   items?: { id: number; label: string }[];
@@ -341,39 +351,41 @@ function premiere(): Host {
     },
     async apply(res) {
       const notes: string[] = [];
-      if (res.sort) return [await sortProject(await ppro.Project.getActiveProject(), res.sort)];
-      if (res.insert) { // a generated layer goes onto the open sequence instead of into a new one
-        const [project, seq] = await active();
-        const root = await project.getRootItem();
-        await project.importFiles([res.insert.path], true, root as any, false);
-        let item = null;
-        for (const it of (await allItems(root)).reverse()) if (norm(await mediaPath(it)) === norm(res.insert.path)) { item = it; break; }
-        if (item) { await insertAt(project, seq, item, res.insert.at, "Kerf layer"); return [`Added ${res.insert.path.split(/[\\/]/).pop()} at the playhead`]; }
+      let open: Awaited<ReturnType<typeof active>> | null = null;
+      const seqNow = async () => open ??= await active(); // only steps that edit the sequence need one open
+      const bin = async () => (await (await ppro.Project.getActiveProject()).getRootItem()) as any;
+      for (const st of res.steps || []) {
+        if (st.op === "sort") notes.push(await sortProject(await ppro.Project.getActiveProject(), st.plan));
+        else if (st.op === "insert") { // a generated layer goes onto the open sequence instead of into a new one
+          const [project, seq] = await seqNow();
+          const root = await project.getRootItem();
+          await project.importFiles([st.path], true, root as any, false);
+          let item = null;
+          for (const it of (await allItems(root)).reverse()) if (norm(await mediaPath(it)) === norm(st.path)) { item = it; break; }
+          if (item) { await insertAt(project, seq, item, st.at, "Kerf layer"); notes.push(`Added ${st.path.split(/[\\/]/).pop()} at the playhead`); }
+        } else if (st.op === "import") {
+          const project = await ppro.Project.getActiveProject();
+          await project.importFiles(st.files, true, await bin(), false);
+          notes.push(st.what === "captions" ? "Caption SRT imported into the project bin" : `Imported ${st.files.length} file(s) into the project`);
+        } else if (st.op === "timeline") {
+          const project = await ppro.Project.getActiveProject();
+          const before = new Set((await project.getSequences()).map((q) => q.guid.toString()));
+          await project.importFiles([st.xml], true, await bin(), false);
+          const created = (await project.getSequences()).filter((q) => !before.has(q.guid.toString()));
+          const target = created.find((q) => q.name === st.name) || created[created.length - 1];
+          if (target) { await project.openSequence(target); open = null; notes.push(`Opened sequence “${target.name}”`); }
+        } else if (st.op === "markers") {
+          const [project, seq] = await seqNow();
+          const markers = await ppro.Markers.getMarkers(seq);
+          transact(project, "Kerf markers", (add) => st.markers.forEach((m) =>
+            add(markers.createAddMarkerAction(m.name, "Chapter", ppro.TickTime.createWithSeconds(m.t),
+                                              ppro.TickTime.createWithSeconds(0), "Kerf"))));
+          notes.push(`Added ${st.markers.length} chapter markers`);
+        } else if (st.op === "mogrt") {
+          const [project, seq] = await seqNow();
+          notes.push(await placeMogrt(project, seq, st));
+        }
       }
-      if (res.imports?.length) { // downloads etc.: into the project bin, no open sequence required
-        const project = await ppro.Project.getActiveProject();
-        await project.importFiles(res.imports, true, (await project.getRootItem()) as any, false);
-        notes.push(`Imported ${res.imports.length} file(s) into the project`);
-        if (!res.xml?.length && !res.markers?.length) return notes;
-      }
-      const [project, seq] = await active();
-      const root = await project.getRootItem();
-      for (const [i, xml] of (res.xml || []).entries()) {
-        const before = new Set((await project.getSequences()).map((s) => s.guid.toString()));
-        await project.importFiles([xml], true, root as any, false);
-        const created = (await project.getSequences()).filter((s) => !before.has(s.guid.toString()));
-        const target = created.find((s) => s.name === res.sequence_names?.[i]) || created[created.length - 1];
-        if (target) { await project.openSequence(target); notes.push(`Opened sequence “${target.name}”`); }
-      }
-      if (res.srt) { await project.importFiles([res.srt], true, root as any, false); notes.push("Caption SRT imported into the project bin"); }
-      if (res.markers?.length) {
-        const markers = await ppro.Markers.getMarkers(seq);
-        transact(project, "Kerf markers", (add) => res.markers!.forEach((m) =>
-          add(markers.createAddMarkerAction(m.name, "Chapter", ppro.TickTime.createWithSeconds(m.t),
-                                            ppro.TickTime.createWithSeconds(0), "Kerf"))));
-        notes.push(`Added ${res.markers.length} chapter markers`);
-      }
-      if (res.mogrt) notes.push(await placeMogrt(project, seq, res.mogrt));
       return notes;
     },
     async insertMogrt(path) {
@@ -438,7 +450,8 @@ function standalone(): Host {
       return seq ? { ...tl, width: seq.width!, height: seq.height!, fps: seq.fps! } : tl;
     },
     async apply(res) {
-      return [...(res.xml || []).map((x) => `Timeline XML: ${x} (import into Premiere or Resolve)`), ...(res.files || [])];
+      const xml = (res.steps || []).flatMap((st) => st.op === "timeline" ? [`Timeline XML: ${st.xml} (import into Premiere or Resolve)`] : []);
+      return [...xml, ...(res.files || [])];
     },
     async insertMogrt(path) { return `Drag ${path} into Premiere (Essential Graphics) - inserting needs the Premiere panel`; },
     async outDir() { return undefined; },
@@ -511,7 +524,18 @@ function aftereffects(): Host {
     async live() { try { return JSON.parse(await es("KerfAE.live()")); } catch { return {}; } },
     async projectKey() { return (await this.live!()).project || "untitled"; },
     async readTimeline() { throw new Error("After Effects tools work on the selected layers of the open composition."); },
-    async apply() { return []; },
+    async apply(res) {
+      const notes: string[] = [];
+      for (const st of res.steps || []) {
+        if (st.op === "import") notes.push(await call("importFiles", {}, [st.files]));
+        else if (st.op === "insert") notes.push(await call("placeFile", {}, [st.path, "Kerf layer", st.at]));
+        else if (st.op === "markers") notes.push(await call("compMarkers", {}, [st.markers]));
+        else if (st.op === "sort") notes.push(await call("sortProject"));
+        else if (st.op === "timeline") notes.push(`Timeline saved: ${st.xml}. Open it in Premiere Pro or Resolve (After Effects can't import edit XML)`);
+        else if (st.op === "mogrt") notes.push("MOGRTs are for Premiere Pro");
+      }
+      return notes;
+    },
     async outDir() { return undefined; },
     async readToken() { // the panel can load before AE has run host.jsx: wait for a real token, not an error string
       for (let i = 0; i < 20; i++) {

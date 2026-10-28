@@ -191,39 +191,36 @@ def export_still(proj):
 
 
 def apply(res):
+    """Performs the Result's steps (kerf/features.py steps) with Resolve's API."""
     proj, notes = project(), []
     mp = proj.GetMediaPool()
-    if res.get("sort"):
-        return [sort_media_pool(mp, res["sort"])]
-    if res.get("insert"):
-        done = insert_layer(proj, mp, res["insert"])
-        if done:
-            return [done]
-    if res.get("imports"):  # downloads etc. go straight into the Media Pool
-        mp.ImportMedia(res["imports"])
-        notes.append(f"Imported {len(res['imports'])} file(s) into the Media Pool")
-    names = res.get("sequence_names") or []
-    for i, xml in enumerate(res.get("xml", [])):
-        name = names[i] if i < len(names) else os.path.splitext(os.path.basename(xml))[0]
-        taken = {proj.GetTimelineByIndex(i + 1).GetName() for i in range(proj.GetTimelineCount())}
-        name = next(n for n in [name] + [f"{name} {k}" for k in range(2, 999)] if n not in taken)  # Resolve rejects duplicates
-        new = import_timeline(mp, xml, name)
-        if new:
-            proj.SetCurrentTimeline(new)
-            notes.append(f"Created timeline '{name}'")
-        else:
-            notes.append(f"Resolve could not import {xml}")
-    if res.get("srt"):
-        mp.ImportMedia([res["srt"]])
-        notes.append("Caption SRT added to the Media Pool (drag it onto the timeline for a subtitle track)")
-    tl = proj.GetCurrentTimeline()
-    fps = float(tl.GetSetting("timelineFrameRate")) if tl else 30.0
-    for m in res.get("markers", []) if tl else []:
-        tl.AddMarker(int(round(m["t"] * fps)), "Blue", m["name"], "Kerf", 1)
-    if res.get("markers"):
-        notes.append(f"Added {len(res['markers'])} chapter markers")
-    if res.get("mogrt"):
-        notes.append("MOGRT captions are Premiere-only; in Resolve use output=overlay (animated caption clip)")
+    for st in res.get("steps") or []:
+        op = st["op"]
+        if op == "sort":
+            notes.append(sort_media_pool(mp, st["plan"]))
+        elif op == "insert":
+            notes.append(insert_layer(proj, mp, st) or "Resolve could not add the layer")
+        elif op == "import":
+            mp.ImportMedia(st["files"])
+            notes.append("Caption SRT added to the Media Pool (drag it onto the timeline for a subtitle track)"
+                         if st["what"] == "captions" else f"Imported {len(st['files'])} file(s) into the Media Pool")
+        elif op == "timeline":
+            taken = {proj.GetTimelineByIndex(i + 1).GetName() for i in range(proj.GetTimelineCount())}
+            name = next(n for n in [st["name"]] + [f"{st['name']} {k}" for k in range(2, 999)] if n not in taken)  # Resolve rejects duplicates
+            new = import_timeline(mp, st["xml"], name)
+            if new:
+                proj.SetCurrentTimeline(new)
+                notes.append(f"Created timeline '{name}'")
+            else:
+                notes.append(f"Resolve could not import {st['xml']}")
+        elif op == "markers":
+            tl = proj.GetCurrentTimeline()
+            fps = float(tl.GetSetting("timelineFrameRate")) if tl else 30.0
+            for m in st["markers"] if tl else []:
+                tl.AddMarker(int(round(m["t"] * fps)), "Blue", m["name"], "Kerf", 1)
+            notes.append(f"Added {len(st['markers'])} chapter markers" if tl else "Open a timeline to add markers")
+        elif op == "mogrt":
+            notes.append("MOGRT captions are Premiere-only; in Resolve use output=overlay (animated caption clip)")
     return notes
 
 
