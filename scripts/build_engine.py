@@ -28,7 +28,7 @@ FFMPEG = {  # static builds (GPL: includes libvidstab for the stabilizer)
 EXCLUDE = ["torch", "torchaudio", "torchvision", "tensorflow", "jax", "scipy", "pandas", "matplotlib", "sklearn", "numba",
            "transformers", "librosa", "PyQt5", "PyQt6", "PySide2", "PySide6", "tkinter", "gi", "IPython", "jupyter", "notebook",
            "pytest", "sympy", "playwright", "selenium"]
-DATA = ["ui/dist:ui/dist", "CHANGELOG.md:.", "mogrt:mogrt", "resolve:resolve", "aftereffects:aftereffects"]
+DATA = ["ui/dist:ui/dist", "CHANGELOG.md:.", "mogrt:mogrt", "aftereffects:aftereffects"]
 
 
 def fetch_ffmpeg(dest):
