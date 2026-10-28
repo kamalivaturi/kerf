@@ -71,7 +71,7 @@ def spec(kind, anim, look, fmt="16x9", overrides=None, name=None):
     s = dict(id=f"{kind}-{anim}-{look}-{fmt}".replace("_", "-"), kind=kind, anim_name=anim, look_name=look, format=fmt,
              name=name or f"Kerf {kind.replace('_', ' ').title()} - {anim.title()} - {look.title()}{' 9x16' if vertical else ''}",
              w=w, h=h, duration=10, preview_seconds=3, text=k["text"], subtext=k.get("subtext", ""),
-             size=round(k["size"] * (.9 if vertical else 1)),
+             size=round(k["size"] * (.7 if vertical else 1)),  # a 1080-wide frame: .9 let the default caption run off both edges
              pos=[k["pos"][0], .72 if vertical and kind == "caption" else k["pos"][1]],
              anim=copy.deepcopy(ANIMS[anim]), look=copy.deepcopy(LOOKS[look]))
     for key, v in (overrides or {}).items():

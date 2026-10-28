@@ -237,9 +237,19 @@ pre.news { max-height: 420px; overflow-y: auto; white-space: pre-wrap; }
 .top-gap { margin-top: var(--space-sm); }
 
 // graphics gallery, MOGRT studio, caption preview
-.mg-grid { display: flex; flex-wrap: wrap; gap: var(--space-xs); max-height: 420px; overflow-y: auto; }
-.mg-card { position: relative; display: flex; flex-direction: column; align-items: stretch; width: 160px; padding: var(--space-2xs); text-align: left;
-  img { width: 150px; border-radius: var(--radius-inner); display: block; } .tier { position: absolute; top: var(--space-xs); right: var(--space-xs); } }
+.mg-head { display: flex; align-items: center; gap: var(--space-xs); margin-bottom: var(--space-sm);
+  h2 { margin: 0; } .count { font-size: var(--text-sm); color: var(--color-muted); } .close { margin-left: auto; } }
+.mg-grid { display: flex; flex-wrap: wrap; gap: var(--space-xs); max-height: 460px; overflow-y: auto; }
+.mg-import { margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 1px solid var(--color-rule); }
+.graphics .tabs .fmt { display: flex; margin-left: auto; } // kind on the left, format on the right: two choices, two groups
+.mg-card { position: relative; display: flex; flex-direction: column; align-items: stretch; width: 166px; padding: var(--space-2xs);
+  text-align: left; white-space: normal;
+  .tier { position: absolute; top: var(--space-xs); right: var(--space-xs); padding: var(--space-3xs) var(--space-2xs); border-radius: var(--radius-inner);
+    background: var(--color-paper); font-style: normal; font-size: var(--text-xs); color: var(--color-muted); } }
+// a 16:9 frame for every card: a 9:16 caption shows the band where its words sit, not a tall black slab
+.mg-thumb { display: block; width: 156px; height: 88px; overflow: hidden; border-radius: var(--radius-inner); background: var(--color-paper);
+  img { display: block; width: 156px; height: 88px; object-fit: contain; } }
+.mg-card.tall .mg-thumb img { height: auto; margin-top: -152px; } // 156 x 277 scaled: the caption line sits about 71% down
 .mg-name { font-size: var(--text-xs); margin-top: var(--space-2xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-muted); }
 .mg-stage { position: relative; overflow: hidden; border-radius: var(--radius-inner); background: var(--color-paper-3); flex: 0 0 auto;
   &.imported { height: 84px; width: 150px; display: flex; align-items: center; justify-content: center; color: var(--color-muted); } }
@@ -275,7 +285,7 @@ pre.news { max-height: 420px; overflow-y: auto; white-space: pre-wrap; }
   &.split { display: flex; align-items: stretch; gap: 0; padding: 0; overflow: hidden; height: var(--control);
     background: var(--color-paper-3); border: 1px solid var(--color-rule); border-radius: var(--radius-control);
     button { flex: 1; min-height: 0; height: 100%; border: 0; border-radius: 0; background: none; &:hover { background: var(--color-hover); } }
-    input[type="color"] { width: 36px; flex: 0 0 36px; height: 100%; min-height: 0; padding: 4px; border: 0; border-left: 1px solid var(--color-rule);
+    input[type="color"] { width: 36px; flex: 0 0 36px; height: 100%; min-height: 0; padding: var(--space-2xs); border: 0; border-left: 1px solid var(--color-rule);
       border-radius: 0; background: none; cursor: pointer; } } }
 .tk-mini { min-height: 28px; padding: 0 var(--space-xs); font-size: var(--text-sm); font-weight: 500; &.on { color: var(--color-accent); } }
 .tk-field { display: flex; flex-direction: column; gap: var(--space-2xs); margin-top: var(--space-xs); font-size: var(--text-sm); color: var(--color-muted);

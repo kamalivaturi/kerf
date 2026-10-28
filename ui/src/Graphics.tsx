@@ -143,11 +143,17 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
   const [o, setO] = useState<Record<string, any>>({}), [saveName, setSaveName] = useState("");
   const [msg, setMsg] = useState(""), [busy, setBusy] = useState(false), [imp, setImp] = useState("");
   const [styles, setStyles] = useState<Record<string, Record<string, any>>>(store.get("mogrtStyles", {}));
-  const [urls, setUrls] = useState<Record<string, string>>({});
+  const [urls, setUrls] = useState<Record<string, { png?: string; gif?: string }>>({});
   const load = () => api.get("/mogrt").then(setInfo).catch((e) => setMsg((e as Error).message));
   useEffect(() => { load(); }, []);
   const built = useMemo(() => Object.fromEntries((info?.library || []).map((e) => [e.id, e])), [info]);
-  useEffect(() => { (info?.library || []).forEach((e) => e.gif && api.mediaUrl(e.id, "gif").then((u) => setUrls((m) => ({ ...m, [e.id]: u })))); }, [info]);
+  // a still per card, the animated preview only under the pointer: 194 live GIFs at once made the panel crawl.
+  // All the URLs land in one update, so the grid renders once, not once per template.
+  useEffect(() => {
+    const lib = info?.library || [];
+    Promise.all(lib.map(async (e) => [e.id, { png: e.png ? await api.mediaUrl(e.id, "png") : undefined,
+      gif: e.gif ? await api.mediaUrl(e.id, "gif") : undefined }] as const)).then((all) => setUrls(Object.fromEntries(all)));
+  }, [info]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const mine = (info?.library || []).filter((e) => e.source !== "pack").map((e) => e.spec || ({ id: e.id, name: e.name, kind: "imported" } as Spec));
@@ -156,6 +162,7 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
       : s.kind === kind && (s.kind !== "caption" || s.format === fmt));
   }, [info, q, kind, fmt]);
   const live = sel?.anim && info ? applyOverrides(sel, o, info) : null;
+  const toBuild = list.filter((s) => s.anim && !built[s.id]);
 
   async function run(label: string, fn: () => Promise<any>) {
     setBusy(true); setMsg(label);
@@ -174,33 +181,36 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
   if (!info) return <section className="card fade"><h2>{t("graphics")}<button className="ghost close" onClick={onClose} aria-label="Close">✕</button></h2><p className="help">{msg || "…"}</p></section>;
   return (
     <section className="card graphics fade">
-      <h2>{t("graphics")} <small className="help">{info.catalog.length} templates, {info.library.length} built</small>
-        <button className="ghost close" onClick={onClose} aria-label="Close">✕</button></h2>
+      <div className="mg-head"><h2>{t("graphics")}</h2><span className="count">{info.catalog.length} templates, {info.library.length} built</span>
+        <button className="ghost close" onClick={onClose} aria-label="Close">✕</button></div>
       {!sel && <>
         <div className="search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("searchTemplates")} aria-label="Search templates" /></div>
         {!q && <nav className="tabs small">
-          {[...info.kinds, "mine"].map((x) => <button key={x} className={kind === x ? "on" : ""} onClick={() => setKind(x)}>{x === "mine" ? "★ Mine" : x.replace("_", " ")}</button>)}
-          {kind === "caption" && info.formats.map((x) => <button key={x} className={fmt === x ? "on" : ""} onClick={() => setFmt(x)}>{x.replace("x", ":")}</button>)}
+          {[...info.kinds, "mine"].map((x) => <button key={x} className={kind === x ? "on" : ""} onClick={() => setKind(x)}>{x === "mine" ? "Mine" : x.replace("_", " ")}</button>)}
+          {kind === "caption" && <span className="fmt">{info.formats.map((x) => <button key={x} className={fmt === x ? "on" : ""}
+            onClick={() => setFmt(x)} aria-label={`Format ${x.replace("x", ":")}`}>{x.replace("x", ":")}</button>)}</span>}
         </nav>}
         <div className="mg-grid">
           {list.map((s) => (
-            <button key={s.id} className="mg-card" onMouseEnter={() => setHover(s.id)} onMouseLeave={() => setHover("")}
+            <button key={s.id} className={`mg-card${s.format === "9x16" ? " tall" : ""}`} onMouseEnter={() => setHover(s.id)}
+              onMouseLeave={() => setHover("")} onFocus={() => setHover(s.id)} onBlur={() => setHover("")}
               onClick={() => { setSel(s); setO({}); setSaveName(""); setMsg(""); }} title={s.name}>
-              {urls[s.id] ? <img src={urls[s.id]} alt="" width={150} /> : s.anim ? <LivePreview s={s} width={150} playing={hover === s.id} /> : <div className="mg-stage imported">MOGRT</div>}
+              {urls[s.id]?.png ? <span className="mg-thumb"><img src={(hover === s.id && urls[s.id].gif) || urls[s.id].png} alt="" /></span>
+                : s.anim ? <LivePreview s={s} width={150} playing={hover === s.id} /> : <div className="mg-stage imported">MOGRT</div>}
               <span className="mg-name">{s.anim_name ? `${s.anim_name}, ${s.look_name}` : s.name}</span>
-              {built[s.id] && <em className="tier">built</em>}
+              {s.anim && !built[s.id] && <em className="tier">not built</em>}
             </button>
           ))}
           {!list.length && <span className="help">No templates here yet.</span>}
         </div>
-        <div className="row"><input value={imp} onChange={(e) => setImp(e.target.value)} placeholder="Import a .mogrt you own: C:\…\template.mogrt" aria-label="MOGRT path" />
+        <div className="row mg-import"><input value={imp} onChange={(e) => setImp(e.target.value)} placeholder="Import a .mogrt you own: C:\…\template.mogrt" aria-label="MOGRT path" />
           {host.pickFile && <button className="ghost" onClick={async () => { const p = await host.pickFile!(); if (p) setImp(p); }}>…</button>}
           <button className="ghost" disabled={!imp || busy} onClick={() => run("Importing", () => api.post("/mogrt/import", { path: imp }).then((e) => `Imported “${e.name}” with ${e.controls} editable controls`))}>Import</button></div>
         <div className="actions">
           {!info.library.some((e) => e.source === "pack") && <button className="primary" disabled={busy}
             onClick={() => run("Downloading the Kerf MOGRT pack (194 templates with previews)…", () => api.post("/mogrt/install-pack", {}).then((r) => `Installed ${r.installed} templates`))}>Install the Kerf MOGRT pack</button>}
-          <button className="ghost" disabled={busy || !list.some((s) => s.anim)} onClick={() => run("Building in After Effects (save and close any open AE project first)…",
-            () => api.post("/mogrt/build", { ids: list.filter((s) => s.anim && !built[s.id]).map((s) => s.id) }))}>Build {list.filter((s) => s.anim && !built[s.id]).length} in AE</button>
+          {toBuild.length > 0 && <button className="ghost" disabled={busy} onClick={() => run("Building in After Effects (save and close any open AE project first)…",
+            () => api.post("/mogrt/build", { ids: toBuild.map((s) => s.id) }))}>Build {toBuild.length} in After Effects</button>}
         </div>
       </>}
       {sel && <div className="studio fade">
@@ -226,7 +236,7 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
             <input value={saveName} onChange={(e) => setSaveName(e.target.value)} placeholder="Name (style or MOGRT)" aria-label="Name" />
             <button className="ghost" onClick={saveStyle} disabled={!saveName.trim()}>Save style</button>
           </div>
-        </> : <p className="help">{sel.name}: imported template. Edit its controls in Premiere's Essential Graphics panel.</p>}
+        </> : <p className="help">{sel.name}: imported template. Edit its controls in Premiere’s Essential Graphics panel.</p>}
         <div className="actions">
           {live && <button className="ghost" onClick={() => setO({})}>Reset</button>}
           {built[sel.id] && <button className="ghost" onClick={() => run("Inserting", () => host.insertMogrt(built[sel.id].file))}>Insert at playhead</button>}
@@ -234,7 +244,7 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
           {live && <button className="primary" disabled={busy || !saveName.trim()} onClick={() => run("Building your MOGRT in After Effects…",
             () => api.post("/mogrt/studio", { base: sel.id, name: saveName.trim(), overrides: Object.fromEntries(Object.entries(o).filter(([, v]) => v !== "")) }))}>Save as my MOGRT</button>}
         </div>
-        {live && <p className="help">Every value stays editable later in Premiere's Essential Graphics panel.</p>}
+        {live && <p className="help">Every value stays editable later in Premiere’s Essential Graphics panel.</p>}
       </div>}
       {msg && <div className={busy ? "busy" : "note"}>{busy && <span className="spinner" />} {msg}</div>}
     </section>
