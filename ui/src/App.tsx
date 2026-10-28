@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, store } from "./api";
+import { api, runFeature, store } from "./api";
 import Graphics from "./Graphics";
 import Toolkit, { ToolTab } from "./Toolkit";
 import { EDITOR_NAME, host, IN_EDITOR, IN_UXP, Live, liveSequence, RunResult, setEditorActions, setStandaloneMedia } from "./host";
@@ -178,11 +178,11 @@ export default function App() {
         setResult({ report: await api.post("/batch", { feature: name, paths: paths(), params: p }) });
         return;
       }
-      let timeline = null;
-      if (f.needs_timeline) { setBusy("Reading timeline"); timeline = await host.readTimeline(); }
-      setBusy(analyze ? "Analyzing" : name === "download" ? "Downloading" : `Running ${f.title}`);
-      const out_dir = store.get<string>("outDir", "") || (await host.outDir());
-      const res: RunResult = await api.post("/run", { feature: name, timeline, params: p, out_dir });
+      const { res, notes: n } = await runFeature(name, p, { needsTimeline: f.needs_timeline, apply: !analyze, onStage: (s, r) => {
+        if (s === "read") setBusy("Reading timeline");
+        else if (s === "run") setBusy(analyze ? "Analyzing" : name === "download" ? "Downloading" : `Running ${f.title}`);
+        else { setBusy("Applying"); setResult(r!); } // the result shows while the editor applies it
+      } });
       if (analyze) {
         setItems(res.items || []);
         setChecked(new Set((res.items || []).map((i) => i.id)));
@@ -190,9 +190,6 @@ export default function App() {
         setResult({ report: res.report });
         return;
       }
-      setBusy("Applying");
-      setResult(res);
-      const n = await host.apply(res);
       setNotes(n);
       setItems(null);
       remember({ feature: name, title: f.title, at: Date.now(), notes: n, params: { ...params }, ok: true });

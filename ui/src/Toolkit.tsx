@@ -1,8 +1,8 @@
 // Toolkit: one-click editor tools (anchor, layers, beats, curves, shakes, stabilizer, zoom, quick mask, FX presets).
 // Engine tools run through /run like every feature; selection-based ones use host.tools (Premiere).
 import { useEffect, useRef, useState } from "react";
-import { api, store } from "./api";
-import { host, IN_EDITOR, RunResult } from "./host";
+import { api, runFeature, store } from "./api";
+import { host, IN_EDITOR } from "./host";
 
 export type ToolTab = "tools" | "graphs" | "motion" | "shakes";
 type P = Record<string, string | number | boolean>;
@@ -59,10 +59,7 @@ function useRunner(hasMedia: boolean, onNeedMedia: () => void) {
     return runNow(feature, params, label);
   };
   const runNow = (feature: string, params: P, label: string) => guard(label, async () => {
-    const timeline = feature === "project_sort" ? null : await host.readTimeline();
-    const out_dir = store.get<string>("outDir", "") || (await host.outDir());
-    const res: RunResult = await api.post("/run", { feature, timeline, params, out_dir });
-    const notes = await host.apply(res);
+    const { res, notes } = await runFeature(feature, params, { needsTimeline: feature !== "project_sort" });
     return notes.length ? notes : res.report ? Object.entries(res.report).slice(0, 3).map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : v}`) : "Done";
   });
   const tool = (label: string, fn: (t: NonNullable<typeof host.tools>) => Promise<string>, fallback?: () => void) =>
