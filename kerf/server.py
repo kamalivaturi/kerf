@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
         if not img and not self._guard():
             return
         routes = {
-            "/features": lambda: dict(features=features.describe(), plugin_errors=features.plugin_errors),
+            "/features": lambda: dict(features=features.describe(), editors=features.EDITORS, plugin_errors=features.plugin_errors),
             "/presets": lambda: (features.get_preset(q["feature"], q["name"]) if "name" in q
                                  else features.list_presets(q["feature"])),
             "/update": check_update,

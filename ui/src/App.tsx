@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, store } from "./api";
 import Graphics from "./Graphics";
 import Toolkit, { ToolTab } from "./Toolkit";
-import { EDITOR_NAME, host, IN_EDITOR, IN_UXP, Live, liveSequence, RunResult, setStandaloneMedia } from "./host";
+import { EDITOR_NAME, host, IN_EDITOR, IN_UXP, Live, liveSequence, RunResult, setEditorActions, setStandaloneMedia } from "./host";
 import { LANGS, setLang, t } from "./i18n";
 
 const HELP_URL = "https://github.com/kamalivaturi/kerf#readme";
@@ -108,7 +108,9 @@ export default function App() {
     host.projectKey?.().then(setProjectKey).catch(() => {});
     if (store.get("seenVersion", "") !== h.version) { setPanel("news"); store.set("seenVersion", h.version); }
     try {
-      setFeatures((await api.get("/features")).features);
+      const f = await api.get("/features");
+      setEditorActions(f.editors?.[host.name]); // before the render that uses host.has
+      setFeatures(f.features);
       api.get("/update").then((u) => u.update_available && setUpdate(u)).catch(() => {});
     } catch (e) { setError((e as Error).message); }
   }

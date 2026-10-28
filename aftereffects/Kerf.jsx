@@ -601,9 +601,9 @@
     if ($.global.KERF_LIB) {  // loaded by the HTML panel (aftereffects/cep): expose the tools, no ScriptUI
         var FUNCS = { anchor: anchor, "null": function () { return addNull(false); }, parentNull: function () { return addNull(true); },
             adjustment: function () { return addSolid(true); }, solid: function (hex) { return addSolid(false, hex); },
-            beats: placeBeats, clearBeats: clearBeats, stabilize: stabilize, zoom: zoom, mask: quickMask, frameExport: frameExport,
+            clearBeats: clearBeats, stabilize: stabilize, zoom: zoom, frameExport: frameExport,
             sortProject: sortProject, copyFx: copyFx, applyFx: applyFx, valueCurve: valueCurve, speedCurve: speedCurve, shake: shake,
-            align: align, captions: captions, clipInfo: clipInfo, addMarkers: addMarkers, addLayer: addLayer,
+            align: align, clipInfo: clipInfo, addMarkers: addMarkers, addLayer: addLayer,
             importFiles: importFiles, placeFile: placeFile, compMarkers: compMarkers,
             listScripts: listScripts, runScript: runScript };
         $.global.KerfAE = {

@@ -398,3 +398,14 @@ def test_units_round_trip_per_editor():
     tl = Timeline.from_dict(dict(width=1920, height=1080, editor="resolve", video=[[dict(
         path="x.mov", src_in=0, src_out=1, start=0, framing=dict(zoom=1.2, pan=192.0, tilt=108.0, source=[3840, 2160]))]]))
     assert tl.editor == "resolve" and tl.video[0][0].base_scale == pytest.approx(60.0)
+
+
+def test_editor_actions_are_one_list():
+    """Every action a panel asks about (host.has) is declared for some editor, and every toolkit feature exists."""
+    import re
+    asked = set()
+    for f in (Path(__file__).resolve().parent.parent / "ui" / "src").glob("*.tsx"):
+        asked |= set(re.findall(r'(?:host\.|[^.\w])has\("(\w+)"\)', f.read_text(encoding="utf-8")))
+    declared = {a for acts in features.EDITORS.values() for a in acts}
+    assert asked and asked <= declared, asked - declared
+    assert {n for n, d in features.describe().items() if d["toolkit"]} == set(features.TOOLKIT) & set(features.REGISTRY)

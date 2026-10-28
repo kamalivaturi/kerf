@@ -34,6 +34,7 @@ class Feature:
     presets: dict = field(default_factory=dict)  # built-in named presets {name: partial params}
     group: str = "Edit"
     needs_timeline: bool = True  # False: runs without an open sequence (e.g. downloads)
+    toolkit: bool = False  # has its own controls in every editor's toolkit tabs; the Edit lists show the rest
 
 
 @dataclass
@@ -254,10 +255,29 @@ def import_presets(bundle):
     return dict(imported=done)
 
 
+TOOLKIT = ("speed_ramp", "zoom_move", "layout", "camera_shake", "stabilize", "add_layer", "frame_export", "beat_markers",
+           "quick_mask", "project_sort")
+for _n in TOOLKIT:
+    if _n in REGISTRY:
+        REGISTRY[_n].toolkit = True
+
+# What each editor's Kerf panel offers (panel actions, not engine features): served by /features, and the panels
+# show only these tabs, cards and buttons. The one list; tests check every action a panel asks about is here.
+_ALL = ("anchor", "null", "bars", "adjustment", "solid", "beats", "clearBeats", "valueCurve", "speedCurve", "speedGraph",
+        "shake", "shakeEngine", "stabilize", "zoom", "layout", "mask", "frameExport", "sortProject", "fx", "graphs", "edit",
+        "graphics")
+EDITORS = {
+    "premiere": list(_ALL),
+    "standalone": [a for a in _ALL if a not in ("adjustment", "clearBeats", "fx")],
+    "aftereffects": ["anchor", "null", "parentNull", "adjustment", "solid", "beats", "clearBeats", "valueCurve", "speedCurve",
+                     "shake", "stabilize", "zoom", "align", "mask", "frameExport", "sortProject", "fx", "captions", "scripts"],
+}
+
+
 def describe():
     return {n: dict(title=f.title, group=f.group, defaults=f.defaults, choices=f.choices, help=f.help, tier=f.tier,
                     review=f.review, entitled=license.entitled(f), presets=list_presets(n),
-                    needs_timeline=f.needs_timeline)
+                    needs_timeline=f.needs_timeline, toolkit=f.toolkit)
             for n, f in REGISTRY.items()}
 
 

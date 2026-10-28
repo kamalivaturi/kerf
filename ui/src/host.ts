@@ -35,15 +35,9 @@ export type RunResult = {
   error?: string;
 };
 
-// What each editor can do; the UI only shows tabs, cards and buttons whose action the editor supports.
-const ALL = ["anchor", "null", "bars", "adjustment", "solid", "beats", "clearBeats", "valueCurve", "speedCurve", "speedGraph", "shake",
-  "shakeEngine", "stabilize", "zoom", "layout", "mask", "frameExport", "sortProject", "fx", "graphs", "edit", "graphics"];
-const CAPS: Record<string, Set<string>> = {
-  premiere: new Set(ALL),
-  standalone: new Set(ALL.filter((a) => !["adjustment", "clearBeats", "fx"].includes(a))),
-  aftereffects: new Set(["anchor", "null", "parentNull", "adjustment", "solid", "beats", "clearBeats", "valueCurve", "speedCurve", "shake",
-    "stabilize", "zoom", "alignAE", "mask", "frameExport", "sortProject", "fx", "captions", "scripts"]),
-};
+// What this editor's panel offers, from the engine's one list (kerf/features.py EDITORS, sent with /features).
+let CAPS = new Set<string>();
+export const setEditorActions = (actions: string[] = []) => { CAPS = new Set(actions); };
 export const EDITOR_NAME: Record<string, string> = { premiere: "Premiere", aftereffects: "After Effects", standalone: "Studio" };
 
 export interface Host {
@@ -326,7 +320,7 @@ function premiere(): Host {
 
   return {
     name: "premiere",
-    has: (a) => CAPS.premiere.has(a),
+    has: (a) => CAPS.has(a),
     tools,
     async projectKey() { return (await ppro.Project.getActiveProject())?.path || "untitled"; },
     async live() {
@@ -429,7 +423,7 @@ function standalone(): Host {
   const tauri = (globalThis as any).__TAURI__; // Kerf Studio exposes the native file picker and file drops
   return {
     name: "standalone",
-    has: (a) => CAPS.standalone.has(a),
+    has: (a) => CAPS.has(a),
     ...(tauri?.dialog && {
       async pickFile() {
         const p = await tauri.dialog.open({ multiple: false, filters: [{ name: "Video, audio or image",
@@ -489,7 +483,7 @@ function aftereffects(): Host {
   const clip = async () => JSON.parse(await call("clipInfo")) as { timeline: TimelineDict; path: string; name: string; region: string };
   return {
     name: "aftereffects",
-    has: (a) => CAPS.aftereffects.has(a),
+    has: (a) => CAPS.has(a),
     native: {
       anchor: (p) => call("anchor", {}, [p.ax, p.ay]), null: () => call("null"), parentNull: () => call("parentNull"),
       adjustment: () => call("adjustment"), solid: (p) => call("solid", {}, [p.color]),

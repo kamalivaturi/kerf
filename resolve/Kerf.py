@@ -225,8 +225,6 @@ def apply(res):
 
 # ------------------------------------------------------------------ UI (Fusion UIManager), styled like the Kerf panel
 
-TOOLKIT = {"speed_ramp", "zoom_move", "layout", "camera_shake", "stabilize", "add_layer", "frame_export", "beat_markers",
-           "quick_mask", "project_sort"}  # these have their own tabs; Edit lists the rest
 COLORS = [("Black", "#000000"), ("White", "#FFFFFF"), ("Kerf orange", "#FF6B2C"), ("Blue", "#3D7CFF"), ("Green", "#13B07A")]
 FORM_ROWS = 7  # settings shown as controls; the rest are under "More settings"
 # The Kerf panel's tokens (ui/src/styles.scss), so the Resolve window reads as the same product.
@@ -278,7 +276,8 @@ def main():
         print("Kerf: engine did not start. Reinstall Kerf (it sets up the engine), then try again.")
         return
     feats = call("/features")["features"]
-    edit_names = sorted((n for n in feats if n not in TOOLKIT), key=lambda k: (feats[k]["group"], feats[k]["title"]))
+    edit_names = sorted((n for n in feats if not feats[n].get("toolkit")),  # the toolkit ones have their own tabs
+                         key=lambda k: (feats[k]["group"], feats[k]["title"]))
     ell = "\u2026"
 
     def head(text):

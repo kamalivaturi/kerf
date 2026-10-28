@@ -325,7 +325,7 @@ export default function Toolkit({ tab, projectKey, hasMedia, onNeedMedia }: {
         <div className="tk-stack">{["in", "out"].map((d) => <div key={d} className="seg"><b>Zoom {d}</b>
           {(host.native ? ["in", "out"] : ["in", "out", "in_out"]).map((e) => <button key={e} className="seg-btn" disabled={busy} onClick={() => zoom(d, e)}>{e === "in_out" ? "Both" : `Ease ${e}`}</button>)}</div>)}</div>
       </section>
-      {has("alignAE") && <section className="tk-card"><span className="tk-label">Align & distribute</span>
+      {has("align") && <section className="tk-card"><span className="tk-label">Align & distribute</span>
         <div className="tk-row wrap">{([["Left", "left"], ["H centre", "hcenter"], ["Right", "right"], ["Top", "top"], ["V centre", "vcenter"], ["Bottom", "bottom"],
           ["Distribute H", "dist_h"], ["Distribute V", "dist_v"]] as [string, string][]).map(([l, m]) =>
           <button key={m} className="tk-btn" disabled={busy} onClick={() => r.act("align", `Align ${l}`, { mode: m }, () => {})}>{l.toUpperCase()}</button>)}</div>
