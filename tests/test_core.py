@@ -6,6 +6,8 @@ import subprocess
 import sys
 import tempfile
 import xml.etree.ElementTree as ET
+
+import pytest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -379,3 +381,20 @@ def test_result_steps_are_one_ordered_list():
     assert features.steps(dict(sort={"bins": {}}, xml=["x.xml"])) == [dict(op="sort", plan={"bins": {}})]
     r = features.run("silences", str(VIDEO))
     assert r["steps"] and all(s["op"] == "timeline" for s in r["steps"])
+
+
+def test_units_round_trip_per_editor():
+    """Timeline intake owns every editor's units: raw reading -> Kerf -> raw reading is exact, and the XML agrees."""
+    from kerf import units
+    frame, source = (1920, 1080), (3840, 2160)
+    for editor, raw in (("premiere", dict(scale=60.0, position=[1152.0, 432.0])),
+                        ("resolve", dict(zoom=1.2, pan=192.0, tilt=108.0))):
+        bs, bc = units.framing_in(editor, raw, frame, source)
+        assert units.framing_out(editor, bs, bc, frame, source) == pytest.approx(raw)
+    assert units.framing_in("premiere", dict(scale=100, position=[0.6, 0.4]), frame, source)[1] == pytest.approx((0.1, -0.1))
+    bs, bc = units.framing_in("resolve", dict(zoom=1.2, pan=192.0, tilt=108.0), frame, source)
+    fit, kx, ky = units.xml_motion("resolve", frame, source)
+    assert bs / fit == pytest.approx(120.0) and (bc[0] * kx, bc[1] * ky) == pytest.approx((0.1, -0.1))
+    tl = Timeline.from_dict(dict(width=1920, height=1080, editor="resolve", video=[[dict(
+        path="x.mov", src_in=0, src_out=1, start=0, framing=dict(zoom=1.2, pan=192.0, tilt=108.0, source=[3840, 2160]))]]))
+    assert tl.editor == "resolve" and tl.video[0][0].base_scale == pytest.approx(60.0)

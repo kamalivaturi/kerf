@@ -287,7 +287,7 @@ def run(name, timeline, params=None, out_dir=None, host=None):
     res["xml"] = []
     for i, t in enumerate(tls):
         path = out / f"{_safe(t.name)} {stamp}{f'-{i + 1}' if len(tls) > 1 else ''}.xml"
-        path.write_text(to_xmeml(t, media.probe, host or "premiere"), "utf-8")
+        path.write_text(to_xmeml(t, media.probe, host or (tl.editor if tl else "") or "premiere"), "utf-8")
         res["xml"].append(str(path))
     res["feature"] = name
     res["sequence_names"] = [t.name for t in tls]

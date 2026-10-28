@@ -80,7 +80,7 @@ def read_timeline():
     fps = float(tl.GetSetting("timelineFrameRate"))
     t0 = tl.GetStartFrame()
     out = dict(fps=fps, width=int(tl.GetSetting("timelineResolutionWidth")),
-               height=int(tl.GetSetting("timelineResolutionHeight")), name=tl.GetName(), video=[], audio=[])
+               height=int(tl.GetSetting("timelineResolutionHeight")), name=tl.GetName(), video=[], audio=[], editor="resolve")
     for kind in ("video", "audio"):
         for i in range(1, tl.GetTrackCount(kind) + 1):
             clips = []
@@ -93,12 +93,11 @@ def read_timeline():
                 enabled = it.GetClipEnabled() if hasattr(it, "GetClipEnabled") else True
                 clip = dict(path=path, start=(it.GetStart() - t0) / fps, src_in=src_in,
                             src_out=src_in + it.GetDuration() / fps, enabled=bool(enabled))
-                if kind == "video":  # the clip's own framing, so effects build on it (Zoom is over fit-to-frame)
+                if kind == "video":  # the clip's framing as Resolve reports it; kerf/units.py converts it
                     try:
                         sw, sh = (int(v) for v in mpi.GetClipProperty("Resolution").lower().split("x"))
-                        fit = min(out["width"] / sw, out["height"] / sh)
-                        clip.update(base_scale=float(it.GetProperty("ZoomX")) * fit * 100,
-                                    base_center=[float(it.GetProperty("Pan")) / out["width"], -float(it.GetProperty("Tilt")) / out["height"]])
+                        clip["framing"] = dict(zoom=float(it.GetProperty("ZoomX")), pan=float(it.GetProperty("Pan")),
+                                               tilt=float(it.GetProperty("Tilt")), source=[sw, sh])
                     except Exception:
                         pass  # unknown resolution or properties: neutral framing
                 clips.append(clip)

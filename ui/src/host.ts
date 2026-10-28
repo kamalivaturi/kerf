@@ -2,9 +2,11 @@
 // works on media files. Both talk to the same local Kerf engine.
 import type { premierepro, Sequence, Project } from "@adobe/premierepro";
 
+// framing: the clip's Scale / Position exactly as the editor reports them; kerf/units.py converts (one place)
 export type Clip = { path: string; src_in: number; src_out: number; start: number; enabled: boolean;
-                     base_scale?: number; base_center?: [number, number] }; // the clip's own Scale / Position
-export type TimelineDict = { fps: number; width: number; height: number; name: string; video: Clip[][]; audio: Clip[][]; playhead?: number };
+                     framing?: Record<string, unknown>; base_scale?: number; base_center?: [number, number] };
+export type TimelineDict = { fps: number; width: number; height: number; name: string; video: Clip[][]; audio: Clip[][];
+                             playhead?: number; editor?: string };
 export type Live = { project?: string; sequence?: string; timecode?: string; playhead?: number; fps?: number; width?: number; height?: number };
 export const timecode = (s: number, fps: number) => {
   const r = Math.round(fps) || 30, f = Math.round(s * fps), p = (n: number) => String(n).padStart(2, "0");
@@ -89,20 +91,19 @@ function premiere(): Host {
     return [project, seq];
   }
 
-  // Scale and Position of a clip as the editor shows them, so effects build on the existing framing
-  async function framing(it: any, W: number, H: number): Promise<Partial<Clip>> {
+  // Scale and Position of a clip as Premiere reports them, so effects build on the existing framing
+  async function framing(it: any): Promise<Partial<Clip>> {
     try {
       const motion = (await components(it)).out.find((c) => c.match === "AE.ADBE Motion")?.comp;
       if (!motion) return {};
       const prm: Record<string, any> = {};
       for (let i = 0; i < motion.getParamCount(); i++) prm[motion.getParam(i).displayName] = motion.getParam(i);
-      const pos = plain((await prm["Position"].getStartValue()).value.value) as number[];
-      const n = Math.abs(pos[0]) > 2 || Math.abs(pos[1]) > 2 ? [pos[0] / W, pos[1] / H] : pos; // pixels or 0..1
-      return { base_scale: Number((await prm["Scale"].getStartValue()).value.value) || 100, base_center: [n[0] - 0.5, n[1] - 0.5] };
+      const position = plain((await prm["Position"].getStartValue()).value.value) as number[];
+      return { framing: { scale: Number((await prm["Scale"].getStartValue()).value.value) || 100, position } };
     } catch { return {}; } // no Motion (audio, graphics) or an unreadable value: neutral framing
   }
 
-  async function trackClips(track: any, frame?: [number, number]): Promise<Clip[]> {
+  async function trackClips(track: any, video = false): Promise<Clip[]> {
     const items = track.getTrackItems(ppro.Constants.TrackItemType.CLIP, false) || [];
     const out: Clip[] = [];
     for (const it of Array.from(items) as any[]) {
@@ -112,7 +113,7 @@ function premiere(): Host {
       if (!path) continue; // graphics, adjustment layers, nested sequences: not media files
       const [s, e, i] = await Promise.all([it.getStartTime(), it.getEndTime(), it.getInPoint()]);
       out.push({ path, start: s.seconds, src_in: i.seconds, src_out: i.seconds + (e.seconds - s.seconds),
-                 enabled: !(await it.isDisabled()), ...(frame ? await framing(it, ...frame) : {}) });
+                 enabled: !(await it.isDisabled()), ...(video ? await framing(it) : {}) });
     }
     return out;
   }
@@ -343,11 +344,10 @@ function premiere(): Host {
       const fps = TICKS / Number(await seq.getTimebase());
       const rect = await (await seq.getSettings()).getVideoFrameRect();
       const video: Clip[][] = [], audio: Clip[][] = [];
-      const frame: [number, number] = [Math.round(rect.width), Math.round(rect.height)];
-      for (let i = 0; i < (await seq.getVideoTrackCount()); i++) video.push(await trackClips(await seq.getVideoTrack(i), frame));
+      for (let i = 0; i < (await seq.getVideoTrackCount()); i++) video.push(await trackClips(await seq.getVideoTrack(i), true));
       for (let i = 0; i < (await seq.getAudioTrackCount()); i++) audio.push(await trackClips(await seq.getAudioTrack(i)));
       const playhead = (await seq.getPlayerPosition()).seconds;
-      return { fps, width: Math.round(rect.width), height: Math.round(rect.height), name: seq.name, video, audio, playhead };
+      return { fps, width: Math.round(rect.width), height: Math.round(rect.height), name: seq.name, video, audio, playhead, editor: "premiere" };
     },
     async apply(res) {
       const notes: string[] = [];

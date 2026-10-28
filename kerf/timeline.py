@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from urllib.parse import quote
 from xml.sax.saxutils import escape
 
+from . import units
+
 # Basic Motion units, measured by importing scripts/calibrate_xml.py output (Premiere 25, Resolve 21):
 # Clip.center is a fraction of the sequence frame (±0.5 = edge, +y down) and Clip.scale is % of native source pixels,
 # both relative to the clip's own framing in the editor (base_scale %, base_center) so effects build on it.
@@ -90,6 +92,7 @@ class Timeline:
     transitions: list = field(default_factory=list)  # record times of audio crossfades
     transition_dur: float = 0.1
     playhead: float = 0.0  # record time of the NLE playhead when read from a host
+    editor: str = ""  # the editor the timeline was read from: picks the XML flavour when none is asked for
 
     @property
     def duration(self):
@@ -100,20 +103,29 @@ class Timeline:
 
     @classmethod
     def from_dict(cls, d):
+        editor, frame = d.get("editor") or "", (int(d.get("width", 1920)), int(d.get("height", 1080)))
+
+        def source_of(path):  # the clip's native size, when the editor didn't report it
+            from .media import probe
+            info = probe(path)
+            return info["width"] or frame[0], info["height"] or frame[1]
+
+        def clip(c):
+            bs, bc = units.clip_framing(c, editor, frame, source_of)
+            return Clip(c["path"], float(c["src_in"]), float(c["src_out"]), float(c["start"]), bool(c.get("enabled", True)),
+                        base_scale=bs, base_center=bc)
+
         def clips(tracks):
-            return [[Clip(c["path"], float(c["src_in"]), float(c["src_out"]), float(c["start"]),
-                          bool(c.get("enabled", True)), base_scale=float(c.get("base_scale") or 100.0),
-                          base_center=tuple(float(v) for v in (c.get("base_center") or (0.0, 0.0))))
-                     for c in tr] for tr in tracks]
+            return [[clip(c) for c in tr] for tr in tracks]
         video = clips(d.get("video") or [[]])
         audio = clips(d["audio"]) if d.get("audio") else copy.deepcopy(video)
         return cls(float(d.get("fps", 30)), int(d.get("width", 1920)), int(d.get("height", 1080)),
-                   d.get("name", "Kerf"), video, audio, playhead=float(d.get("playhead") or 0.0))
+                   d.get("name", "Kerf"), video, audio, playhead=float(d.get("playhead") or 0.0), editor=editor)
 
     def to_dict(self):
         clip = lambda c: dict(path=c.path, src_in=c.src_in, src_out=c.src_out, start=c.start, enabled=c.enabled,
                               base_scale=c.base_scale, base_center=list(c.base_center))
-        return dict(fps=self.fps, width=self.width, height=self.height, name=self.name,
+        return dict(fps=self.fps, width=self.width, height=self.height, name=self.name, editor=self.editor,
                     video=[[clip(c) for c in tr] for tr in self.video], audio=[[clip(c) for c in tr] for tr in self.audio])
 
     @classmethod
@@ -269,11 +281,7 @@ def to_xmeml(tl, probe, host="premiere"):
         base = F(c.src_in)
         info = probe(c.path)
         sw, sh = info["width"] or tl.width, info["height"] or tl.height
-        if host == "resolve":
-            fit = min(tl.width / sw, tl.height / sh)
-            kx = ky = 1.0
-        else:
-            fit, kx, ky = 1.0, tl.width / sw, tl.height / sh
+        fit, kx, ky = units.xml_motion(host, (tl.width, tl.height), (sw, sh))
 
         def param(pid, name, kf, fmt):
             if not kf:
