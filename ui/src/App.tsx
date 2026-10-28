@@ -512,7 +512,7 @@ function InEditorOnly() {
     <h2>Kerf works inside your editor</h2>
     <p className="help">Open Kerf where you edit and it uses the open sequence, composition or timeline: no files to pick.</p>
     <ul className="places"><li><b>Premiere Pro</b> Window › UXP Plugins › Kerf</li><li><b>After Effects</b> Window › Extensions › Kerf</li>
-      <li><b>DaVinci Resolve</b> Workspace › Scripts › Kerf</li></ul>
+      <li><b>DaVinci Resolve</b> Effects › OpenFX › Kerf</li></ul>
   </main></div>;
 }
 

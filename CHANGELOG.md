@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- **DaVinci Resolve is Kerf FX only.** Kerf in Resolve is the seven Kerf FX effects (Effects › OpenFX › Kerf), with
+  Resolve's own keyframes and live preview. The Workspace › Scripts › Kerf window is gone: updating Kerf removes it.
+  Timeline features (silences, captions, AI edits) are in the Premiere Pro and After Effects panels.
+
 ## 0.3.2 — 2026-10-27
 
 - **Kerf FX for DaVinci Resolve (new):** seven OpenFX effects you drop on any clip in the Edit page (or the Color

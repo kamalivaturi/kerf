@@ -4,7 +4,6 @@
         kerf-<v>.zip                  engine source + built UIs + host scripts + installers
         kerf-premiere-<v>.ccx         Premiere Pro UXP plugin (double-click → Creative Cloud installs it)
         kerf-aftereffects-<v>.zip     After Effects panel (Kerf.jsx) + installers
-        kerf-resolve-<v>.zip          DaVinci Resolve script + installers
         kerf-<v>-py3-none-any.whl     pip install kerf (engine + CLI)
     python scripts/build_release.py --portable NAME      engine-dist/ → kerf-studio-portable-<v>-NAME.zip|.tar.gz
     python scripts/build_release.py --collect-desktop NAME   Tauri installers (.exe .msi .dmg .AppImage .deb .rpm)
@@ -25,7 +24,7 @@ sys.path.insert(0, str(ROOT))
 from kerf import __version__ as V  # noqa: E402
 
 OUT = ROOT / "release"
-INCLUDE = ["kerf", "resolve", "aftereffects", "mogrt/kerf_mogrt_builder.jsx", "install", "docs", "tests", "scripts",
+INCLUDE = ["kerf", "aftereffects", "ofx", "mogrt/kerf_mogrt_builder.jsx", "install", "docs", "tests", "scripts",
            "ui/dist", "ui/dist-uxp", "ui/src", "ui/public", "ui/package.json", "ui/package-lock.json", "ui/vite.config.ts",
            "ui/tsconfig.json", "ui/index.html", "start-kerf.cmd", "start-kerf.command", "start-kerf.sh", "pyproject.toml",
            "README.md", "LICENSE", "CHANGELOG.md"]
@@ -57,7 +56,6 @@ def packages():
     zip_paths(OUT / f"kerf-premiere-{V}.ccx", list(files("ui/dist-uxp")), ROOT / "ui/dist-uxp")  # a .ccx is a zip of the plugin
     host = lambda *rels: [f for rel in (*rels, "install", "README.md", "LICENSE") for f in files(rel)]
     zip_paths(OUT / f"kerf-aftereffects-{V}.zip", host("aftereffects"), ROOT, prefix=f"kerf-aftereffects-{V}/")
-    zip_paths(OUT / f"kerf-resolve-{V}.zip", host("resolve"), ROOT, prefix=f"kerf-resolve-{V}/")
     subprocess.run([sys.executable, "-m", "pip", "wheel", str(ROOT), "--no-deps", "-q", "-w", str(OUT)], check=True)
 
 

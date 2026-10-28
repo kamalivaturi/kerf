@@ -87,7 +87,7 @@ jobs:
           path: release/*
           if-no-files-found: error
 
-  packages:  # host plugins: .ccx, AE panel, Resolve script, source zip, wheel
+  packages:  # host plugins: .ccx, AE panel, source zip, wheel
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

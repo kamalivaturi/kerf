@@ -57,5 +57,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: cp aftereffects/Kerf.jsx /tmp/k.js && node --check /tmp/k.js
-      - run: python3 -c "import ast; ast.parse(open('resolve/Kerf.py').read())"
       - run: sh -n install/install.sh && sh -n start-kerf.sh && sh -n start-kerf.command

@@ -51,7 +51,7 @@ Diverged widely, then converged against desirability / feasibility / viability:
 |---|---|---|---|---|
 | Kerf Studio desktop app as the hub | low (another app) | high | high | **dropped** (user feedback) |
 | Native panel per editor sharing one UI (UXP Premiere, CEP After Effects) | high | high | high | **yes** |
-| Resolve: Kerf-styled native window (Qt) | high | high | high | **yes** (Resolve scripts can't host web UI) |
+| Resolve: Kerf-styled native window (Qt) | high | high | high | **dropped** (Resolve is Kerf FX only: OpenFX effects) |
 | Effects build on each clip's existing Scale/Position | high | high | high | **yes** |
 | Capability map: show only what an editor supports | high | high | high | **yes** |
 | Background installer that sets up engine + all panels | high | medium | high | **yes** |
@@ -66,7 +66,7 @@ Diverged widely, then converged against desirability / feasibility / viability:
 | Shared UI (React), capability map, host adapters | `ui/src/host.ts`, `App.tsx`, `Toolkit.tsx` |
 | Premiere UXP rendering fixes (buttons, SVG, sliders) | `ui/src/uxp-jsx-runtime.ts`, `ui/vite.config.ts` |
 | After Effects HTML panel calling native AE tools | `aftereffects/cep/`, `aftereffects/Kerf.jsx` (`KerfAE.call`) |
-| Resolve Kerf-styled window | `resolve/Kerf.py` |
+| Kerf FX for Resolve (OpenFX) | `ofx/kerf_fx.cpp` |
 | Engine: live editors, follow-editors, framing | `kerf/hosts.py`, `kerf/timeline.py` |
 
 ## 5 · Test

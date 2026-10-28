@@ -18,14 +18,15 @@ music with auto-ducking, beat edits, audio cleanup and reframing. It runs on you
 ## Download
 
 **One installer adds Kerf to every editor on your computer.** There is no separate app: open the Kerf panel
-inside Premiere Pro, After Effects or DaVinci Resolve and it works on the open sequence, composition or timeline.
+inside Premiere Pro or After Effects and it works on the open sequence or composition. In DaVinci Resolve, Kerf is
+Kerf FX: effects you drop on any clip (Effects › OpenFX › Kerf).
 
 | Your computer | Get | Then open Kerf in your editor |
 |---|---|---|
-| **Windows** | `Kerf-…-windows-x64-setup.exe` (or `.msi` for IT deployment) | **Premiere Pro 25.6+:** Window › UXP Plugins › Kerf · **After Effects 2022+:** Window › Extensions › Kerf · **Resolve 18.6+:** Workspace › Scripts › Kerf |
+| **Windows** | `Kerf-…-windows-x64-setup.exe` (or `.msi` for IT deployment) | **Premiere Pro 25.6+:** Window › UXP Plugins › Kerf · **After Effects 2022+:** Window › Extensions › Kerf · **Resolve 18.6+:** Effects › OpenFX › Kerf (Kerf FX) |
 | **macOS** (Apple silicon / Intel) | `Kerf-…-macos-arm64.dmg` / `…-macos-x64.dmg` | Drag Kerf to Applications and open it once (right-click → Open the first time); it adds the panels, then use the same menus. |
-| **Linux** | `.AppImage`, `.deb` or `.rpm` | DaVinci Resolve: Workspace › Scripts › Kerf. |
-| **No installer** | `kerf-portable-…` (zip / tar.gz) | Unpack, run `kerf-engine/kerf-engine serve`, and install the panels from `kerf-premiere-….ccx`, `kerf-resolve-….zip`. |
+| **Linux** | `.AppImage`, `.deb` or `.rpm` | DaVinci Resolve: Effects › OpenFX › Kerf (Kerf FX). |
+| **No installer** | `kerf-portable-…` (zip / tar.gz) | Unpack, run `kerf-engine/kerf-engine serve`, and install the panel from `kerf-premiere-….ccx`. |
 | **Python** | `pip install kerf-…whl` or `pip install -e ".[ai]"` | `kerf serve` (needs FFmpeg on PATH). |
 
 Every release lists SHA-256 checksums in `SHA256SUMS.txt`. Kerf starts when you open a panel, stops about a minute
@@ -107,7 +108,7 @@ kerf run camera_shake --media clip.mp4 --set on=whole --set axis=hv --set output
 ```
 Premiere UXP panel (React + TS) ┐                         ┌ FFmpeg · faster-whisper · Silero VAD
 After Effects panel (ScriptUI)  │                         │ U²-Net (ONNX) · OpenCV YuNet · NumPy
-Resolve script (Fusion UI)      ├── 127.0.0.1:7878 ───────┤ yt-dlp · beat tracking · vidstab
+                                ├── 127.0.0.1:7878 ───────┤ yt-dlp · beat tracking · vidstab
 Kerf helper (Tauri / Rust)      ┘    token-protected      └ Claude / OpenAI / Gemini / Ollama (opt-in)
    reads the timeline → engine builds the new edit → FCP7 XML / clips / markers → the editor applies it
 ```
@@ -115,7 +116,7 @@ Kerf helper (Tauri / Rust)      ┘    token-protected      └ Claude / OpenAI 
 ```
 kerf/          engine (Python): timeline model + XML, one module per feature, server, CLI, licensing
 ui/            React + TypeScript + SCSS (Vite) → dist-uxp/ (Premiere) and dist/ (After Effects panel)
-aftereffects/  After Effects panel (ExtendScript)     resolve/  DaVinci Resolve script
+aftereffects/  After Effects panel (ExtendScript)     ofx/      Kerf FX (OpenFX effects for DaVinci Resolve, C++)
 desktop/       Kerf installer + background helper (Tauri 2, Rust): engine + panels → .exe .msi .dmg .AppImage .deb .rpm
 mogrt/         After Effects MOGRT builder            scripts/  engine freezer + release builder
 ```

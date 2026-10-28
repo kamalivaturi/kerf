@@ -1,4 +1,4 @@
-"""Local JSON API used by the Premiere panel and the Resolve script. Binds 127.0.0.1 only.
+"""Local JSON API used by the Premiere Pro and After Effects panels. Binds 127.0.0.1 only.
 
 Every route except /health needs header X-Kerf-Token (the value in ~/.kerf/token), so random
 web pages in a browser can't drive the engine.

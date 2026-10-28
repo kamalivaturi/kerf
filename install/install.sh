@@ -1,6 +1,6 @@
 #!/bin/sh
 # Kerf installer for macOS and Linux.
-#   DaVinci Resolve (Free/Studio, macOS + Linux): Workspace > Scripts > Kerf
+#   DaVinci Resolve: Kerf FX comes with the Kerf installer (Effects > OpenFX > Kerf)
 #   After Effects (macOS): Window > Kerf.jsx
 #   Premiere Pro (macOS): installs the .ccx through Adobe's Unified Plugin Installer Agent
 #   --engine: also pip-install the Kerf engine from this folder (not needed with Kerf Studio installed)
@@ -8,21 +8,6 @@ set -e
 KERF="$(cd "$(dirname "$0")/.." && pwd)"
 OS="$(uname -s)"
 say() { printf '  %s\n' "$1"; }
-
-if [ "$OS" = Darwin ]; then
-  RES="$HOME/Library/Application Support/Blackmagic Design/DaVinci Resolve/Fusion/Scripts/Utility"
-else
-  RES="$HOME/.local/share/DaVinciResolve/Fusion/Scripts/Utility"
-fi
-mkdir -p "$RES"
-python3 - "$KERF" "$RES" <<'PY'
-import sys
-kerf, dest = sys.argv[1], sys.argv[2]
-src = open(f"{kerf}/resolve/Kerf.py", encoding="utf-8").read()
-src = src.replace('os.environ.get("KERF_HOME", r"C:\\Kerf")', f'os.environ.get("KERF_HOME", r"{kerf}")')
-open(f"{dest}/Kerf.py", "w", encoding="utf-8").write(src)
-PY
-say "DaVinci Resolve: installed to $RES (Workspace > Scripts > Kerf)"
 
 if [ "$OS" = Darwin ]; then
   found=0
@@ -43,7 +28,7 @@ if [ "$OS" = Darwin ]; then
     say "Premiere Pro: no .ccx here (download kerf-premiere-*.ccx from the release page)"
   fi
 else
-  say "Premiere Pro and After Effects are not available on Linux: use DaVinci Resolve or Kerf Studio"
+  say "Premiere Pro and After Effects are not available on Linux: Kerf FX for DaVinci Resolve comes with the Kerf installer"
 fi
 
 if [ "$1" = "--engine" ]; then
