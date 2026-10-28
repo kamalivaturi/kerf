@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import copy
 import json
+import shutil
 import tarfile
+import threading
 import time
 import urllib.error
 import urllib.request
 import wave
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 
@@ -46,15 +49,32 @@ def voice_label(v):
     return f"{v[3:].replace('_', ' ').title()} ({LANGS[v[0]]}, {'female' if v[1] == 'f' else 'male'})"
 
 
+_download = threading.Lock()  # the engine serves requests on threads: one download at a time
+
+
+def _extract(tar, to):
+    try:
+        tar.extractall(to, filter="data")  # refuses paths outside the folder and links
+    except TypeError:  # Python before 3.10.12 / 3.11.4 has no filter=: check the members ourselves
+        safe = [m for m in tar.getmembers() if (m.isfile() or m.isdir()) and not m.name.startswith(("/", "\\"))
+                and ".." not in Path(m.name).parts]
+        tar.extractall(to, members=safe)
+
+
 def model_dir():
     d = media.HOME / "models" / MODEL
-    if not (d / "model.int8.onnx").exists():
-        d.parent.mkdir(parents=True, exist_ok=True)
-        tmp = d.parent / f"{MODEL}.tar.bz2.part"
-        urllib.request.urlretrieve(URL, tmp)
-        with tarfile.open(tmp) as tar:
-            tar.extractall(d.parent, filter="data")  # "data" refuses paths outside the folder and links
-        tmp.unlink()
+    with _download:
+        if not (d / "model.int8.onnx").exists():
+            d.parent.mkdir(parents=True, exist_ok=True)
+            tmp, part = d.parent / f"{MODEL}.tar.bz2.part", d.parent / f"{MODEL}.extracting"
+            shutil.rmtree(part, ignore_errors=True)
+            urllib.request.urlretrieve(URL, tmp)
+            with tarfile.open(tmp) as tar:
+                _extract(tar, part)
+            shutil.rmtree(d, ignore_errors=True)  # a half-extracted model from an older version
+            (part / MODEL).rename(d)  # appears only once complete, so an interrupted install retries
+            shutil.rmtree(part, ignore_errors=True)
+            tmp.unlink()
     return d
 
 

@@ -37,7 +37,8 @@ def main():
     run("cmake", "-S", ROOT / "ofx", "-B", BUILD / "cmake", f"-DOFX_INCLUDE={headers / 'include'}",
         "-DCMAKE_BUILD_TYPE=Release")
     run("cmake", "--build", BUILD / "cmake", "--config", "Release")
-    built = next(p for p in (BUILD / "cmake").rglob("KerfFX.ofx") if p.is_file())
+    # Visual Studio puts each configuration in its own folder; single-config generators build in place
+    built = next(p for p in (BUILD / "cmake" / "Release" / "KerfFX.ofx", BUILD / "cmake" / "KerfFX.ofx") if p.is_file())
 
     bundle = ROOT / "build" / "panels" / "KerfFX.ofx.bundle"
     shutil.rmtree(bundle, ignore_errors=True)

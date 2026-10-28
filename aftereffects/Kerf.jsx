@@ -416,10 +416,8 @@
         importAbove(mov, l, 0).name = "Kerf captions";
         return "Captions added (" + res.report.captions + " lines)";
     }
-    function openStudio() {
-        var url = "http://127.0.0.1:" + PORT + "/app/";
-        system.callSystem(($.os.indexOf("Windows") >= 0 ? "cmd /c start \"\" " : "open ") + url);
-        return "Kerf Studio opened in your browser";
+    function openPanel() {  // the full Kerf UI lives in the docked panel, not in a browser
+        return "All AI features: open Window > Extensions > Kerf";
     }
 
     // ------------------------------------------------------------ live: tell Kerf which project / comp / time is open
@@ -544,7 +542,7 @@
         // AI
         var pai = group(tAI, "KERF ENGINE", "column");
         btn(pai, "CAPTIONS FOR SELECTED LAYER", act("Captions", captions));
-        btn(pai, "OPEN KERF STUDIO (all AI features)", act("Studio", openStudio));
+        btn(pai, "ALL AI FEATURES (Kerf panel)", act("Kerf panel", openPanel));
         btn(pai, "CHECK ENGINE", function () { try { http("GET", "/settings"); say("Engine OK"); } catch (e) { say(e.message); } });
 
         status = win.add("statictext", undefined, "Ready", { truncate: "end" });

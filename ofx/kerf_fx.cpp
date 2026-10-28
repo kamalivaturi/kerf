@@ -150,6 +150,10 @@ static bool fetch(OfxImageEffectHandle fx, const char *clipName, double t, Img &
   im.data = (char *)d;
   P->propGetIntN(im.h, kOfxImagePropBounds, 4, &im.b.x1);
   P->propGetInt(im.h, kOfxImagePropRowBytes, 0, &im.row);
+  if (!im.data) {  // an image without pixels is no image: hand it back so it never leaks
+    E->clipReleaseImage(im.h);
+    im.h = nullptr;
+  }
   return im.data != nullptr;
 }
 
@@ -175,9 +179,13 @@ static void rows(int y1, int y2, F f) {
   std::vector<std::thread> pool;
   for (int a = y1; a < y2; a += step) {
     int b = std::min(y2, a + step);
-    pool.emplace_back([=] {
+    try {
+      pool.emplace_back([=] {
+        for (int y = a; y < b; y++) f(y);
+      });
+    } catch (...) {  // no thread available: do this band here (an unjoined thread would terminate the host)
       for (int y = a; y < b; y++) f(y);
-    });
+    }
   }
   for (auto &t : pool) t.join();
 }
@@ -410,7 +418,7 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
       }
     });
   } else if (k == SPEEDRAMP || k == MOTIONBLUR) {
-    double first = range[0], last = std::max(range[0], range[1] - 1);  // last frame that exists
+    double first = range[0], last = std::max(range[0], range[1]);  // OFX frame ranges include their last frame
     FrameCache frames{fx, first, last, {}};
     auto copy = [&](const Img &from) {
       rows(w.y1, w.y2, [&](int y) {

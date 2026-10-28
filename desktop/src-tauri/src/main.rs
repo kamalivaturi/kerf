@@ -148,6 +148,26 @@ fn resolve_scripts() -> Option<PathBuf> {
     }
 }
 
+/// Kerf has no window, so a Desktop shortcut to it is misleading. The Windows installer's finish page can still
+/// create one after every install hook has run; drop it whenever the helper starts (only if it points at kerf.exe).
+fn remove_desktop_shortcut() {
+    if !cfg!(windows) {
+        return;
+    }
+    for var in ["USERPROFILE", "OneDrive", "PUBLIC"] {
+        if let Some(lnk) = std::env::var_os(var).map(|d| PathBuf::from(d).join("Desktop").join("Kerf.lnk")) {
+            let ours = fs::read(&lnk).is_ok_and(|b| {
+                let ascii = String::from_utf8_lossy(&b).to_lowercase();
+                let wide: String = b.chunks_exact(2).map(|c| c[0] as char).collect::<String>().to_lowercase();
+                ascii.contains("kerf.exe") || wide.contains("kerf.exe") // .lnk stores the target as ANSI or UTF-16
+            });
+            if ours {
+                let _ = fs::remove_file(&lnk);
+            }
+        }
+    }
+}
+
 /// Kerf FX, the OpenFX effects for Resolve's Edit, Color and Fusion pages. The standard OFX folders need admin
 /// rights, so Kerf FX lives in a per-user folder that Resolve finds through OFX_PLUGIN_PATH.
 fn ofx_dir() -> Option<PathBuf> {
@@ -170,8 +190,12 @@ fn add_ofx_path(dir: &Path) {
     }
     let value = if current.is_empty() { d.clone() } else { format!("{current}{sep}{d}") };
     if cfg!(windows) {
-        let _ = quiet(Command::new("setx").args(["OFX_PLUGIN_PATH", &value])).status(); // user scope, tells Explorer
+        // user scope, tells Explorer; unlike setx it never truncates long values (the value travels via the env)
+        let script = "[Environment]::SetEnvironmentVariable('OFX_PLUGIN_PATH', $env:KERF_OFX_PATH, 'User')";
+        let _ = quiet(Command::new("powershell").args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .env("KERF_OFX_PATH", &value)).status();
     } else if cfg!(target_os = "macos") {
+        let value = value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;"); // plist is XML
         // apps launched from the Dock only see launchd's environment: set it now and at every login
         let _ = quiet(Command::new("launchctl").args(["setenv", "OFX_PLUGIN_PATH", &value])).status();
         if let Some(agents) = home().map(|h| h.join("Library/LaunchAgents")) {
@@ -205,14 +229,23 @@ fn install_panels(res: &Path, version: &str, force: bool) {
         let _ = fs::create_dir_all(&dir).and_then(|_| fs::copy(p.join("Kerf.py"), dir.join("Kerf.py")).map(|_| ()));
     }
     let fx = p.join("KerfFX.ofx.bundle");
+    let mut ok = true;
     if let (Some(dir), true) = (ofx_dir(), fx.is_dir()) {
-        let dest = dir.join("KerfFX.ofx.bundle"); // Resolve: Effects > OpenFX > Kerf (after Resolve restarts)
-        let _ = fs::remove_dir_all(&dest);
-        if copy_dir(&fx, &dest).is_ok() {
+        // Resolve: Effects > OpenFX > Kerf (after Resolve restarts). Copy beside the old bundle, then swap, so a
+        // bundle locked by a running Resolve stays usable and the swap is retried on the next start.
+        let (dest, new, old) = (dir.join("KerfFX.ofx.bundle"), dir.join("KerfFX.ofx.bundle.new"), dir.join("KerfFX.ofx.bundle.old"));
+        let _ = fs::remove_dir_all(&new);
+        let _ = fs::remove_dir_all(&old);
+        ok = copy_dir(&fx, &new).is_ok() && (!dest.exists() || fs::rename(&dest, &old).is_ok()) && fs::rename(&new, &dest).is_ok();
+        if !ok && !dest.exists() && old.exists() {
+            let _ = fs::rename(&old, &dest); // put the previous Kerf FX back
+        }
+        let _ = fs::remove_dir_all(if ok { &old } else { &new });
+        if ok {
             add_ofx_path(&dir);
         }
     }
-    if let Some(m) = marker {
+    if let (Some(m), true) = (marker, ok) {
         if let Some(parent) = m.parent() {
             let _ = fs::create_dir_all(parent);
         }
@@ -230,6 +263,7 @@ fn main() {
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory); // background helper: no Dock icon
+            remove_desktop_shortcut();
             let res = app.path().resource_dir().map_err(io_err)?;
             let version = app.package_info().version.to_string();
             if install_only {
