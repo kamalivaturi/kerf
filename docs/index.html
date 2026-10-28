@@ -3,240 +3,316 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kerf · AI editing toolkit</title>
-<meta name="description" content="Free, open-source AI editing toolkit for Premiere Pro, After Effects and DaVinci Resolve on Windows, macOS and Linux.">
-<meta property="og:title" content="Kerf · AI editing toolkit for Premiere Pro, After Effects and DaVinci Resolve">
-<meta property="og:description" content="Silence cuts, captions, 194 editable MOGRTs, speed ramps, camera shakes, stabilizer, offline AI cutouts and more. Free and open source.">
+<meta name="color-scheme" content="dark light">
+<title>Kerf: editing toolkit for Premiere Pro, After Effects and DaVinci Resolve</title>
+<meta name="description" content="Free, open-source editing toolkit for Premiere Pro, After Effects and DaVinci Resolve on Windows, macOS and Linux.">
+<meta property="og:title" content="Kerf: editing toolkit for Premiere Pro, After Effects and DaVinci Resolve">
+<meta property="og:description" content="Silence cuts, captions, 194 editable MOGRTs, speed ramps, camera shakes, a stabilizer, offline AI cutouts and more. Free and open source.">
+<meta property="og:image" content="https://kamalivaturi.github.io/kerf/images/panel-graphs.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ff6b2c'/%3E%3Ctext x='19' y='47' font-family='Arial' font-weight='900' font-style='italic' font-size='42' fill='%23fff4ec'%3Ek%3C/text%3E%3C/svg%3E">
 <style>
+/* Hallmark · shape: Workbench (try) · genre: atmospheric · theme: brand (kept wordmark and ember) · redesign: full
+ * paper: #121110 · accent: #ff6b2c (Kerf ember) · display: system grotesk 800 · body: system UI · mono: the host menu paths
+ * nav: edge-aligned, wordmark and links · footer: wordmark over the links · signature: the bezier speed and value curve, the real panel
+ * axes: dark/grotesk-sans/warm · posture: restrained, technical · imagery: product captures only · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R4 V4 · weakest: S, three tall product captures; cropped to one aspect and alternated so they read as moments, not a gallery */
+/* Hallmark · dismissed 72 · .card · the measured overflow is the closed "More formats" lists inside details, laid out by Chrome but never painted */
+
 :root {
-  --bg: #140f0c; --bg2: #2a1a12; --card: rgba(255,255,255,.035); --card-hi: rgba(255,255,255,.07); --line: rgba(255,255,255,.09);
-  --text: #f3ece7; --muted: #a59a92; --accent: #ff6b2c; --accent-2: #ff9a5c; --on-accent: #1a0f08; --accent-ink: #ff8a4c; --blue: #4d7dff; --green: #8fd694;
-  --shadow: 0 18px 50px rgba(0,0,0,.45); --radius: 22px;
+  --color-paper: #121110; --color-paper-2: #1a1817; --color-paper-3: #242120;
+  --color-rule: #2e2a28; --color-rule-strong: #403a36;
+  --color-ink: #f3ece7; --color-ink-2: #d6cdc6; --color-muted: #a59a92;
+  --color-accent: #ff6b2c; --color-accent-deep: #b8400f; --color-accent-ink: #1a0f08; --color-accent-text: #ff8a4c; --color-accent-hover: #ff8a4c;
+  --color-accent-soft: #3a1d10; --color-hover: #2c2826; --color-press: #34302d;
+  --color-focus: #ffb38a; --color-mark: #ff6b2c; --color-ok: #8fd694;
+  --font-body: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mark: "Arial Black", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --text-sm: 14px; --text-md: 17px; --text-lg: 20px; --text-h2: clamp(28px, 3.2vw, 40px); --text-h1: clamp(40px, 5.2vw, 66px);
+  --space-xs: 8px; --space-sm: 12px; --space-md: 20px; --space-lg: 32px; --space-xl: 56px; --space-2xl: 104px;
+  --radius-card: 12px; --radius-control: 8px; --measure: 1200px; --gutter: 24px; --control: 48px;
+}
+:root[data-theme="light"] {
+  --color-paper: #f6f1ec; --color-paper-2: #fffaf6; --color-paper-3: #ede4dc;
+  --color-rule: #e0d4ca; --color-rule-strong: #c9b9ac;
+  --color-ink: #23170f; --color-ink-2: #3d2e24; --color-muted: #6a5b51;
+  --color-accent-text: #a83a0a; --color-accent-soft: #fde3d3; --color-hover: #efe5dc; --color-press: #e6d9ce;
+  --color-focus: #a83a0a; --color-mark: #e8561a; --color-ok: #2f7a3a;
 }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --bg: #f6f1ec; --bg2: #fde6d6; --card: rgba(255,255,255,.75); --card-hi: #fff; --line: rgba(60,30,10,.12);
-    --text: #23170f; --muted: #6f6157; --accent: #b93d0b; --accent-2: #c84a12; --on-accent: #ffffff; --accent-ink: #8f2f08; --shadow: 0 14px 40px rgba(80,40,10,.12); }
+  :root:not([data-theme="dark"]) {
+    --color-paper: #f6f1ec; --color-paper-2: #fffaf6; --color-paper-3: #ede4dc;
+    --color-rule: #e0d4ca; --color-rule-strong: #c9b9ac;
+    --color-ink: #23170f; --color-ink-2: #3d2e24; --color-muted: #6a5b51;
+    --color-accent-text: #a83a0a; --color-accent-soft: #fde3d3; --color-hover: #efe5dc; --color-press: #e6d9ce;
+    --color-focus: #a83a0a; --color-mark: #e8561a; --color-ok: #2f7a3a;
+  }
 }
-:root[data-theme="light"] { --bg: #f6f1ec; --bg2: #fde6d6; --card: rgba(255,255,255,.75); --card-hi: #fff; --line: rgba(60,30,10,.12);
-  --text: #23170f; --muted: #6f6157; --accent: #b93d0b; --accent-2: #c84a12; --on-accent: #ffffff; --accent-ink: #8f2f08; --shadow: 0 14px 40px rgba(80,40,10,.12); }
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; color: var(--text); background: radial-gradient(120% 70% at 50% -10%, var(--bg2) 0%, var(--bg) 55%) fixed, var(--bg);
-  font: 16px/1.6 "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { overflow-x: clip; scroll-behavior: smooth; scroll-padding-top: 80px; }
+body { overflow-x: clip; margin: 0; background: var(--color-paper); color: var(--color-ink);
+  font: var(--text-md)/1.6 var(--font-body); -webkit-font-smoothing: antialiased; }
 a { color: inherit; }
-.wrap { max-width: 1140px; margin: 0 auto; padding: 0 20px; }
-header.nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(14px); background: color-mix(in srgb, var(--bg) 70%, transparent); border-bottom: 1px solid var(--line); }
-header.nav .wrap { display: flex; align-items: center; height: 64px; gap: 22px; }
-.mark { font-weight: 900; font-style: italic; letter-spacing: -.04em; font-size: 28px; color: var(--accent); text-decoration: none; text-shadow: 0 2px 0 #b8400f; }
-header.nav nav { display: flex; gap: 20px; margin-left: auto; }
-header.nav nav a { text-decoration: none; color: var(--muted); font-weight: 600; font-size: 14px; }
-header.nav nav a:hover { color: var(--text); }
-.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 22px; border-radius: 14px; font-weight: 800; letter-spacing: .02em;
-  text-decoration: none; border: 1px solid var(--line); background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(255,255,255,.02)); }
-.btn.primary { color: var(--on-accent); border-color: transparent; background: linear-gradient(180deg, var(--accent-2), var(--accent));
-  box-shadow: 0 8px 22px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.35); }
-.btn:hover { transform: translateY(-1px); }
-.btn small { font-weight: 600; opacity: .75; }
-header.nav nav a.coffee { color: var(--accent-ink); }
-.btn.coffee-btn { color: #1a0f08; border-color: transparent; background: #ffdd00; }
-.hero { padding: 84px 0 40px; display: grid; grid-template-columns: 1.1fr .9fr; gap: 48px; align-items: center; }
-.eyebrow { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 13px; font-weight: 700; }
-.eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
-h1 { font-size: clamp(38px, 5.4vw, 64px); line-height: 1.04; letter-spacing: -.035em; margin: 18px 0 18px; font-weight: 900; }
-h1 em { font-style: normal; color: var(--accent); }
-.lede { color: var(--muted); font-size: 19px; max-width: 560px; margin: 0 0 28px; }
-.ctas { display: flex; flex-wrap: wrap; gap: 12px; }
-.hosts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 26px; }
-.hosts span { padding: 7px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); font-size: 13px; font-weight: 700; color: var(--muted); }
-/* panel mock */
-.panel { border-radius: 26px; padding: 14px; background: linear-gradient(180deg, #221813, #140f0c); border: 1px solid rgba(255,255,255,.1); box-shadow: var(--shadow); color: #f3ece7; }
-.panel .top { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px 12px; }
-.panel .top b { font-size: 22px; font-weight: 900; font-style: italic; color: #ff6b2c; letter-spacing: -.04em; }
-.pills { display: flex; gap: 6px; } .pills span { font-size: 11px; font-weight: 800; padding: 5px 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,.12); color: #a59a92; }
-.tabs { display: flex; padding: 5px; border-radius: 20px; background: rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.08); margin-bottom: 12px; }
-.tabs span { flex: 1; text-align: center; font-size: 10.5px; font-weight: 800; letter-spacing: .09em; color: #a59a92; padding: 10px 0; border-radius: 15px; }
-.tabs span.on { color: #fff; background: linear-gradient(180deg, rgba(255,255,255,.15), rgba(255,255,255,.03)); box-shadow: inset 0 1px 0 rgba(255,255,255,.25); }
-.pcard { border-radius: 16px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.04); padding: 12px; margin-bottom: 10px; }
-.pcard .lbl { margin: 0 0 10px; font-size: 10.5px; letter-spacing: .16em; color: #a59a92; }
-.row { display: flex; gap: 10px; }
-.dots { display: grid; grid-template-columns: repeat(3, 26px); gap: 6px; }
-.dots i { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle, #8a7e76 3px, rgba(0,0,0,.3) 4px); border: 1px solid rgba(255,255,255,.08); }
-.dots i.c { background: radial-gradient(circle, #fff 5px, rgba(0,0,0,.3) 6px); }
-.mini { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.mini span, .beats span { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-align: center; padding: 9px 0; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04); }
-.mini span.g { color: #8fd694; }
-.beats { width: 96px; display: flex; flex-direction: column; gap: 6px; }
-.beats span.p { color: #1a0f08; background: linear-gradient(180deg, #ff9a5c, #ff6b2c); border: none; }
-.curves { display: flex; gap: 6px; } .curves svg { width: 38px; height: 38px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
-.qm { text-align: center; font-weight: 900; letter-spacing: .14em; font-size: 12px; padding: 14px; border-radius: 16px; border: 1.5px solid rgba(255,107,44,.65);
-  background: linear-gradient(180deg, rgba(255,107,44,.22), rgba(255,107,44,.06)); }
-section { padding: 70px 0; }
-h2 { font-size: clamp(28px, 3.4vw, 40px); letter-spacing: -.03em; margin: 0 0 10px; }
-.sub { color: var(--muted); max-width: 640px; margin: 0 0 34px; font-size: 17px; }
-.grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-.card { border-radius: var(--radius); padding: 22px; background: linear-gradient(180deg, var(--card-hi), var(--card)); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
-.card h3 { margin: 0 0 6px; font-size: 18px; letter-spacing: -.01em; }
-.card p { margin: 0; color: var(--muted); font-size: 15px; }
-.card .ih { display: flex; align-items: center; gap: 10px; }
-.card .ih svg { flex: 0 0 auto; width: 22px; height: 22px; stroke: var(--accent); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.matrix { width: 100%; border-collapse: collapse; font-size: 15px; }
-.matrix th, .matrix td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); }
-.matrix th { color: var(--muted); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
-.matrix td:first-child { font-weight: 700; }
-.ok { color: var(--green); font-weight: 800; }
-.dl { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-.dl .card { display: flex; flex-direction: column; gap: 10px; }
-.dl .card h3 { margin: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
-.dl .card.you { border-color: color-mix(in srgb, var(--accent) 60%, transparent); box-shadow: var(--shadow); }
-.dl .you-tag { font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; padding: 4px 8px; border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-ink); }
-.dl .card p { margin: 0; color: var(--muted); font-size: 14px; }
-.dl .get { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 48px; padding: 12px 16px; border-radius: 12px;
-  font-weight: 800; font-size: 15px; white-space: nowrap; text-decoration: none; color: var(--text); border: 1px solid var(--line); background: var(--card-hi); }
-.dl .get.primary { color: var(--on-accent); border-color: transparent; background: linear-gradient(180deg, var(--accent-2), var(--accent)); }
-.dl .get small { font-weight: 600; opacity: .8; white-space: nowrap; }
-.dl .get:hover { transform: translateY(-1px); }
-.dl details { border: 0; padding: 0; margin-top: 2px; }
-.dl details summary { font-size: 14px; color: var(--muted); }
-.dl details a { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; font-weight: 700; color: var(--accent-ink); text-decoration: none; border-bottom: 1px solid var(--line); }
-.dl details a small { color: var(--muted); font-weight: 600; white-space: nowrap; }
-.dl-foot { margin-top: 14px; font-size: 14px; color: var(--muted); }
-.dl-foot a { color: var(--accent-ink); }
-.price { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-.price .card { padding: 28px; }
-.price .amount { font-size: 42px; font-weight: 900; letter-spacing: -.03em; margin: 8px 0; }
-.price ul { padding-left: 18px; color: var(--muted); margin: 14px 0 0; }
-.price .feat { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: var(--shadow); }
-.tag { display: inline-block; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; padding: 4px 10px; border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 18%, transparent); color: var(--accent-ink); }
-details { border-bottom: 1px solid var(--line); padding: 16px 0; } summary { cursor: pointer; font-weight: 700; } details p { color: var(--muted); margin: 10px 0 0; }
-footer { padding: 40px 0 60px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--line); }
-footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space-between; }
-.theme { margin-left: 8px; border: 1px solid var(--line); background: transparent; color: var(--muted); border-radius: 10px; padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; }
-@media (max-width: 920px) { .hero { grid-template-columns: 1fr; padding-top: 48px; } .grid { grid-template-columns: 1fr 1fr; } .dl { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 620px) { header.nav nav { display: none; } .grid, .dl, .price { grid-template-columns: 1fr; } .matrix { font-size: 13px; } .matrix th, .matrix td { padding: 10px 6px; }
-  .tablewrap { overflow-x: auto; } }
-@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .btn:hover { transform: none; } }
+img { display: block; max-width: 100%; height: auto; }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; transition: none; }
+.wrap { width: 100%; max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter); }
+h1, h2, h3 { overflow-wrap: break-word; min-width: 0; color: var(--color-ink); text-wrap: balance; }
+p, dd, li { text-wrap: pretty; }
+::selection { background: var(--color-accent); color: var(--color-accent-ink); }
+html { scrollbar-color: var(--color-rule-strong) var(--color-paper); }
+h1 { font-size: var(--text-h1); line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; margin: 0 0 var(--space-md); }
+h2 { font-size: var(--text-h2); line-height: 1.1; letter-spacing: -0.025em; font-weight: 800; margin: 0 0 var(--space-sm); }
+h3 { font-size: var(--text-lg); line-height: 1.3; font-weight: 800; margin: 0 0 var(--space-xs); }
+p { margin: 0; }
+.lede { color: var(--color-ink-2); font-size: var(--text-lg); max-width: 34ch; margin-bottom: var(--space-lg); }
+.sub { color: var(--color-muted); max-width: 56ch; margin-bottom: var(--space-xl); }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 10; background: var(--color-paper); border-bottom: 1px solid var(--color-rule); }
+.nav .wrap { display: flex; align-items: center; gap: var(--space-md); height: 64px; }
+.mark { display: inline-block; transform: skewX(-12deg); font: 900 30px/1 var(--font-mark); letter-spacing: -0.05em; color: var(--color-mark); text-decoration: none;
+  text-shadow: 0 2px 0 var(--color-accent-deep); padding: 4px 2px; border-radius: 4px; }
+.nav nav { display: flex; gap: var(--space-md); margin-left: auto; }
+.nav nav a, .foot-links a { color: var(--color-muted); text-decoration: none; font-size: var(--text-sm); font-weight: 600; padding: var(--space-xs) 0; border-radius: 4px;
+  transition: color 120ms ease; }
+.nav nav a:hover, .foot-links a:hover { color: var(--color-ink); }
+.nav nav a:active, .foot-links a:active { color: var(--color-accent-text); }
+.theme { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; cursor: pointer; color: var(--color-muted);
+  background: transparent; border: 1px solid var(--color-rule); border-radius: var(--radius-control); transition: color 120ms ease, background-color 120ms ease; }
+.theme:hover { color: var(--color-ink); background: var(--color-hover); }
+.theme:active { background: var(--color-press); }
+.theme svg { width: 18px; height: 18px; }
+
+/* controls: default, hover, active, focus-visible, disabled, busy (none here), visited (inherits), current (n/a) */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: var(--control); padding: 0 var(--space-md);
+  border-radius: var(--radius-control); border: 1px solid var(--color-rule-strong); background: var(--color-paper-3); color: var(--color-ink);
+  font: 600 var(--text-md)/1 var(--font-body); text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease; }
+.btn:hover { background: var(--color-hover); }
+.btn:active { background: var(--color-press); transform: translateY(1px); }
+.btn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+.btn.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+.btn.primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.btn small { font-weight: 600; font-size: var(--text-sm); opacity: 0.8; }
+.btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.meta { margin-top: var(--space-md); color: var(--color-muted); font-size: var(--text-sm); }
+
+/* hero */
+.hero { display: grid; grid-template-columns: minmax(0, 560px) minmax(0, 400px); justify-content: center; gap: 80px; align-items: center;
+  padding-block: var(--space-xl) var(--space-2xl); }
+.screen { margin: 0; border: 1px solid var(--color-rule-strong); border-radius: var(--radius-card); overflow: hidden; background: var(--color-paper-2); }
+.screen img { width: 100%; aspect-ratio: 16 / 25; object-fit: cover; object-position: top; }
+.hero .screen { max-width: 400px; width: 100%; }
+figcaption { padding: var(--space-sm) var(--space-md); border-top: 1px solid var(--color-rule); color: var(--color-muted); font-size: var(--text-sm); }
+
+/* sections */
+section { padding: var(--space-2xl) 0; border-top: 1px solid var(--color-rule); }
+.moment { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-xl); align-items: center; }
+.moment + .moment { margin-top: var(--space-2xl); }
+.moment .screen { max-width: 360px; width: 100%; justify-self: center; }
+.moment.flip .screen { order: 2; }
+.moment p { color: var(--color-ink-2); max-width: 40ch; }
+
+.engine { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-xl); margin: 0; }
+.engine div { padding: var(--space-md) 0; border-top: 1px solid var(--color-rule); }
+.engine dt { font-weight: 800; font-size: var(--text-lg); margin-bottom: 4px; }
+.engine dd { margin: 0; color: var(--color-muted); }
+
+.tablewrap { overflow-x: auto; }
+.matrix { width: 100%; border-collapse: collapse; }
+.matrix th, .matrix td { text-align: left; padding: var(--space-sm) var(--space-sm) var(--space-sm) 0; border-bottom: 1px solid var(--color-rule); vertical-align: top; }
+.matrix th { color: var(--color-muted); font-size: var(--text-sm); font-weight: 600; }
+.matrix td:first-child { font-weight: 600; }
+.matrix .yes { color: var(--color-ok); font-weight: 600; }
+.matrix code { color: var(--color-ink-2); white-space: nowrap; }
+
+.plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-xl); }
+.plan { padding-top: var(--space-md); border-top: 2px solid var(--color-rule-strong); }
+.plan.now { border-top-color: var(--color-accent); }
+.plan .amount { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1; margin: 4px 0 var(--space-sm); }
+.plan ul { margin: var(--space-md) 0 var(--space-lg); padding-left: 1.1em; color: var(--color-ink-2); }
+.plan li + li { margin-top: 4px; }
+.plan p { color: var(--color-muted); }
+
+/* downloads: the cards are rebuilt from the latest release by the script below */
+.dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-md); }
+.card { display: flex; flex-direction: column; gap: var(--space-sm); padding: var(--space-md); background: var(--color-paper-2);
+  border: 1px solid var(--color-rule); border-radius: var(--radius-card); }
+.card.you { border-color: var(--color-accent); }
+.card h3 { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-xs); margin: 0; }
+.card p { color: var(--color-muted); font-size: var(--text-sm); }
+.you-tag { font-size: var(--text-sm); font-weight: 600; color: var(--color-accent-text); white-space: nowrap; }
+.get { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); min-height: var(--control); padding: 0 var(--space-md);
+  border-radius: var(--radius-control); border: 1px solid var(--color-rule-strong); background: var(--color-paper-3); color: var(--color-ink);
+  font-weight: 600; text-decoration: none; white-space: nowrap; transition: background-color 120ms ease; }
+.get:hover { background: var(--color-hover); }
+.get:active { background: var(--color-press); }
+.get.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+.get.primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.get small { font-weight: 600; font-size: var(--text-sm); opacity: 0.8; }
+.card details summary { cursor: pointer; font-size: var(--text-sm); color: var(--color-muted); border-radius: 4px; }
+.card details summary:hover { color: var(--color-ink); }
+.card details a { display: flex; justify-content: space-between; gap: var(--space-sm); padding: var(--space-xs) 0; border-bottom: 1px solid var(--color-rule);
+  color: var(--color-accent-text); font-size: var(--text-sm); font-weight: 600; text-decoration: none; }
+.card details a:hover { color: var(--color-ink); }
+.card details a small { color: var(--color-muted); font-weight: 600; white-space: nowrap; }
+.dl-foot { margin-top: var(--space-md); color: var(--color-muted); font-size: var(--text-sm); }
+.dl-foot a { color: var(--color-accent-text); }
+
+.faq details { border-top: 1px solid var(--color-rule); padding: var(--space-md) 0; }
+.faq details:last-child { border-bottom: 1px solid var(--color-rule); }
+.faq summary { cursor: pointer; font-weight: 600; font-size: var(--text-lg); border-radius: 4px; }
+.faq summary:hover { color: var(--color-accent-text); }
+.faq details p { color: var(--color-ink-2); margin-top: var(--space-sm); max-width: 70ch; }
+
+footer { border-top: 1px solid var(--color-rule); padding: var(--space-xl) 0; color: var(--color-muted); font-size: var(--text-sm); }
+footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
+.foot-links { display: flex; flex-wrap: wrap; gap: var(--space-md); }
+
+@media (max-width: 960px) {
+  .hero { grid-template-columns: minmax(0, 1fr); padding-top: var(--space-lg); }
+  .hero .screen { justify-self: start; }
+  .dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 720px) {
+  :root { --gutter: 16px; --space-2xl: 72px; --space-xl: 40px; }
+  .nav nav { display: none; }
+  .theme { margin-left: auto; }
+  .moment, .engine, .plans, .dl { grid-template-columns: minmax(0, 1fr); }
+  .moment.flip .screen { order: 0; }
+  .moment .screen { justify-self: start; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; }
+  .btn:active { transform: none; }
+}
 </style>
 </head>
 <body>
 <header class="nav"><div class="wrap">
-  <a class="mark" href="#">kerf</a>
-  <nav><a href="#toolkit">Toolkit</a><a href="#features">Features</a><a href="#hosts">Hosts</a><a href="#download">Download</a><a href="#pricing">Pricing</a><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a class="coffee" href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">☕ Support</a></nav>
-  <button class="theme" id="theme" aria-label="Toggle light or dark theme">◐</button>
+  <a class="mark" href="#" aria-label="Kerf, back to top">kerf</a>
+  <nav aria-label="Sections"><a href="#toolkit">Panel</a><a href="#features">Engine</a><a href="#hosts">Hosts</a><a href="#pricing">Pricing</a><a href="#download">Download</a><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Support</a></nav>
+  <button class="theme" id="theme" type="button" aria-label="Switch between light and dark">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
+  </button>
 </div></header>
 
-<main class="wrap">
-  <div class="hero">
+<main>
+  <div class="wrap hero">
     <div>
-      <span class="eyebrow"><i></i> v<span id="ver">0.2.0</span> · free &amp; open source</span>
-      <h1>The editing toolkit that <em>does the busywork</em>.</h1>
-      <p class="lede">Silence cuts, animated captions, 194 editable MOGRTs, speed ramps, camera shakes, stabilizer, offline AI cutouts and more, inside Premiere Pro, After Effects and DaVinci Resolve. It runs on your own computer.</p>
-      <div class="ctas">
+      <h1>Cut the busywork, not the edit.</h1>
+      <p class="lede">Silence cuts, captions, ramps and shakes, inside Premiere, After Effects and Resolve.</p>
+      <div class="actions">
         <a class="btn primary" id="dl-main" href="https://github.com/kamalivaturi/kerf/releases/latest">Download Kerf <small id="dl-os"></small></a>
         <a class="btn" href="#download">All downloads</a>
       </div>
-      <div class="hosts"><span>Premiere Pro</span><span>After Effects</span><span>DaVinci Resolve (Free &amp; Studio)</span><span>Windows · macOS · Linux</span></div>
+      <p class="meta">Version <span id="ver">0.3.2</span>. Free, MIT licensed, runs on your own computer.</p>
     </div>
-    <div class="panel" aria-hidden="true">
-      <div class="top"><b>kerf</b><div class="pills"><span>● Premiere Pro</span><span>live</span></div></div>
-      <div class="tabs"><span class="on">TOOLS</span><span>GRAPHS</span><span>MOTION</span><span>SHAKES</span><span>EDIT</span></div>
-      <div class="pcard"><div class="row">
-        <div><div class="lbl">ANCHOR</div><div class="dots"><i></i><i></i><i></i><i></i><i class="c"></i><i></i><i></i><i></i><i></i></div></div>
-        <div style="flex:1"><div class="lbl">ADD LAYER</div><div class="mini"><span>NULL</span><span>BARS</span><span class="g">ADJ</span><span>SOLID</span></div></div>
-        <div><div class="lbl">BEATS</div><div class="beats"><span class="p">PLACE BEATS</span><span>CLEAR</span></div></div>
-      </div></div>
-      <div class="pcard"><div class="lbl">CURVES</div><div class="curves">
-        <svg viewBox="0 0 40 40"><path d="M6 34C6 18 18 6 34 6" fill="none" stroke="#ff6b2c" stroke-width="2.4" stroke-linecap="round"/></svg>
-        <svg viewBox="0 0 40 40"><path d="M6 34C24 34 34 22 34 6" fill="none" stroke="#ff6b2c" stroke-width="2.4" stroke-linecap="round"/></svg>
-        <svg viewBox="0 0 40 40"><path d="M6 34C18 34 22 6 34 6" fill="none" stroke="#ff6b2c" stroke-width="2.4" stroke-linecap="round"/></svg>
-        <svg viewBox="0 0 40 40"><path d="M5 34C14 34 18 30 20 6C22 30 26 34 35 34" fill="none" stroke="#4d7dff" stroke-width="2.4" stroke-linecap="round"/></svg>
-        <svg viewBox="0 0 40 40"><path d="M5 34C16 34 18 6 20 6C22 6 24 34 35 34" fill="none" stroke="#4d7dff" stroke-width="2.4" stroke-linecap="round"/></svg>
-      </div></div>
-      <div class="qm">QUICK MASK — DRAW REGION</div>
-    </div>
+    <figure class="screen" data-slot="hero" data-kind="product" data-alt="The Kerf panel, Graphs tab, with the speed and value curve editor">
+      <img src="images/panel-graphs.png" width="960" height="1800" alt="The Kerf panel on the Graphs tab: a bezier curve editor with presets, slowest and fastest speed sliders and a Ramp clip button" fetchpriority="high">
+    </figure>
   </div>
 
-  <section id="toolkit">
-    <h2>One-click tools</h2>
-    <p class="sub">The tools motion editors reach for a hundred times a day, built into one panel and working the same way in every host.</p>
-    <div class="grid">
-      <div class="card"><h3 class="ih"><svg viewBox="0 0 24 24"><path d="M3 20c4 0 5-16 9-16s5 16 9 16"/></svg>Speed &amp; value graphs</h3><p>Ease in, ease out, speedramp and your own bezier, on keyframes or as real speed ramps.</p></div>
-      <div class="card"><h3 class="ih"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>Camera shake</h3><p>Vertical, horizontal, HV, scale or all axes, on the playhead, cuts or beats, with a live preview, flash and RGB split.</p></div>
-      <div class="card"><h3 class="ih"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3" stroke-dasharray="3 3"/><circle cx="12" cy="11" r="3"/><path d="M7 18c1-3 9-3 10 0"/></svg>Quick mask</h3><p>Offline AI cutout of the region you draw. Nothing is uploaded and you get an alpha clip back.</p></div>
-      <div class="card"><h3 class="ih"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Beat markers</h3><p>Detects the tempo and drops markers on every beat or bar, then clears them in one click.</p></div>
-      <div class="card"><h3 class="ih"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 4v4M12 16v4M4 12h4M16 12h4"/></svg>Stabilizer &amp; zoom</h3><p>One-click stabilization, and eased zoom in or out with the direction and curve you choose.</p></div>
-      <div class="card"><h3 class="ih"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>Anchor, align, layers</h3><p>A 9-point anchor, align and distribute, null/adjustment/solid layers, a project sorter, frame export and FX presets.</p></div>
+  <section id="toolkit"><div class="wrap">
+    <h2>In the panel</h2>
+    <p class="sub">The same panel in every host, docked next to your timeline.</p>
+    <div class="moment">
+      <figure class="screen" data-slot="shakes" data-kind="product" data-alt="The Kerf panel, Shakes tab">
+        <img src="images/panel-shakes.png" width="960" height="1800" loading="lazy" alt="The Shakes tab: axis buttons, a live preview of the shake, and amplitude, rotation, frequency and duration sliders">
+      </figure>
+      <div>
+        <h3>Camera shake, previewed before it lands</h3>
+        <p>Pick an axis, set amplitude, rotation and frequency, then drop it on the playhead, every cut or every beat.</p>
+      </div>
     </div>
-  </section>
-
-  <section id="features">
-    <h2>An assistant for the whole edit</h2>
-    <p class="sub">Kerf reads your timeline, builds a new edit and hands it back as a sequence, clips or markers. Your original edit is never touched.</p>
-    <div class="grid">
-      <div class="card"><h3>Silences &amp; bad takes</h3><p>Loudness, the Silero speech model or both together, with J/L cuts and a review before anything is cut.</p></div>
-      <div class="card"><h3>Captions + 194 MOGRTs</h3><p>Ten animations, a live safe-zone preview, and After Effects-built templates where every control stays editable.</p></div>
-      <div class="card"><h3>Transcripts that learn</h3><p>Whisper large-v3-turbo with automatic language detection, 21 mixed-language profiles and a vocabulary that learns from your fixes.</p></div>
-      <div class="card"><h3>Prompt editing</h3><p>"Tighten pacing, bold captions, vertical Short." Claude, OpenAI, Gemini or a local model plans it and Kerf runs it.</p></div>
-      <div class="card"><h3>Audio</h3><p>Voice cleanup, music that ducks itself under speech, a sound-effect pack on cuts, beat edits, and translate &amp; dub.</p></div>
-      <div class="card"><h3>Repurpose</h3><p>Viral-moment scoring, face-tracked 9:16 reframing, chapters, multicam podcasts, yt-dlp downloads, and 4K60 or alpha renders.</p></div>
+    <div class="moment flip">
+      <figure class="screen" data-slot="tools" data-kind="product" data-alt="The Kerf panel, Tools tab">
+        <img src="images/panel-tools.png" width="960" height="1800" loading="lazy" alt="The Tools tab: a nine-point anchor grid, Null, Bars and Solid layer buttons, and beat markers">
+      </figure>
+      <div>
+        <h3>The hundred-times-a-day tools, one click each</h3>
+        <p>Anchor points, nulls and solids, beat markers, value and speed curves, stabilize, quick mask and frame export.</p>
+      </div>
     </div>
-  </section>
+  </div></section>
 
-  <section id="hosts">
+  <section id="features"><div class="wrap">
+    <h2>The engine behind it</h2>
+    <p class="sub">It reads your timeline and hands back new sequences, clips or markers. Your edit stays untouched.</p>
+    <dl class="engine">
+      <div><dt>Silences and bad takes</dt><dd>Loudness or Silero speech detection, J and L cuts, reviewed before cutting.</dd></div>
+      <div><dt>Captions and 194 MOGRTs</dt><dd>Ten animations, a safe-zone preview, every control still editable.</dd></div>
+      <div><dt>Transcripts</dt><dd>Whisper large-v3-turbo with a vocabulary that learns your fixes.</dd></div>
+      <div><dt>Prompt edits</dt><dd>Claude, OpenAI, Gemini or a local model plans the edit; Kerf runs it.</dd></div>
+      <div><dt>Audio</dt><dd>Voice cleanup, music that ducks under speech, voiceover, translate and dub.</dd></div>
+      <div><dt>Repurpose</dt><dd>Viral-moment scoring, face-tracked 9:16, chapters, multicam podcasts.</dd></div>
+    </dl>
+  </div></section>
+
+  <section id="hosts"><div class="wrap">
     <h2>Every host, every OS</h2>
-    <p class="sub">One installer, one local engine, and a native Kerf panel in each app. There is no separate app to open.</p>
+    <p class="sub">One installer, one local engine, no separate app.</p>
     <div class="tablewrap"><table class="matrix">
-      <thead><tr><th>Host</th><th>Windows</th><th>macOS</th><th>Linux</th><th>Panel</th></tr></thead>
+      <thead><tr><th>Host</th><th>Windows</th><th>macOS</th><th>Linux</th><th>Where to find it</th></tr></thead>
       <tbody>
-        <tr><td>Premiere Pro 25.6+</td><td class="ok">✓</td><td class="ok">✓</td><td>n/a</td><td>Window › UXP Plugins › Kerf</td></tr>
-        <tr><td>After Effects 2022+</td><td class="ok">✓</td><td class="ok">✓</td><td>n/a</td><td>Window › Extensions › Kerf</td></tr>
-        <tr><td>DaVinci Resolve 18.6+ (Free &amp; Studio)</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td>Workspace › Scripts › Kerf</td></tr>
-        <tr><td>Kerf FX in Resolve (Edit, Color, Fusion)</td><td class="ok">✓</td><td class="ok">✓</td><td class="ok">✓</td><td>Effects › OpenFX › Kerf</td></tr>
+        <tr><td>Premiere Pro 25.6+</td><td class="yes">Yes</td><td class="yes">Yes</td><td>n/a</td><td><code>Window › UXP Plugins › Kerf</code></td></tr>
+        <tr><td>After Effects 2022+</td><td class="yes">Yes</td><td class="yes">Yes</td><td>n/a</td><td><code>Window › Extensions › Kerf</code></td></tr>
+        <tr><td>DaVinci Resolve 18.6+</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td><code>Workspace › Scripts › Kerf</code></td></tr>
+        <tr><td>Kerf FX in Resolve</td><td class="yes">Yes</td><td class="yes">Yes</td><td class="yes">Yes</td><td><code>Effects › OpenFX › Kerf</code></td></tr>
       </tbody>
     </table></div>
-  </section>
+  </div></section>
 
-  <section id="download">
+  <section id="pricing"><div class="wrap">
+    <h2>Pricing</h2>
+    <p class="sub">Everything here is free. A paid plan will only add things that cost money to run.</p>
+    <div class="plans">
+      <div class="plan now">
+        <h3>Community</h3><p class="amount">Free</p>
+        <p>Every feature, on every host and OS.</p>
+        <ul><li>All tools, AI features and the MOGRT library</li><li>Your own AI keys, or fully offline</li><li>Automatic updates</li></ul>
+        <a class="btn" href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v2M12 3v2"/></svg>Buy me a coffee</a>
+      </div>
+      <div class="plan">
+        <h3>Pro, later</h3><p class="amount">Subscription</p>
+        <p>For editors who want it hosted and handled.</p>
+        <ul><li>Cloud transcription and AI edits, no keys</li><li>Premium template packs</li><li>Signed installers, priority support</li></ul>
+        <a class="btn" href="https://github.com/kamalivaturi/kerf">Watch on GitHub</a>
+      </div>
+    </div>
+  </div></section>
+
+  <section id="download"><div class="wrap">
     <h2>Download</h2>
-    <p class="sub">One installer adds Kerf to Premiere Pro, After Effects and DaVinci Resolve. Pick your computer.</p>
+    <p class="sub">One installer adds Kerf to Premiere Pro, After Effects and DaVinci Resolve.</p>
     <div class="dl" id="dl-grid">
       <div class="card"><h3>Windows</h3><p>Windows 10 and 11, 64-bit</p><a class="get primary" href="https://github.com/kamalivaturi/kerf/releases/latest">Installer <small>.exe</small></a></div>
       <div class="card"><h3>macOS</h3><p>macOS 11 or later</p><a class="get primary" href="https://github.com/kamalivaturi/kerf/releases/latest">Apple silicon <small>.dmg</small></a><a class="get" href="https://github.com/kamalivaturi/kerf/releases/latest">Intel <small>.dmg</small></a></div>
       <div class="card"><h3>Linux</h3><p>For DaVinci Resolve on Linux</p><a class="get primary" href="https://github.com/kamalivaturi/kerf/releases/latest">AppImage <small>x64</small></a></div>
-      <div class="card"><h3>Manual install</h3><p>Not needed with the installer, which adds every panel for you.</p><a class="get" href="https://github.com/kamalivaturi/kerf/releases/latest">Panels &amp; developer files</a></div>
+      <div class="card"><h3>Manual install</h3><p>Not needed with the installer.</p><a class="get" href="https://github.com/kamalivaturi/kerf/releases/latest">Panels and developer files</a></div>
     </div>
     <p class="dl-foot">Every release lists <a href="https://github.com/kamalivaturi/kerf/releases/latest">SHA-256 checksums</a>. Older versions are on <a href="https://github.com/kamalivaturi/kerf/releases">GitHub</a>.</p>
-  </section>
+  </div></section>
 
-  <section id="pricing">
-    <h2>Pricing</h2>
-    <p class="sub">Everything on this page is free. Paid plans will add things that cost real money to run, never a lock on what you already have.</p>
-    <div class="price">
-      <div class="card"><span class="tag">Community</span><div class="amount">Free</div><p>Every feature, on every host and OS. MIT licensed.</p>
-        <ul><li>All tools, AI features and the full MOGRT library</li><li>Bring your own AI keys, or run fully offline</li><li>Automatic updates</li></ul>
-        <p style="margin-top:16px">Kerf saves you time? Help keep it free.</p>
-        <p style="margin-top:12px"><a class="btn coffee-btn" href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">☕ Buy me a coffee</a></p></div>
-      <div class="card feat"><span class="tag">Pro · coming</span><div class="amount">Subscription</div><p>For editors who want it hosted and handled.</p>
-        <ul><li>Cloud GPU transcription and AI edits, no keys needed</li><li>Premium template and preset packs</li><li>Signed installers, priority support</li></ul>
-        <p style="margin-top:16px"><a class="btn" href="https://github.com/kamalivaturi/kerf">Watch on GitHub for launch</a></p></div>
-    </div>
-  </section>
-
-  <section id="faq">
+  <section id="faq" class="faq"><div class="wrap">
     <h2>Questions</h2>
-    <details><summary>Does my footage leave my computer?</summary><p>No. Cutting, captions, cutouts and renders all run locally. Only the AI providers you switch on (with your own key) receive text such as transcripts.</p></details>
+    <details><summary>Does my footage leave my computer?</summary><p>No. Cutting, captions, cutouts and renders all run locally. Only the AI providers you switch on, with your own key, receive text such as transcripts.</p></details>
     <details><summary>Will it change my edit?</summary><p>Kerf builds a new sequence or timeline, or adds clips and markers you can undo. Your original edit and media are never modified.</p></details>
-    <details><summary>Why does macOS or Windows warn me on first launch?</summary><p>The builds aren't signed with an Apple or Microsoft developer certificate yet. On macOS right-click the app and choose Open (or System Settings → Privacy &amp; Security → Open Anyway); on Windows choose More info, then Run anyway. If macOS says the app is "damaged", run <code>xattr -dr com.apple.quarantine /Applications/Kerf.app</code> in Terminal.</p></details>
-    <details><summary>How do updates work?</summary><p>Kerf checks for new versions while your editor is open, downloads them in the background and installs them after you close your editors, panels included. You can switch this off in the panel's Settings.</p></details>
+    <details><summary>Why does macOS or Windows warn me on first launch?</summary><p>The builds aren’t signed with an Apple or Microsoft certificate yet. On macOS, right-click the app and choose Open, or use System Settings, Privacy &amp; Security, Open Anyway. On Windows, choose More info, then Run anyway. If macOS says the app is damaged, run <code>xattr -dr com.apple.quarantine /Applications/Kerf.app</code> in Terminal.</p></details>
+    <details><summary>How do updates work?</summary><p>Kerf checks for new versions while your editor is open, downloads them in the background and installs them after you close your editors, panels included. You can switch this off in the panel’s Settings.</p></details>
     <details><summary>Is a GPU required?</summary><p>No. With an NVIDIA GPU, transcription uses large-v3-turbo on CUDA; otherwise Kerf picks a fast CPU model automatically.</p></details>
-  </section>
+  </div></section>
 </main>
 
 <footer><div class="wrap">
-  <span><b class="mark" style="font-size:20px">kerf</b> · MIT licensed · not affiliated with Adobe or Blackmagic Design</span>
-  <span><a href="https://github.com/kamalivaturi/kerf">GitHub</a> · <a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a> · <a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">☕ Buy me a coffee</a></span>
+  <a class="mark" href="#" aria-label="Kerf, back to top">kerf</a>
+  <div class="foot-links"><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Buy me a coffee</a></div>
+  <p>MIT licensed. Not affiliated with Adobe or Blackmagic Design.</p>
 </div></footer>
 
 <script>
@@ -251,12 +327,11 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
   // Latest release: OS-matched primary download + full asset lists.
   const ua = navigator.userAgent, os = /Mac/.test(ua) ? "macos" : /Linux|X11/.test(ua) && !/Android/.test(ua) ? "linux" : "windows";
   const pick = { windows: /windows-x64-setup\.exe$/, macos: /macos-arm64\.dmg$/, linux: /linux-x64\.AppImage$/ };
-  const groups = [["Windows", /windows/], ["macOS", /macos/], ["Linux", /linux/], ["Plugins", /\.(ccx|whl)$|aftereffects|resolve|^kerf-\d/]];
   fetch("https://api.github.com/repos/kamalivaturi/kerf/releases/latest").then((r) => r.ok ? r.json() : Promise.reject(r.status)).then((rel) => {
     document.getElementById("ver").textContent = rel.tag_name.replace(/^v/, "");
     const assets = rel.assets || [], main = assets.find((a) => pick[os].test(a.name));
     if (main) { const a = document.getElementById("dl-main"); a.href = main.browser_download_url;
-      document.getElementById("dl-os").textContent = `for ${os === "macos" ? "macOS" : os[0].toUpperCase() + os.slice(1)} · ${Math.round(main.size / 1e6)} MB`; }
+      document.getElementById("dl-os").textContent = `for ${os === "macos" ? "macOS" : os[0].toUpperCase() + os.slice(1)}, ${Math.round(main.size / 1e6)} MB`; }
     const grid = document.getElementById("dl-grid");
     const size = (b) => b >= 1e6 ? `${Math.round(b / 1e6)} MB` : `${Math.max(1, Math.round(b / 1e3))} KB`;
     // Every downloadable file, in plain words. Anything not listed (signatures, updater archives, latest.json) stays hidden.
@@ -272,7 +347,7 @@ footer .wrap { display: flex; flex-wrap: wrap; gap: 18px; justify-content: space
       ["manual", false, /^kerf-\d[\d.]*\.zip$/, "Engine source (.zip)"],
     ];
     const CARDS = { windows: ["Windows", "Windows 10 and 11, 64-bit"], macos: ["macOS", "macOS 11 or later"],
-                    linux: ["Linux", "For DaVinci Resolve on Linux"], manual: ["Manual install", "Not needed with the installer, which adds every panel for you."] };
+                    linux: ["Linux", "For DaVinci Resolve on Linux"], manual: ["Manual install", "Not needed with the installer."] };
     const link = (a, label, cls) => `<a class="${cls}" href="${a.browser_download_url}">${label} <small>${size(a.size)}</small></a>`;
     const order = [os, ...["windows", "macos", "linux"].filter((o) => o !== os), "manual"];  // your computer first
     const cards = order.map((key) => {
