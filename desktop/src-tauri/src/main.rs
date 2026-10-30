@@ -328,7 +328,10 @@ fn install_panels(res: &Path, version: &str, force: bool) {
     if force || !marked("panels-version", version) {
         let ccx = p.join("kerf-premiere.ccx");
         if let (Some((agent, flag)), true) = (adobe_installer(), ccx.is_file()) {
-            let _ = quiet(Command::new(agent).arg(flag).arg(&ccx)).status(); // Premiere Pro
+            // Premiere Pro. Adobe's installer skips a package whose version is already installed (a reinstall, a
+            // rebuild), so take the old one out first: the new panel always lands.
+            let _ = quiet(Command::new(&agent).arg(if cfg!(windows) { "/remove" } else { "--remove" }).arg("Kerf")).status();
+            let _ = quiet(Command::new(agent).arg(flag).arg(&ccx)).status();
         }
         if let Some(dir) = cep_extensions() {
             let dest = dir.join("com.kerf.aftereffects"); // After Effects
