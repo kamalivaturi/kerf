@@ -27,7 +27,7 @@ OUT = ROOT / "release"
 INCLUDE = ["kerf", "aftereffects", "ofx", "mogrt/kerf_mogrt_builder.jsx", "install", "docs", "tests", "scripts",
            "ui/dist", "ui/dist-uxp", "ui/src", "ui/public", "ui/package.json", "ui/package-lock.json", "ui/vite.config.ts",
            "ui/tsconfig.json", "ui/index.html", "start-kerf.cmd", "start-kerf.command", "start-kerf.sh", "pyproject.toml",
-           "README.md", "LICENSE", "CHANGELOG.md"]
+           "README.md", "LICENSE", "CHANGELOG.md", "NOTICES.md", "licenses"]
 SKIP = {"__pycache__", "node_modules", ".pytest_cache"}
 INSTALLERS = (".exe", ".msi", ".dmg", ".AppImage", ".deb", ".rpm")
 

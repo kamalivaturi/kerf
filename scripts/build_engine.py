@@ -28,7 +28,7 @@ FFMPEG = {  # static builds (GPL: includes libvidstab for the stabilizer)
 EXCLUDE = ["torch", "torchaudio", "torchvision", "tensorflow", "jax", "scipy", "pandas", "matplotlib", "sklearn", "numba",
            "transformers", "librosa", "PyQt5", "PyQt6", "PySide2", "PySide6", "tkinter", "gi", "IPython", "jupyter", "notebook",
            "pytest", "sympy", "playwright", "selenium"]
-DATA = ["ui/dist:ui/dist", "CHANGELOG.md:.", "mogrt:mogrt", "aftereffects:aftereffects"]
+DATA = ["ui/dist:ui/dist", "CHANGELOG.md:.", "NOTICES.md:.", "licenses:licenses", "mogrt:mogrt", "aftereffects:aftereffects"]
 
 
 def fetch_ffmpeg(dest):
@@ -46,6 +46,41 @@ def fetch_ffmpeg(dest):
                 f = dest / Path(name).name
                 f.write_bytes(data)
                 f.chmod(0o755)
+
+
+FFMPEG_SOURCE = """ffmpeg and ffprobe in this folder: where they come from, and how to get their source
+
+These two programs are FFmpeg (https://ffmpeg.org), free software you may use, change and share under the
+GNU General Public License, version 3 or later (full text: FFMPEG-LICENSE-GPL-3.0.txt). Kerf only runs them;
+Kerf's own code is MIT licensed (see NOTICES.md).
+
+Build:   {version}
+From:    {origin}
+
+Complete corresponding source:
+  FFmpeg itself, at the git revision in the build line above (the part after "-g"):
+    https://git.ffmpeg.org/ffmpeg.git  (mirror: https://github.com/FFmpeg/FFmpeg)
+  The scripts and every library the build compiles in, with their versions:
+    {scripts}
+
+Written offer: for at least three years after we last distribute this build, anyone can ask for the complete
+corresponding source of these two programs, and we will provide it on a medium customarily used for software
+interchange for no more than the cost of physically performing that distribution. Ask by opening an issue at
+https://github.com/kamalivaturi/kerf/issues.
+"""
+SCRIPTS = {"win32": "https://github.com/BtbN/FFmpeg-Builds (build scripts; the release matching the date in the build line)",
+           "linux": "https://github.com/BtbN/FFmpeg-Builds (build scripts; the release matching the date in the build line)",
+           "darwin": "https://ffmpeg.martin-riedl.de (build scripts and per-build source listings)"}
+
+
+def ffmpeg_notice(bin_dir, origin):
+    """GPL: the licence beside the binaries, and exactly which source they were built from."""
+    ff = bin_dir / f"ffmpeg{EXE}"
+    version = subprocess.run([str(ff), "-version"], capture_output=True, text=True, check=True).stdout.splitlines()[0]
+    plat = "darwin" if sys.platform == "darwin" else "win32" if sys.platform == "win32" else "linux"
+    (bin_dir / "FFMPEG-SOURCE.txt").write_text(FFMPEG_SOURCE.format(version=version, origin=origin, scripts=SCRIPTS[plat]),
+                                               encoding="utf-8")
+    shutil.copy2(ROOT / "licenses" / "GPL-3.0.txt", bin_dir / "FFMPEG-LICENSE-GPL-3.0.txt")
 
 
 def main():
@@ -69,6 +104,7 @@ def main():
     bin_dir.mkdir(parents=True, exist_ok=True)
     if "--download" in sys.argv:
         fetch_ffmpeg(bin_dir)
+        origin = ", ".join(FFMPEG["darwin" if sys.platform == "darwin" else "win32" if sys.platform == "win32" else "linux"])
     else:
         for tool in ("ffmpeg", "ffprobe"):
             found = shutil.which(tool)
@@ -77,6 +113,8 @@ def main():
             shutil.copy2(found, bin_dir)
             for lib in Path(found).parent.glob("*.dll"):  # shared Windows builds keep av*.dll beside the exe
                 shutil.copy2(lib, bin_dir)
+        origin = "the ffmpeg on the build machine's PATH"
+    ffmpeg_notice(bin_dir, origin)
     exe = out / f"kerf-engine{EXE}"
     print(subprocess.run([str(exe), "--version"], capture_output=True, text=True, check=True).stdout.strip(), "->", out)
 
