@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Terms of use · Kerf</title>
+<meta name="description" content="The terms for using the Kerf website and downloading Kerf: licence, warranty, responsible use and paid plans.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ff6b2c'/%3E%3Ctext x='19' y='47' font-family='Arial' font-weight='900' font-style='italic' font-size='42' fill='%23fff4ec'%3Ek%3C/text%3E%3C/svg%3E">
+<style>
+/* Hallmark · shape: Long Document (legal prose) · copy: verbatim (legal text, kept whole) · genre: atmospheric · theme: brand (same tokens as index.html) · redesign: none (new page)
+ * paper: #121110 · accent: #ff6b2c (Kerf ember) · display: system grotesk 800 · body: system UI · mono: system mono
+ * nav: edge-aligned, wordmark and links · hero: banner (title, draft notice, contents; no visual) · footer: wordmark over the links · signature: the italic kerf wordmark
+ * axes: dark/grotesk-sans/warm · posture: restrained, plain · imagery: none · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S3 R4 V4 · weakest: S, legal prose has no hero moment; the wordmark and the ember rule carry it */
+/* Hallmark · waive 44c · Long Document shape, no hero visual · a legal page opens on its title and the draft notice, not on an image beside the text */
+/* Hallmark · waive 77 · Long Document shape, one prose column of 800px · the reading column is deliberately narrow for long legal text */
+/* Hallmark · waive 78 · Long Document shape, numbered section heads · the policy sections are numbered clauses that readers cite, so heads stay at 24px */
+
+:root {
+  --color-paper: #121110; --color-paper-2: #1a1817; --color-paper-3: #242120;
+  --color-rule: #2e2a28; --color-rule-strong: #403a36;
+  --color-ink: #f3ece7; --color-ink-2: #d6cdc6; --color-muted: #a59a92;
+  --color-accent: #ff6b2c; --color-accent-deep: #b8400f; --color-accent-ink: #1a0f08; --color-accent-text: #ff8a4c; --color-accent-hover: #ff8a4c;
+  --color-accent-soft: #3a1d10; --color-hover: #2c2826; --color-press: #34302d;
+  --color-focus: #ffb38a; --color-mark: #ff6b2c; --color-ok: #8fd694;
+  --font-body: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mark: "Arial Black", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --text-sm: 14px; --text-md: 17px; --text-lg: 20px; --text-h2: clamp(28px, 3.2vw, 40px); --text-h1: clamp(40px, 5.2vw, 66px);
+  --space-xs: 8px; --space-sm: 12px; --space-md: 20px; --space-lg: 32px; --space-xl: 56px; --space-2xl: 104px;
+  --radius-card: 12px; --radius-control: 8px; --measure: 1200px; --gutter: 24px; --control: 48px;
+}
+:root[data-theme="light"] {
+  --color-paper: #f6f1ec; --color-paper-2: #fffaf6; --color-paper-3: #ede4dc;
+  --color-rule: #e0d4ca; --color-rule-strong: #c9b9ac;
+  --color-ink: #23170f; --color-ink-2: #3d2e24; --color-muted: #6a5b51;
+  --color-accent-text: #a83a0a; --color-accent-soft: #fde3d3; --color-hover: #efe5dc; --color-press: #e6d9ce;
+  --color-focus: #a83a0a; --color-mark: #e8561a; --color-ok: #2f7a3a;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-paper: #f6f1ec; --color-paper-2: #fffaf6; --color-paper-3: #ede4dc;
+    --color-rule: #e0d4ca; --color-rule-strong: #c9b9ac;
+    --color-ink: #23170f; --color-ink-2: #3d2e24; --color-muted: #6a5b51;
+    --color-accent-text: #a83a0a; --color-accent-soft: #fde3d3; --color-hover: #efe5dc; --color-press: #e6d9ce;
+    --color-focus: #a83a0a; --color-mark: #e8561a; --color-ok: #2f7a3a;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { overflow-x: clip; scroll-behavior: smooth; scroll-padding-top: 80px; }
+body { overflow-x: clip; margin: 0; background: var(--color-paper); color: var(--color-ink);
+  font: var(--text-md)/1.6 var(--font-body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+img { display: block; max-width: 100%; height: auto; }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; transition: none; }
+.wrap { width: 100%; max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter); }
+h1, h2, h3 { overflow-wrap: break-word; min-width: 0; color: var(--color-ink); text-wrap: balance; }
+p, dd, li { text-wrap: pretty; }
+::selection { background: var(--color-accent); color: var(--color-accent-ink); }
+.sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: var(--space-sm); top: -100px; z-index: 20; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-control);
+  background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; text-decoration: none; }
+.skip:focus { top: var(--space-sm); }
+html { scrollbar-color: var(--color-rule-strong) var(--color-paper); }
+h1 { font-size: var(--text-h1); line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; margin: 0 0 var(--space-md); }
+h2 { font-size: var(--text-h2); line-height: 1.1; letter-spacing: -0.025em; font-weight: 800; margin: 0 0 var(--space-sm); }
+h3 { font-size: var(--text-lg); line-height: 1.3; font-weight: 800; margin: 0 0 var(--space-xs); }
+p { margin: 0; }
+.lede { color: var(--color-ink-2); font-size: var(--text-lg); max-width: 34ch; margin-bottom: var(--space-lg); }
+.sub { color: var(--color-muted); max-width: 56ch; margin-bottom: var(--space-xl); }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 10; background: var(--color-paper); border-bottom: 1px solid var(--color-rule); }
+.nav .wrap { display: flex; align-items: center; gap: var(--space-md); height: 64px; }
+.mark { display: inline-block; transform: skewX(-12deg); font: 900 30px/1 var(--font-mark); letter-spacing: -0.05em; color: var(--color-mark); text-decoration: none;
+  text-shadow: 0 2px 0 var(--color-accent-deep); padding: 4px 2px; border-radius: 4px; }
+.nav nav { display: flex; gap: var(--space-md); margin-left: auto; }
+.nav nav a, .foot-links a { color: var(--color-muted); text-decoration: none; font-size: var(--text-sm); font-weight: 600; padding: var(--space-xs) 0; border-radius: 4px;
+  transition: color 120ms ease; }
+.nav nav a:hover, .foot-links a:hover { color: var(--color-ink); }
+.nav nav a:active, .foot-links a:active { color: var(--color-accent-text); }
+.theme { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; cursor: pointer; color: var(--color-muted);
+  background: transparent; border: 1px solid var(--color-rule); border-radius: var(--radius-control); transition: color 120ms ease, background-color 120ms ease; }
+.theme:hover { color: var(--color-ink); background: var(--color-hover); }
+.theme:active { background: var(--color-press); }
+.theme svg { width: 18px; height: 18px; }
+
+/* controls: default, hover, active, focus-visible, disabled, busy (none here), visited (inherits), current (n/a) */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: var(--control); padding: 0 var(--space-md);
+  border-radius: var(--radius-control); border: 1px solid var(--color-rule-strong); background: var(--color-paper-3); color: var(--color-ink);
+  font: 600 var(--text-md)/1 var(--font-body); text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease; }
+.btn:hover { background: var(--color-hover); }
+.btn:active { background: var(--color-press); transform: translateY(1px); }
+.btn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+.btn.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+.btn.primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.btn small { font-weight: 600; font-size: var(--text-sm); opacity: 0.8; }
+.btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.meta { margin-top: var(--space-md); color: var(--color-muted); font-size: var(--text-sm); }
+
+
+footer { border-top: 1px solid var(--color-rule); padding: var(--space-xl) 0; color: var(--color-muted); font-size: var(--text-sm); }
+footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
+.foot-links { display: flex; flex-wrap: wrap; gap: var(--space-md); }
+
+
+/* document pages */
+.nav nav a[aria-current="page"] { color: var(--color-ink); }
+.doc { max-width: calc(800px + 2 * var(--gutter)); padding-block: var(--space-xl) var(--space-2xl); }
+.doc h1 { font-size: var(--text-h2); margin-bottom: var(--space-xs); }
+.doc h2 { font-size: 24px; line-height: 1.2; letter-spacing: -0.015em; margin: var(--space-xl) 0 var(--space-sm); padding-top: var(--space-md); border-top: 1px solid var(--color-rule); }
+.doc h3 { margin-top: var(--space-md); }
+.doc p, .doc li, .doc dd { color: var(--color-ink-2); max-width: 70ch; }
+.doc p + p, .doc p + ul, .doc ul + p, .doc h2 + p, .doc h2 + .tablewrap { margin-top: var(--space-sm); }
+.doc ul, .doc ol { margin: var(--space-sm) 0 0; padding-left: 1.2em; }
+.doc li + li { margin-top: var(--space-xs); }
+.doc strong, .grid th { font-weight: 600; }
+.doc a { color: var(--color-accent-text); text-underline-offset: 3px; }
+.doc a:hover { color: var(--color-ink); }
+.stamp { color: var(--color-muted); font-size: var(--text-sm); }
+.toc { margin-top: var(--space-md); }
+.toc ol { columns: 2; column-gap: var(--space-xl); font-size: var(--text-sm); }
+.note { margin: var(--space-md) 0; padding: var(--space-md); border: 1px solid var(--color-accent); border-radius: var(--radius-control);
+  background: var(--color-paper-2); color: var(--color-ink-2); max-width: 70ch; }
+.todo { background: var(--color-accent-soft); color: var(--color-ink); padding: 0 4px; border-radius: 4px; font-weight: 600; }
+.facts { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: var(--space-xs) var(--space-md); margin: var(--space-sm) 0 0; }
+.facts dt { color: var(--color-muted); font-size: var(--text-sm); font-weight: 600; padding-top: 4px; }
+.facts dd { margin: 0; }
+.tablewrap { overflow-x: auto; margin-top: var(--space-sm); }
+.tablewrap:focus-visible { outline-offset: -2px; }
+.grid { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 15px; overflow-wrap: anywhere; }
+.grid th, .grid td { text-align: left; vertical-align: top; padding: var(--space-sm) var(--space-sm) var(--space-sm) 0; border-bottom: 1px solid var(--color-rule); }
+.grid th { color: var(--color-muted); font-size: var(--text-sm); font-weight: 600; }
+.grid td { color: var(--color-ink-2); }
+.grid td:first-child { color: var(--color-ink); font-weight: 600; }
+.doc code { color: var(--color-ink); }
+@media (max-width: 720px) {
+  :root { --gutter: 16px; --space-2xl: 72px; --space-xl: 40px; }
+  .nav nav { display: none; }
+  .theme { margin-left: auto; }
+  .toc ol { columns: 1; }
+  .facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .facts dd { margin-bottom: var(--space-sm); }
+  .grid, .grid tbody, .grid tr, .grid td { display: block; }
+  .grid thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .grid tr { padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-rule); }
+  .grid td { padding: var(--space-xs) 0; border: 0; }
+  .grid td::before { content: attr(data-label); display: block; color: var(--color-muted); font-size: var(--text-sm); font-weight: 600; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav"><div class="wrap">
+  <a class="mark" href="index.html" aria-label="Kerf, home">kerf</a>
+  <nav aria-label="Site"><a href="index.html">Home</a><a href="privacy.html">Privacy</a><a href="terms.html" aria-current="page">Terms</a><a href="cookies.html">Cookies</a><a href="refund.html">Refunds</a></nav>
+  <button class="theme" id="theme" type="button" aria-label="Switch between light and dark">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
+  </button>
+</div></header>
+
+<main id="main">
+<div class="wrap doc">
+  <h1>Terms of use</h1>
+  <p class="stamp">Draft of <time datetime="2026-10-30">30 October 2026</time>. Covers this website and Kerf 0.3.x.</p>
+  <aside class="note" role="note"><strong>Draft for the project owner.</strong> This page was written from a review of the code and has not been checked by a lawyer. It is not legal advice. Anything marked <span class="todo">[TO CONFIRM]</span> must be filled in or removed before the site goes live, and this box should then be deleted.</aside>
+  <nav class="toc" aria-label="On this page"><ol><li><a href="#about">What these terms cover</a></li><li><a href="#what">What Kerf is</a></li><li><a href="#licence">Licence</a></li><li><a href="#warranty">No warranty</a></li><li><a href="#use">Using Kerf responsibly</a></li><li><a href="#services">Other services</a></li><li><a href="#install">The installer</a></li><li><a href="#support">Support and tips</a></li><li><a href="#paid">Paid plans</a></li><li><a href="#changes">Changes</a></li><li><a href="#law">Governing law</a></li><li><a href="#access">Accessibility and contact</a></li></ol></nav>
+
+  <h2 id="about">1. What these terms cover</h2>
+  <p>These terms apply to this website and to downloading and using Kerf. The Kerf software itself is licensed under the <a href="https://github.com/kamalivaturi/kerf/blob/main/LICENSE">MIT licence</a>; if these terms and the licence differ about the code, the licence wins. The website’s text and screenshots are in the same repository and covered by the same licence.</p>
+  <dl class="facts">
+  <dt>Project</dt><dd>Kerf, a free, open-source editing toolkit (<a href="https://github.com/kamalivaturi/kerf">github.com/kamalivaturi/kerf</a>)</dd>
+  <dt>Copyright holder</dt><dd>Kamal Ivaturi, as named in the project’s <a href="https://github.com/kamalivaturi/kerf/blob/main/LICENSE">licence file</a></dd>
+  <dt>Legal or trading name</dt><dd><span class="todo">[TO CONFIRM: legal or trading name, if different from the copyright holder]</span></dd>
+  <dt>Country and state</dt><dd><span class="todo">[TO CONFIRM: country and state or province]</span></dd>
+  <dt>Public contact email</dt><dd><span class="todo">[TO CONFIRM: an address you check, for privacy, support and refund questions]</span></dd>
+  <dt>Grievance contact (India)</dt><dd><span class="todo">[TO CONFIRM: name, role and email of the person who handles privacy and consumer complaints]</span></dd>
+</dl>
+
+  <h2 id="what">2. What Kerf is</h2>
+  <p>Kerf is a free, open-source toolkit with panels for Adobe Premiere Pro and Adobe After Effects, a local engine, and OpenFX effects (Kerf FX) for DaVinci Resolve. It is made by an independent developer and is not affiliated with, endorsed by or sponsored by Adobe or Blackmagic Design.</p>
+  <p>Adobe, Premiere Pro and After Effects are trademarks or registered trademarks of Adobe Inc. DaVinci Resolve is a trademark of Blackmagic Design Pty Ltd. Names such as Claude, OpenAI, Gemini, ElevenLabs, Pexels, Hugging Face, GitHub and Buy Me a Coffee belong to their owners. They are used here only to say what Kerf works with.</p>
+
+  <h2 id="licence">3. Licence and third-party parts</h2>
+  <p>You may use, copy, modify and share Kerf under the MIT licence. Kerf includes and downloads software and models made by others, such as FFmpeg, yt-dlp, Whisper models, voice and cutout models, and the OpenFX headers. Their own licences continue to apply to those parts.</p>
+
+  <h2 id="warranty">4. No warranty, limited liability</h2>
+  <p>Kerf is provided “as is”, without warranty of any kind, as the MIT licence says. To the extent the law allows, the publisher is not liable for lost work, lost time, damaged files, inaccurate transcripts, captions or translations, or anything else that comes from using Kerf or this site. Nothing in these terms limits liability that cannot be limited by law, or any consumer right you have that cannot be waived.</p>
+  <p>Back up your projects and try Kerf on a copy first. AI output and transcripts can be wrong; check them before you publish.</p>
+
+  <h2 id="use">5. Using Kerf responsibly</h2>
+  <ul>
+    <li>Use the downloader (yt-dlp) only for material you own, have permission to use, or may lawfully copy. Follow the terms of the sites you download from and the copyright law that applies to you.</li>
+    <li>You are responsible for the rights to the footage, music, text and other material you process with Kerf and for what you publish.</li>
+    <li>Do not use Kerf, or this site, to break the law, infringe other people’s rights, or overload other people’s servers.</li>
+  </ul>
+
+  <h2 id="services">6. Other services</h2>
+  <p>AI providers, ElevenLabs, Pexels, Hugging Face, GitHub and Buy Me a Coffee are separate services with their own terms, prices and privacy policies. You supply your own keys, you pay for your own use of them, and you follow their rules, including the licence of any stock footage you download. Kerf does not control them.</p>
+
+  <h2 id="install">7. What the installer does</h2>
+  <p>The installer adds Kerf to the Premiere Pro and After Effects plugin folders and, for Kerf FX, to the OpenFX folder, which may ask for administrator permission. It also sets up a small background helper that starts when you log in, keeps Kerf up to date unless you switch that off, and stops soon after your editors close. The uninstaller removes the helper’s login entry. Your <code>.kerf</code> folder is yours to delete. Current builds are not signed with an Apple or Microsoft certificate, so your system may warn you on first launch; the <a href="index.html#faq">FAQ</a> explains what to do.</p>
+
+  <h2 id="support">8. Support and tips</h2>
+  <p>Kerf is free and comes with no guaranteed support or response time. The best place to ask is <a href="https://github.com/kamalivaturi/kerf/issues">GitHub issues</a>. Tips through Buy Me a Coffee are voluntary gifts, not a purchase. They do not buy a licence, a feature or priority support. See the <a href="refund.html">refund policy</a>.</p>
+
+  <h2 id="paid">9. Paid plans</h2>
+  <p>No paid plan, subscription or licence is on sale today. “Pro, later” on the home page is an idea, not an offer. If a paid plan ever goes on sale, it will have its own price, billing and refund terms, shown before you can buy.</p>
+
+  <h2 id="changes">10. Changes to Kerf, the site and these terms</h2>
+  <p>Features, downloads, supported host versions and this site may change or be removed. We may update these terms; the date at the top shows the latest version, and the page’s history is public in the project’s <a href="https://github.com/kamalivaturi/kerf/commits/main/docs/terms.html">repository</a>. Using Kerf after a change means you accept the updated terms.</p>
+
+  <h2 id="law">11. Governing law</h2>
+  <p>These terms are governed by <span class="todo">[TO CONFIRM: governing law and courts, for example the laws of India and the courts of a named city. Pick what your lawyer advises]</span>. This does not take away rights you have under the consumer-protection law of the place where you live.</p>
+
+  <h2 id="access">12. Accessibility and contact</h2>
+  <p>We aim for this site to meet WCAG 2.2 level AA. If you meet a barrier, or have a question about these terms, write to the contact in <a href="#about">section 1</a> or open an <a href="https://github.com/kamalivaturi/kerf/issues">issue on GitHub</a>.</p>
+
+</div>
+</main>
+
+<footer><div class="wrap">
+  <a class="mark" href="index.html" aria-label="Kerf, home">kerf</a>
+  <div class="foot-links"><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Tip on Buy Me a Coffee<span class="sr"> (opens in a new tab)</span></a></div>
+  <nav class="foot-links" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="cookies.html">Cookies</a><a href="refund.html">Refunds</a></nav>
+  <p>© 2026 Kamal Ivaturi. MIT licensed. Not affiliated with Adobe or Blackmagic Design.</p>
+</div></footer>
+
+<script>
+  // Theme toggle (remembered per browser; falls back to the system setting).
+  const root = document.documentElement, btn = document.getElementById("theme");
+  try { const t = localStorage.getItem("kerf-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+  btn.onclick = () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("kerf-theme", root.dataset.theme); } catch (e) {}
+  };
+</script>
+</body>
+</html>

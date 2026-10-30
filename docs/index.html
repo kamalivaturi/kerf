@@ -7,7 +7,7 @@
 <title>Kerf: editing toolkit for Premiere Pro, After Effects and DaVinci Resolve</title>
 <meta name="description" content="Free, open-source editing toolkit for Premiere Pro, After Effects and DaVinci Resolve on Windows, macOS and Linux.">
 <meta property="og:title" content="Kerf: editing toolkit for Premiere Pro, After Effects and DaVinci Resolve">
-<meta property="og:description" content="Silence cuts, captions, 194 editable MOGRTs, speed ramps, camera shakes, a stabilizer, offline AI cutouts and more. Free and open source.">
+<meta property="og:description" content="Silence cuts, captions, 194 editable MOGRTs, speed ramps, camera shakes, a stabilizer, local AI cutouts and more. Free and open source.">
 <meta property="og:image" content="https://kamalivaturi.github.io/kerf/images/panel-graphs.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ff6b2c'/%3E%3Ctext x='19' y='47' font-family='Arial' font-weight='900' font-style='italic' font-size='42' fill='%23fff4ec'%3Ek%3C/text%3E%3C/svg%3E">
 <style>
@@ -61,6 +61,10 @@ code { font-family: var(--font-mono); font-size: 0.92em; }
 h1, h2, h3 { overflow-wrap: break-word; min-width: 0; color: var(--color-ink); text-wrap: balance; }
 p, dd, li { text-wrap: pretty; }
 ::selection { background: var(--color-accent); color: var(--color-accent-ink); }
+.sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: var(--space-sm); top: -100px; z-index: 20; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-control);
+  background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; text-decoration: none; }
+.skip:focus { top: var(--space-sm); }
 html { scrollbar-color: var(--color-rule-strong) var(--color-paper); }
 h1 { font-size: var(--text-h1); line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; margin: 0 0 var(--space-md); }
 h2 { font-size: var(--text-h2); line-height: 1.1; letter-spacing: -0.025em; font-weight: 800; margin: 0 0 var(--space-sm); }
@@ -167,6 +171,7 @@ section { padding: var(--space-2xl) 0; border-top: 1px solid var(--color-rule); 
 .faq summary { cursor: pointer; font-weight: 600; font-size: var(--text-lg); border-radius: 4px; }
 .faq summary:hover { color: var(--color-accent-text); }
 .faq details p { color: var(--color-ink-2); margin-top: var(--space-sm); max-width: 70ch; }
+.faq details p a { white-space: nowrap; }
 
 footer { border-top: 1px solid var(--color-rule); padding: var(--space-xl) 0; color: var(--color-muted); font-size: var(--text-sm); }
 footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
@@ -193,15 +198,16 @@ footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
 </style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <header class="nav"><div class="wrap">
   <a class="mark" href="#" aria-label="Kerf, back to top">kerf</a>
-  <nav aria-label="Sections"><a href="#toolkit">Panel</a><a href="#features">Engine</a><a href="#hosts">Hosts</a><a href="#pricing">Pricing</a><a href="#download">Download</a><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Support</a></nav>
+  <nav aria-label="Sections"><a href="#toolkit">Panel</a><a href="#features">Engine</a><a href="#hosts">Hosts</a><a href="#pricing">Pricing</a><a href="#download">Download</a><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Support<span class="sr"> on Buy Me a Coffee (opens in a new tab)</span></a></nav>
   <button class="theme" id="theme" type="button" aria-label="Switch between light and dark">
     <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
   </button>
 </div></header>
 
-<main>
+<main id="main">
   <div class="wrap hero">
     <div>
       <h1>Cut the busywork, not the edit.</h1>
@@ -245,16 +251,16 @@ footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
     <p class="sub">It reads your timeline and hands back new sequences, clips or markers. Your edit stays untouched.</p>
     <dl class="engine">
       <div><dt>Silences and bad takes</dt><dd>Loudness or Silero speech detection, J and L cuts, reviewed before cutting.</dd></div>
-      <div><dt>Captions and 194 MOGRTs</dt><dd>Ten animations, a safe-zone preview, every control still editable.</dd></div>
-      <div><dt>Transcripts</dt><dd>Whisper large-v3-turbo with a vocabulary that learns your fixes.</dd></div>
-      <div><dt>Prompt edits</dt><dd>Claude, OpenAI, Gemini or a local model plans the edit; Kerf runs it.</dd></div>
-      <div><dt>Audio</dt><dd>Voice cleanup, music that ducks under speech, voiceover, translate and dub.</dd></div>
+      <div><dt>Captions and 194 MOGRTs</dt><dd>Animated word-by-word captions with a safe-zone preview, and a pack of 194 templates whose controls stay editable.</dd></div>
+      <div><dt>Transcripts</dt><dd>Whisper on your computer, large-v3-turbo on an NVIDIA GPU, with a vocabulary that learns your fixes.</dd></div>
+      <div><dt>Prompt edits</dt><dd>Claude, OpenAI, Gemini (your own key) or a local model plans the edit; Kerf runs it.</dd></div>
+      <div><dt>Audio</dt><dd>Voice cleanup, music that ducks under speech, voiceover, translate and dub. Studio cleanup and dubbing use ElevenLabs with your own key.</dd></div>
       <div><dt>Repurpose</dt><dd>Viral-moment scoring, face-tracked 9:16, chapters, multicam podcasts.</dd></div>
     </dl>
   </div></section>
 
   <section id="hosts"><div class="wrap">
-    <h2>Every host, every OS</h2>
+    <h2>Hosts and systems</h2>
     <p class="sub">One installer, one local engine, no separate app.</p>
     <div class="tablewrap"><table class="matrix">
       <thead><tr><th>Host</th><th>Windows</th><th>macOS</th><th>Linux</th><th>Where to find it</th></tr></thead>
@@ -268,20 +274,21 @@ footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
 
   <section id="pricing"><div class="wrap">
     <h2>Pricing</h2>
-    <p class="sub">Everything here is free. A paid plan will only add things that cost money to run.</p>
+    <p class="sub">Everything here is free. No paid plan is on sale.</p>
     <div class="plans">
       <div class="plan now">
         <h3>Community</h3><p class="amount">Free</p>
-        <p>Every feature, on every host and OS.</p>
-        <ul><li>All tools, AI features and the MOGRT library</li><li>Your own AI keys, or fully offline</li><li>Automatic updates</li></ul>
+        <p>Every feature, on every supported host.</p>
+        <ul><li>All tools, AI features and the MOGRT library</li><li>Your own AI keys, or a local model</li><li>Automatic updates, which you can switch off</li></ul>
         <a class="btn" href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v2M12 3v2"/></svg>Buy me a coffee</a>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM17 10h1.5a2.5 2.5 0 0 1 0 5H17M8 3v2M12 3v2"/></svg>Leave a tip on Buy Me a Coffee<span class="sr"> (opens in a new tab)</span></a>
+        <p class="meta">Tips are optional, buy nothing and are <a href="refund.html">handled under Buy Me a Coffee’s refund rules</a>.</p>
       </div>
       <div class="plan">
-        <h3>Pro, later</h3><p class="amount">Subscription</p>
-        <p>For editors who want it hosted and handled.</p>
+        <h3>Pro, later</h3><p class="amount">Not on sale</p>
+        <p>Ideas being considered, none promised and none available:</p>
         <ul><li>Cloud transcription and AI edits, no keys</li><li>Premium template packs</li><li>Signed installers, priority support</li></ul>
-        <a class="btn" href="https://github.com/kamalivaturi/kerf">Watch on GitHub</a>
+        <a class="btn" href="https://github.com/kamalivaturi/kerf">Follow progress on GitHub</a>
       </div>
     </div>
   </div></section>
@@ -295,13 +302,13 @@ footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
       <div class="card"><h3>Linux</h3><p>For DaVinci Resolve on Linux</p><a class="get primary" href="https://github.com/kamalivaturi/kerf/releases/latest">AppImage <small>x64</small></a></div>
       <div class="card"><h3>Manual install</h3><p>Not needed with the installer.</p><a class="get" href="https://github.com/kamalivaturi/kerf/releases/latest">Panels and developer files</a></div>
     </div>
-    <p class="dl-foot">Every release lists <a href="https://github.com/kamalivaturi/kerf/releases/latest">SHA-256 checksums</a>. Older versions are on <a href="https://github.com/kamalivaturi/kerf/releases">GitHub</a>.</p>
+    <p class="dl-foot">Releases include a <a href="https://github.com/kamalivaturi/kerf/releases/latest">SHA256SUMS.txt file</a> with SHA-256 checksums. Older versions are on <a href="https://github.com/kamalivaturi/kerf/releases">GitHub</a>.</p>
   </div></section>
 
   <section id="faq" class="faq"><div class="wrap">
     <h2>Questions</h2>
-    <details><summary>Does my footage leave my computer?</summary><p>No. Cutting, captions, cutouts and renders all run locally. Only the AI providers you switch on, with your own key, receive text such as transcripts.</p></details>
-    <details><summary>Will it change my edit?</summary><p>Kerf builds a new sequence or timeline, or adds clips and markers you can undo. Your original edit and media are never modified.</p></details>
+    <details><summary>Does my footage leave my computer?</summary><p>Not by default. Cutting, captions, cutouts and renders run locally, and Kerf has no account and no server of its own. Features you switch on yourself, with your own key, do send data to that provider: AI providers receive your prompt and text such as transcripts, stock footage search sends search words, and ElevenLabs voice cleanup and dubbing upload audio. Models download once from GitHub or Hugging Face. The <a href="privacy.html#software">privacy policy</a> lists every connection.</p></details>
+    <details><summary>Will it change my edit?</summary><p>Most features build a new sequence or timeline. Tools such as markers, layers and shakes add items to your project, and you can undo them. Kerf does not alter your original media files.</p></details>
     <details><summary>Why does macOS or Windows warn me on first launch?</summary><p>The builds aren’t signed with an Apple or Microsoft certificate yet. On macOS, right-click the app and choose Open, or use System Settings, Privacy &amp; Security, Open Anyway. On Windows, choose More info, then Run anyway. If macOS says the app is damaged, run <code>xattr -dr com.apple.quarantine /Applications/Kerf.app</code> in Terminal.</p></details>
     <details><summary>How do updates work?</summary><p>Kerf checks for new versions while your editor is open, downloads them in the background and installs them after you close your editors, panels included. You can switch this off in the panel’s Settings.</p></details>
     <details><summary>Is a GPU required?</summary><p>No. With an NVIDIA GPU, transcription uses large-v3-turbo on CUDA; otherwise Kerf picks a fast CPU model automatically.</p></details>
@@ -310,8 +317,9 @@ footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
 
 <footer><div class="wrap">
   <a class="mark" href="#" aria-label="Kerf, back to top">kerf</a>
-  <div class="foot-links"><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Buy me a coffee</a></div>
-  <p>MIT licensed. Not affiliated with Adobe or Blackmagic Design.</p>
+  <div class="foot-links"><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Tip on Buy Me a Coffee<span class="sr"> (opens in a new tab)</span></a></div>
+  <nav class="foot-links" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="cookies.html">Cookies</a><a href="refund.html">Refunds</a></nav>
+  <p>© 2026 Kamal Ivaturi. MIT licensed. Not affiliated with Adobe or Blackmagic Design.</p>
 </div></footer>
 
 <script>

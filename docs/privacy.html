@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<title>Privacy policy · Kerf</title>
+<meta name="description" content="What the Kerf website and the Kerf software collect, who receives it, and your rights. No analytics, no cookies, no accounts.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ff6b2c'/%3E%3Ctext x='19' y='47' font-family='Arial' font-weight='900' font-style='italic' font-size='42' fill='%23fff4ec'%3Ek%3C/text%3E%3C/svg%3E">
+<style>
+/* Hallmark · shape: Long Document (legal prose) · copy: verbatim (legal text, kept whole) · genre: atmospheric · theme: brand (same tokens as index.html) · redesign: none (new page)
+ * paper: #121110 · accent: #ff6b2c (Kerf ember) · display: system grotesk 800 · body: system UI · mono: system mono
+ * nav: edge-aligned, wordmark and links · hero: banner (title, draft notice, contents; no visual) · footer: wordmark over the links · signature: the italic kerf wordmark
+ * axes: dark/grotesk-sans/warm · posture: restrained, plain · imagery: none · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S3 R4 V4 · weakest: S, legal prose has no hero moment; the wordmark and the ember rule carry it */
+/* Hallmark · waive 44c · Long Document shape, no hero visual · a legal page opens on its title and the draft notice, not on an image beside the text */
+/* Hallmark · waive 77 · Long Document shape, one prose column of 800px · the reading column is deliberately narrow for long legal text */
+/* Hallmark · waive 78 · Long Document shape, numbered section heads · the policy sections are numbered clauses that readers cite, so heads stay at 24px */
+
+:root {
+  --color-paper: #121110; --color-paper-2: #1a1817; --color-paper-3: #242120;
+  --color-rule: #2e2a28; --color-rule-strong: #403a36;
+  --color-ink: #f3ece7; --color-ink-2: #d6cdc6; --color-muted: #a59a92;
+  --color-accent: #ff6b2c; --color-accent-deep: #b8400f; --color-accent-ink: #1a0f08; --color-accent-text: #ff8a4c; --color-accent-hover: #ff8a4c;
+  --color-accent-soft: #3a1d10; --color-hover: #2c2826; --color-press: #34302d;
+  --color-focus: #ffb38a; --color-mark: #ff6b2c; --color-ok: #8fd694;
+  --font-body: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mark: "Arial Black", "Segoe UI", system-ui, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --text-sm: 14px; --text-md: 17px; --text-lg: 20px; --text-h2: clamp(28px, 3.2vw, 40px); --text-h1: clamp(40px, 5.2vw, 66px);
+  --space-xs: 8px; --space-sm: 12px; --space-md: 20px; --space-lg: 32px; --space-xl: 56px; --space-2xl: 104px;
+  --radius-card: 12px; --radius-control: 8px; --measure: 1200px; --gutter: 24px; --control: 48px;
+}
+:root[data-theme="light"] {
+  --color-paper: #f6f1ec; --color-paper-2: #fffaf6; --color-paper-3: #ede4dc;
+  --color-rule: #e0d4ca; --color-rule-strong: #c9b9ac;
+  --color-ink: #23170f; --color-ink-2: #3d2e24; --color-muted: #6a5b51;
+  --color-accent-text: #a83a0a; --color-accent-soft: #fde3d3; --color-hover: #efe5dc; --color-press: #e6d9ce;
+  --color-focus: #a83a0a; --color-mark: #e8561a; --color-ok: #2f7a3a;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-paper: #f6f1ec; --color-paper-2: #fffaf6; --color-paper-3: #ede4dc;
+    --color-rule: #e0d4ca; --color-rule-strong: #c9b9ac;
+    --color-ink: #23170f; --color-ink-2: #3d2e24; --color-muted: #6a5b51;
+    --color-accent-text: #a83a0a; --color-accent-soft: #fde3d3; --color-hover: #efe5dc; --color-press: #e6d9ce;
+    --color-focus: #a83a0a; --color-mark: #e8561a; --color-ok: #2f7a3a;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { overflow-x: clip; scroll-behavior: smooth; scroll-padding-top: 80px; }
+body { overflow-x: clip; margin: 0; background: var(--color-paper); color: var(--color-ink);
+  font: var(--text-md)/1.6 var(--font-body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+img { display: block; max-width: 100%; height: auto; }
+code { font-family: var(--font-mono); font-size: 0.92em; }
+:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; transition: none; }
+.wrap { width: 100%; max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter); }
+h1, h2, h3 { overflow-wrap: break-word; min-width: 0; color: var(--color-ink); text-wrap: balance; }
+p, dd, li { text-wrap: pretty; }
+::selection { background: var(--color-accent); color: var(--color-accent-ink); }
+.sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+.skip { position: absolute; left: var(--space-sm); top: -100px; z-index: 20; padding: var(--space-sm) var(--space-md); border-radius: var(--radius-control);
+  background: var(--color-accent); color: var(--color-accent-ink); font-weight: 600; text-decoration: none; }
+.skip:focus { top: var(--space-sm); }
+html { scrollbar-color: var(--color-rule-strong) var(--color-paper); }
+h1 { font-size: var(--text-h1); line-height: 1.02; letter-spacing: -0.035em; font-weight: 800; margin: 0 0 var(--space-md); }
+h2 { font-size: var(--text-h2); line-height: 1.1; letter-spacing: -0.025em; font-weight: 800; margin: 0 0 var(--space-sm); }
+h3 { font-size: var(--text-lg); line-height: 1.3; font-weight: 800; margin: 0 0 var(--space-xs); }
+p { margin: 0; }
+.lede { color: var(--color-ink-2); font-size: var(--text-lg); max-width: 34ch; margin-bottom: var(--space-lg); }
+.sub { color: var(--color-muted); max-width: 56ch; margin-bottom: var(--space-xl); }
+
+/* nav */
+.nav { position: sticky; top: 0; z-index: 10; background: var(--color-paper); border-bottom: 1px solid var(--color-rule); }
+.nav .wrap { display: flex; align-items: center; gap: var(--space-md); height: 64px; }
+.mark { display: inline-block; transform: skewX(-12deg); font: 900 30px/1 var(--font-mark); letter-spacing: -0.05em; color: var(--color-mark); text-decoration: none;
+  text-shadow: 0 2px 0 var(--color-accent-deep); padding: 4px 2px; border-radius: 4px; }
+.nav nav { display: flex; gap: var(--space-md); margin-left: auto; }
+.nav nav a, .foot-links a { color: var(--color-muted); text-decoration: none; font-size: var(--text-sm); font-weight: 600; padding: var(--space-xs) 0; border-radius: 4px;
+  transition: color 120ms ease; }
+.nav nav a:hover, .foot-links a:hover { color: var(--color-ink); }
+.nav nav a:active, .foot-links a:active { color: var(--color-accent-text); }
+.theme { display: grid; place-items: center; width: 40px; height: 40px; padding: 0; cursor: pointer; color: var(--color-muted);
+  background: transparent; border: 1px solid var(--color-rule); border-radius: var(--radius-control); transition: color 120ms ease, background-color 120ms ease; }
+.theme:hover { color: var(--color-ink); background: var(--color-hover); }
+.theme:active { background: var(--color-press); }
+.theme svg { width: 18px; height: 18px; }
+
+/* controls: default, hover, active, focus-visible, disabled, busy (none here), visited (inherits), current (n/a) */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: var(--control); padding: 0 var(--space-md);
+  border-radius: var(--radius-control); border: 1px solid var(--color-rule-strong); background: var(--color-paper-3); color: var(--color-ink);
+  font: 600 var(--text-md)/1 var(--font-body); text-decoration: none; white-space: nowrap; cursor: pointer;
+  transition: background-color 120ms ease, transform 120ms ease; }
+.btn:hover { background: var(--color-hover); }
+.btn:active { background: var(--color-press); transform: translateY(1px); }
+.btn[aria-disabled="true"] { opacity: 0.5; pointer-events: none; }
+.btn.primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-ink); }
+.btn.primary:hover { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
+.btn small { font-weight: 600; font-size: var(--text-sm); opacity: 0.8; }
+.btn svg { width: 18px; height: 18px; flex: 0 0 auto; }
+.actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+.meta { margin-top: var(--space-md); color: var(--color-muted); font-size: var(--text-sm); }
+
+
+footer { border-top: 1px solid var(--color-rule); padding: var(--space-xl) 0; color: var(--color-muted); font-size: var(--text-sm); }
+footer .wrap { display: flex; flex-direction: column; gap: var(--space-md); }
+.foot-links { display: flex; flex-wrap: wrap; gap: var(--space-md); }
+
+
+/* document pages */
+.nav nav a[aria-current="page"] { color: var(--color-ink); }
+.doc { max-width: calc(800px + 2 * var(--gutter)); padding-block: var(--space-xl) var(--space-2xl); }
+.doc h1 { font-size: var(--text-h2); margin-bottom: var(--space-xs); }
+.doc h2 { font-size: 24px; line-height: 1.2; letter-spacing: -0.015em; margin: var(--space-xl) 0 var(--space-sm); padding-top: var(--space-md); border-top: 1px solid var(--color-rule); }
+.doc h3 { margin-top: var(--space-md); }
+.doc p, .doc li, .doc dd { color: var(--color-ink-2); max-width: 70ch; }
+.doc p + p, .doc p + ul, .doc ul + p, .doc h2 + p, .doc h2 + .tablewrap { margin-top: var(--space-sm); }
+.doc ul, .doc ol { margin: var(--space-sm) 0 0; padding-left: 1.2em; }
+.doc li + li { margin-top: var(--space-xs); }
+.doc strong, .grid th { font-weight: 600; }
+.doc a { color: var(--color-accent-text); text-underline-offset: 3px; }
+.doc a:hover { color: var(--color-ink); }
+.stamp { color: var(--color-muted); font-size: var(--text-sm); }
+.toc { margin-top: var(--space-md); }
+.toc ol { columns: 2; column-gap: var(--space-xl); font-size: var(--text-sm); }
+.note { margin: var(--space-md) 0; padding: var(--space-md); border: 1px solid var(--color-accent); border-radius: var(--radius-control);
+  background: var(--color-paper-2); color: var(--color-ink-2); max-width: 70ch; }
+.todo { background: var(--color-accent-soft); color: var(--color-ink); padding: 0 4px; border-radius: 4px; font-weight: 600; }
+.facts { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: var(--space-xs) var(--space-md); margin: var(--space-sm) 0 0; }
+.facts dt { color: var(--color-muted); font-size: var(--text-sm); font-weight: 600; padding-top: 4px; }
+.facts dd { margin: 0; }
+.tablewrap { overflow-x: auto; margin-top: var(--space-sm); }
+.tablewrap:focus-visible { outline-offset: -2px; }
+.grid { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 15px; overflow-wrap: anywhere; }
+.grid th, .grid td { text-align: left; vertical-align: top; padding: var(--space-sm) var(--space-sm) var(--space-sm) 0; border-bottom: 1px solid var(--color-rule); }
+.grid th { color: var(--color-muted); font-size: var(--text-sm); font-weight: 600; }
+.grid td { color: var(--color-ink-2); }
+.grid td:first-child { color: var(--color-ink); font-weight: 600; }
+.doc code { color: var(--color-ink); }
+@media (max-width: 720px) {
+  :root { --gutter: 16px; --space-2xl: 72px; --space-xl: 40px; }
+  .nav nav { display: none; }
+  .theme { margin-left: auto; }
+  .toc ol { columns: 1; }
+  .facts { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .facts dd { margin-bottom: var(--space-sm); }
+  .grid, .grid tbody, .grid tr, .grid td { display: block; }
+  .grid thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .grid tr { padding: var(--space-sm) 0; border-bottom: 1px solid var(--color-rule); }
+  .grid td { padding: var(--space-xs) 0; border: 0; }
+  .grid td::before { content: attr(data-label); display: block; color: var(--color-muted); font-size: var(--text-sm); font-weight: 600; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { transition: none !important; }
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="nav"><div class="wrap">
+  <a class="mark" href="index.html" aria-label="Kerf, home">kerf</a>
+  <nav aria-label="Site"><a href="index.html">Home</a><a href="privacy.html" aria-current="page">Privacy</a><a href="terms.html">Terms</a><a href="cookies.html">Cookies</a><a href="refund.html">Refunds</a></nav>
+  <button class="theme" id="theme" type="button" aria-label="Switch between light and dark">
+    <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/></svg>
+  </button>
+</div></header>
+
+<main id="main">
+<div class="wrap doc">
+  <h1>Privacy policy</h1>
+  <p class="stamp">Draft of <time datetime="2026-10-30">30 October 2026</time>. Covers this website and Kerf 0.3.x.</p>
+  <aside class="note" role="note"><strong>Draft for the project owner.</strong> This page was written from a review of the code and has not been checked by a lawyer. It is not legal advice. Anything marked <span class="todo">[TO CONFIRM]</span> must be filled in or removed before the site goes live, and this box should then be deleted.</aside>
+  <nav class="toc" aria-label="On this page"><ol><li><a href="#summary">In short</a></li><li><a href="#who">Who is responsible</a></li><li><a href="#website">This website</a></li><li><a href="#support">Tips</a></li><li><a href="#software">The Kerf software</a></li><li><a href="#rights">Sharing and your rights</a></li><li><a href="#security">Security</a></li><li><a href="#laws">Laws considered</a></li><li><a href="#children">Children</a></li><li><a href="#changes">Changes</a></li><li><a href="#contact">Contact</a></li></ol></nav>
+
+  <h2 id="summary">In short</h2>
+  <ul>
+    <li>This website has no analytics, advertising, tracking pixels, accounts, forms or comment boxes. It sets no cookies.</li>
+    <li>It is hosted by GitHub Pages, and GitHub logs visitors’ IP addresses. The project does not collect those logs.</li>
+    <li>Your browser asks GitHub for the latest release so the page can show the current version and the right download.</li>
+    <li>If you press the theme button, your light or dark choice is saved in your own browser and goes nowhere else.</li>
+    <li>The Kerf software runs on your computer. It has no Kerf account, no usage tracking and no Kerf server. Some optional features contact services you choose; <a href="#software">section 4</a> lists every one.</li>
+  </ul>
+
+  <h2 id="who">1. Who is responsible</h2>
+  <p>Kerf is a free, open-source project published under the MIT licence.</p>
+  <dl class="facts">
+  <dt>Project</dt><dd>Kerf, a free, open-source editing toolkit (<a href="https://github.com/kamalivaturi/kerf">github.com/kamalivaturi/kerf</a>)</dd>
+  <dt>Copyright holder</dt><dd>Kamal Ivaturi, as named in the project’s <a href="https://github.com/kamalivaturi/kerf/blob/main/LICENSE">licence file</a></dd>
+  <dt>Legal or trading name</dt><dd><span class="todo">[TO CONFIRM: legal or trading name, if different from the copyright holder]</span></dd>
+  <dt>Country and state</dt><dd><span class="todo">[TO CONFIRM: country and state or province]</span></dd>
+  <dt>Public contact email</dt><dd><span class="todo">[TO CONFIRM: an address you check, for privacy, support and refund questions]</span></dd>
+  <dt>Grievance contact (India)</dt><dd><span class="todo">[TO CONFIRM: name, role and email of the person who handles privacy and consumer complaints]</span></dd>
+</dl>
+
+  <h2 id="website">2. This website</h2>
+  <p>The site is a set of static pages. It has no server code of its own and no database.</p>
+  <div class="tablewrap"><table class="grid" aria-label="What this website handles"><thead><tr><th scope="col">What</th><th scope="col">Who receives it</th><th scope="col">Why</th><th scope="col">How long</th></tr></thead><tbody><tr><td data-label="What">Your IP address, browser type, the page you asked for, the time, and the page you came from</td><td data-label="Who receives it">GitHub, which hosts the site on GitHub Pages</td><td data-label="Why">To deliver the page and keep the service secure</td><td data-label="How long">Decided by GitHub under its <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement">Privacy Statement</a>. The project does not run its own logs and keeps no copy.</td></tr><tr><td data-label="What">The same details, in a request to <code>api.github.com</code> for the latest release</td><td data-label="Who receives it">GitHub</td><td data-label="Why">To show the current version and the download for your system. If the request fails or is blocked, the page still works with plain links.</td><td data-label="How long">Not stored by this site.</td></tr><tr><td data-label="What">Your light or dark choice, as <code>kerf-theme</code> in your browser’s local storage</td><td data-label="Who receives it">Nobody. It stays on your device.</td><td data-label="Why">To remember the choice you made</td><td data-label="How long">Until you clear this site’s data. It is written only when you press the theme button.</td></tr></tbody></table></div>
+  <p>There are no forms on this site. If you email the project or open a GitHub issue, we receive what you write and the details your email provider or GitHub attaches. GitHub issues are public.</p>
+  <p>The page loads no third-party scripts, fonts, images, frames or embeds. Links to GitHub and Buy Me a Coffee take you to their sites, where their policies apply. The preview image named in the page’s sharing tags is only read by services that build link previews, not by your browser.</p>
+  <p>Legal basis, where GDPR or UK GDPR applies: GitHub is its own controller for its server logs. To the extent your browser’s release request counts as processing by this project, it rests on legitimate interests, namely showing you the right download, and it goes only to the same provider that already hosts this page.</p>
+
+  <h2 id="support">3. Tips through Buy Me a Coffee</h2>
+  <p>If you leave a tip, Buy Me a Coffee handles the payment and your payment details under its own <a href="https://buymeacoffee.com/terms">terms</a> and privacy policy. This project never sees your card. The project may see your name or handle, your message, the amount and, depending on your settings there, your email address. We use that only to thank you and to answer refund or support questions. <span class="todo">[TO CONFIRM: confirm you do not copy supporter details anywhere else]</span></p>
+
+  <h2 id="software">4. The Kerf software</h2>
+  <p>Kerf’s engine runs on your own computer and listens only on <code>127.0.0.1</code>, so other computers cannot reach it. Every request needs a token kept in your user folder. Your footage, projects, transcripts and generated files stay on your computer unless you use one of the features in the table below.</p>
+  <h3>What Kerf keeps on your computer</h3>
+  <ul>
+    <li>A <code>.kerf</code> folder in your user folder: settings, the access token, caches, downloaded models, presets, your custom vocabulary, and a log of the last 50 engine errors with your home folder shortened to <code>~</code>.</li>
+    <li>API keys you enter for AI providers are stored in <code>settings.json</code> in that folder as plain text. The panel shows them masked and sends each key only to the provider it belongs to. Protect your user account accordingly.</li>
+    <li>The panels keep layout preferences in the editor’s local storage on your device.</li>
+    <li>Kerf Studio, the background helper, starts when you log in. It checks the list of running programs on your computer to see whether Premiere Pro or After Effects is open, and it stops soon after they close. That check stays on your computer.</li>
+  </ul>
+  <h3>Every connection Kerf can make</h3>
+  <div class="tablewrap"><table class="grid" aria-label="Network connections made by Kerf"><thead><tr><th scope="col">Feature</th><th scope="col">Where it connects</th><th scope="col">What is sent</th><th scope="col">When</th></tr></thead><tbody><tr><td data-label="Feature">Update check in the panel</td><td data-label="Where it connects">GitHub (<code>api.github.com</code>)</td><td data-label="What is sent">A standard web request: your IP address and the app name “kerf”</td><td data-label="When">When the panel checks for a new version</td></tr><tr><td data-label="Feature">Automatic updates (Kerf Studio)</td><td data-label="Where it connects">GitHub releases (<code>latest.json</code>, then the update package)</td><td data-label="What is sent">A standard web request: your IP address</td><td data-label="When">Shortly after launch and every 6 hours while it runs. Switch off under Settings.</td></tr><tr><td data-label="Feature">One-time model downloads</td><td data-label="Where it connects">GitHub releases (voiceover voice, background-removal and face models, the MOGRT pack) and Hugging Face Hub (Whisper speech models)</td><td data-label="What is sent">A standard web request: your IP address and the model’s name in the address</td><td data-label="When">The first time you use that feature. Models are then kept on your computer.</td></tr><tr><td data-label="Feature">Downloader (yt-dlp)</td><td data-label="Where it connects">The site whose link you paste, and its media servers</td><td data-label="What is sent">What a browser would send, plus your IP address. If you choose “cookies from browser”, that browser’s cookies for the site are read on your computer and sent to that site.</td><td data-label="When">Only when you use Download</td></tr><tr><td data-label="Feature">AI prompt edits and text features</td><td data-label="Where it connects">The provider you pick: Anthropic (Claude), OpenAI, Google (Gemini), or the local model address you enter</td><td data-label="What is sent">Your prompt, a timeline summary (name, length, frame size, frame rate, track counts) and, for some features, transcript text: caption translation, chapter titles, viral-moment ratings, romanised words, stock-footage search terms. Your API key. Not your video or audio.</td><td data-label="When">Only after you add a key or address and run such a feature</td></tr><tr><td data-label="Feature">Stock footage (B-roll)</td><td data-label="Where it connects">Pexels (<code>api.pexels.com</code>) and its media servers</td><td data-label="What is sent">Search words of two or so words taken from your transcript, plus your Pexels key</td><td data-label="When">Only after you add a key and run B-roll</td></tr><tr><td data-label="Feature">Studio voice cleanup, translate and dub</td><td data-label="Where it connects">ElevenLabs (<code>api.elevenlabs.io</code>)</td><td data-label="What is sent">Audio mixed down from the tracks you choose, plus your ElevenLabs key</td><td data-label="When">Only if you choose ElevenLabs and add a key</td></tr><tr><td data-label="Feature">Voiceover from a speech server</td><td data-label="Where it connects">The address in Settings. The default, <code>localhost:3900</code>, is your own computer.</td><td data-label="What is sent">The text to speak, the voice name and, if you set one, your speech key</td><td data-label="When">Only when you pick the speech server</td></tr><tr><td data-label="Feature">Report a bug</td><td data-label="Where it connects">Your browser opens a GitHub issue form</td><td data-label="What is sent">Pre-filled with the Kerf version, host app, operating system, FFmpeg version, video encoders and your last three engine errors. Nothing leaves until you press submit, and issues are public.</td><td data-label="When">Only when you press Report a bug</td></tr></tbody></table></div>
+  <p>Kerf’s own code contains no analytics, crash reporting, advertising identifier or usage tracking, and Kerf has no server of its own to send data to. We checked this for version 0.3.2. Libraries Kerf uses, such as the AI provider kits and the model downloader, add their usual client details (library version, operating system) to their own requests. Each provider applies its own privacy policy, so read it before you send it transcripts or audio.</p>
+  <p>Kerf’s code also supports optional licence keys. No feature in the free version needs one. If you paste a key into Settings anyway, Kerf sends the key and your computer’s name to the licence service, Lemon Squeezy, to activate it, and checks again about once a week. This page will be updated if that changes.</p>
+
+  <h2 id="rights">5. Sharing, keeping and your rights</h2>
+  <p>We do not sell or share personal information, we do not profile anyone, and nothing here makes automated decisions about you. This site and Kerf do not hold personal data about you that we could look up. If you have written to us, we hold what you sent, and we keep it only as long as needed to answer you.</p>
+  <ul>
+    <li><strong>EEA and UK (GDPR, UK GDPR):</strong> you may ask for access, correction, erasure, restriction, portability, and object to processing, and you may complain to your data protection authority, such as the ICO in the UK.</li>
+    <li><strong>India (Digital Personal Data Protection Act, 2023):</strong> you may ask for a summary of data held, ask for correction or erasure, use our grievance contact above, and nominate someone to exercise your rights. If we do not resolve a complaint, you may approach the Data Protection Board of India once it is operating.</li>
+    <li><strong>California (CCPA/CPRA):</strong> you may ask what we hold and to delete or correct it, and you will not be treated differently for asking. We do not sell or share personal information.</li>
+  </ul>
+  <p>To make a request about something you sent us, write to the contact above. For the server logs, contact GitHub. Our reply time is <span class="todo">[TO CONFIRM: a response time you can honour, for example 30 days]</span>.</p>
+
+  <h2 id="security">6. Security</h2>
+  <p>The site is served over HTTPS by GitHub. Updates are downloaded only after their signature is checked. The engine accepts connections only from your own computer and only with its token. No system is perfectly secure; report a vulnerability through the project’s <a href="https://github.com/kamalivaturi/kerf/issues">GitHub issues</a> without including secrets, or by email.</p>
+
+  <h2 id="laws">7. Laws we considered</h2>
+  <p>This is our reading, not legal advice.</p>
+  <ul>
+    <li><strong>GDPR and UK GDPR</strong> apply to anyone offering a site to people in the EEA or UK. The only personal data involved here is the IP address handled by GitHub, described above.</li>
+    <li><strong>India:</strong> the DPDP Act 2023 and the DPDP Rules 2025 (notified 13 November 2025, with most duties applying from May 2027), the Information Technology Act 2000 (section 43A) and the 2011 Sensitive Personal Data Rules. Kerf collects none of the sensitive personal data those rules list. We still follow their transparency, security and grievance ideas.</li>
+    <li><strong>CCPA/CPRA:</strong> as far as we know, this project is below the thresholds that make a business subject to it, and it does not sell or share personal information anyway.</li>
+  </ul>
+
+  <h2 id="children">8. Children</h2>
+  <p>This site and Kerf are made for video editors and are not directed at children. We do not knowingly collect children’s data. Under the DPDP Act a child is anyone under 18.</p>
+
+  <h2 id="changes">9. Changes</h2>
+  <p>We will update this page when the website or the software changes what it does with data. The date at the top shows the latest version, and the page’s history is public in the project’s <a href="https://github.com/kamalivaturi/kerf/commits/main/docs/privacy.html">repository</a>.</p>
+
+  <h2 id="contact">10. Contact and complaints</h2>
+  <p>Use the public email and the grievance contact in <a href="#who">section 1</a>. Do not post personal information in a public GitHub issue.</p>
+
+</div>
+</main>
+
+<footer><div class="wrap">
+  <a class="mark" href="index.html" aria-label="Kerf, home">kerf</a>
+  <div class="foot-links"><a href="https://github.com/kamalivaturi/kerf">GitHub</a><a href="https://github.com/kamalivaturi/kerf/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/kamalivaturi/kerf/issues/new">Report a bug</a><a href="https://buymeacoffee.com/kamalivaturi" target="_blank" rel="noopener">Tip on Buy Me a Coffee<span class="sr"> (opens in a new tab)</span></a></div>
+  <nav class="foot-links" aria-label="Legal"><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a><a href="cookies.html">Cookies</a><a href="refund.html">Refunds</a></nav>
+  <p>© 2026 Kamal Ivaturi. MIT licensed. Not affiliated with Adobe or Blackmagic Design.</p>
+</div></footer>
+
+<script>
+  // Theme toggle (remembered per browser; falls back to the system setting).
+  const root = document.documentElement, btn = document.getElementById("theme");
+  try { const t = localStorage.getItem("kerf-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+  btn.onclick = () => {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("kerf-theme", root.dataset.theme); } catch (e) {}
+  };
+</script>
+</body>
+</html>
