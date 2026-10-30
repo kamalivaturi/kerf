@@ -71,7 +71,7 @@ https://github.com/kamalivaturi/kerf/issues.
 """
 SCRIPTS = {"win32": "https://github.com/BtbN/FFmpeg-Builds (build scripts; the release matching the date in the build line)",
            "linux": "https://github.com/BtbN/FFmpeg-Builds (build scripts; the release matching the date in the build line)",
-           "darwin": "https://ffmpeg.martin-riedl.de (build scripts and per-build source listings)"}
+           "darwin": "https://git.martin-riedl.de/ffmpeg/build-script (build script; per-build library versions at https://ffmpeg.martin-riedl.de)"}
 
 
 def ffmpeg_notice(bin_dir, origin):
