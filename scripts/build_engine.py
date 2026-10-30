@@ -56,6 +56,7 @@ Kerf's own code is MIT licensed (see NOTICES.md).
 
 Build:   {version}
 From:    {origin}
+{configuration}
 
 Complete corresponding source:
   FFmpeg itself, at the git revision in the build line above (the part after "-g"):
@@ -76,10 +77,12 @@ SCRIPTS = {"win32": "https://github.com/BtbN/FFmpeg-Builds (build scripts; the r
 def ffmpeg_notice(bin_dir, origin):
     """GPL: the licence beside the binaries, and exactly which source they were built from."""
     ff = bin_dir / f"ffmpeg{EXE}"
-    version = subprocess.run([str(ff), "-version"], capture_output=True, text=True, check=True).stdout.splitlines()[0]
+    lines = subprocess.run([str(ff), "-version"], capture_output=True, text=True, check=True).stdout.splitlines()
+    config = next((ln for ln in lines if ln.startswith("configuration:")), "")  # the configure options are part of the source
     plat = "darwin" if sys.platform == "darwin" else "win32" if sys.platform == "win32" else "linux"
-    (bin_dir / "FFMPEG-SOURCE.txt").write_text(FFMPEG_SOURCE.format(version=version, origin=origin, scripts=SCRIPTS[plat]),
-                                               encoding="utf-8")
+    (bin_dir / "FFMPEG-SOURCE.txt").write_text(
+        FFMPEG_SOURCE.format(version=lines[0], origin=origin, scripts=SCRIPTS[plat],
+                             configuration=("Config:   " + config.split(":", 1)[1].strip()) if config else ""), encoding="utf-8")
     shutil.copy2(ROOT / "licenses" / "GPL-3.0.txt", bin_dir / "FFMPEG-LICENSE-GPL-3.0.txt")
 
 
