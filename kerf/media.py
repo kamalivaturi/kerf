@@ -36,19 +36,29 @@ def need_filter(name, why):
 
 
 def ffmpeg(*args, cwd=None):
-    subprocess.run(["ffmpeg", "-y", "-hide_banner", "-v", "error", *map(str, args)], check=True, cwd=cwd)
+    r = subprocess.run(["ffmpeg", "-y", "-hide_banner", "-v", "error", *map(str, args)], cwd=cwd,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode:  # FFmpeg's own reason, for the panel and the error log (the command line alone says nothing)
+        raise RuntimeError(f"FFmpeg failed: {' | '.join(r.stderr.strip().splitlines()[-3:]) or f'exit {r.returncode}'}")
 
 
 @functools.lru_cache(maxsize=None)
 def probe(path):
+    if not os.path.isfile(path):  # offline media, an unplugged drive, or a clip that isn't a file
+        raise FileNotFoundError(f"Kerf can't find the media file {path}. Relink the offline media in your editor or "
+                                "reconnect its drive, then try again.")
     if Path(path).suffix.lower() in IMAGE_EXT:
         import cv2
-        img = cv2.imread(str(path), cv2.IMREAD_UNCHANGED)
+        # imdecode, not imread: OpenCV's imread can't open paths with non-ASCII characters on Windows
+        img = cv2.imdecode(np.fromfile(str(path), np.uint8), cv2.IMREAD_UNCHANGED)
         h, w = img.shape[:2] if img is not None else (1080, 1920)
         return dict(duration=0.0, fps=0.0, width=w, height=h, channels=0, sample_rate=48000)
-    out = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
-                         capture_output=True, text=True, check=True).stdout
-    d = json.loads(out)
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(path)],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode:
+        raise ValueError(f"Kerf can't read {Path(path).name}: {(r.stderr.strip().splitlines() or ['unknown error'])[-1]}. "
+                         "Check the file plays in your editor, or convert it to MP4 or MOV.")
+    d = json.loads(r.stdout)
     info = dict(duration=float(d["format"].get("duration", 0) or 0), fps=0.0, width=0, height=0,
                 channels=0, sample_rate=48000)
     for s in d["streams"]:

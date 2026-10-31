@@ -428,6 +428,31 @@ def test_engine_writes_its_locator(monkeypatch):
     assert urllib.request.urlopen(f"http://127.0.0.1:{loc['port']}/health", timeout=5).status == 200
 
 
+def test_missing_or_unreadable_media_says_what_to_do():
+    """Offline media (26 Oct log: a clip on an unplugged drive) is a plain 400, not an ffprobe crash."""
+    gone = TMP / "Food A'fair" / "C0186.MP4"
+    with pytest.raises(FileNotFoundError, match="Relink"):
+        media.probe(str(gone))
+    with pytest.raises(FileNotFoundError):
+        features.run("silences", dict(video=[[dict(path="1129270354", src_in=0, src_out=2, start=0)]]), {}, TMP / "out")
+    junk = TMP / "junk.mp4"
+    junk.write_bytes(b"not a video")
+    with pytest.raises(ValueError, match="can't read junk.mp4"):
+        media.probe(str(junk))
+
+
+def test_non_ascii_paths_for_images():
+    """OpenCV's imread/imwrite fail on non-ASCII Windows paths: sizes fell back to 1920x1080 and layers weren't written."""
+    d = TMP / "Ünïcode 日本 A'fair"
+    d.mkdir(exist_ok=True)
+    pic = d / "pic ü.png"
+    media.ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x240", "-frames:v", "1", pic)
+    info = media.probe(str(pic))
+    assert (info["width"], info["height"]) == (320, 240)
+    r = features.run("add_layer", str(VIDEO), {"kind": "vignette"}, d / "out")
+    assert Path(r["files"][0]).stat().st_size > 0
+
+
 def test_beats_on_long_music_across_blocks():
     """Beat detection runs in blocks (an hour-long mix needed ~7 GB), and every beat stays on the real click: the
     tempo used to come out 0.14% slow, so cuts drifted 0.25 s off the beat by the end of a 3-minute song."""

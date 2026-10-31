@@ -387,7 +387,7 @@ def add_layer(tl, p, ctx):
     import cv2
     img = make_layer(p["kind"], tl.width, tl.height, p["color"], p["color2"], p["opacity"], p["aspect"])
     f = ctx.out_dir / f"Kerf {p['kind']} {tl.width}x{tl.height} {str(p['color']).lstrip('#')}.png"
-    cv2.imwrite(str(f), img)
+    cv2.imencode(".png", img)[1].tofile(str(f))  # imwrite can't write to non-ASCII paths on Windows
     d = float(p["duration"]) or max(1.0, tl.duration - tl.playhead)
     out = copy.deepcopy(tl)
     add_track(out, "video", [Clip(str(f), 0.0, d, tl.playhead)])
