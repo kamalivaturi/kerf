@@ -8,9 +8,9 @@ music with auto-ducking, beat edits, audio cleanup and reframing. It runs on you
 
 [Download](https://github.com/kamalivaturi/kerf/releases/latest) ·
 [Website](https://kamalivaturi.github.io/kerf/) ·
-[Feature teardown](docs/REVERSE_ENGINEERING.md) ·
+[Feature teardown](dev-docs/REVERSE_ENGINEERING.md) ·
 [Changelog](CHANGELOG.md) ·
-[Design brief](docs/DESIGN.md) ·
+[Design brief](dev-docs/DESIGN.md) ·
 [☕ Buy me a coffee](https://buymeacoffee.com/kamalivaturi)
 
 ---
@@ -125,7 +125,7 @@ mogrt/         After Effects MOGRT builder            scripts/  engine freezer +
 
 Drop a Python file in `~/.kerf/plugins/` and it appears in every panel. Paid plans: mark features
 `tier="pro"`, set your Lemon Squeezy product (`KERF_LS_PRODUCT`) and users activate a licence key in
-Settings; or plug in your own provider. See [docs/MONETIZATION.md](docs/MONETIZATION.md).
+Settings; or plug in your own provider. See [dev-docs/MONETIZATION.md](dev-docs/MONETIZATION.md).
 
 ## Develop
 

@@ -7,7 +7,7 @@ Paid plans, two ways (both leave free features free):
   2. Your own provider: KERF_LICENSE_PROVIDER=my_module with entitled(name, tier) -> bool and status() -> dict.
 
 Anything in an open-source client can be patched out: keep the real value (hosted AI, cloud renders, premium
-packs) behind your server as well. See docs/MONETIZATION.md.
+packs) behind your server as well. See dev-docs/MONETIZATION.md.
 """
 from __future__ import annotations
 
