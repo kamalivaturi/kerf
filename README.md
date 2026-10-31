@@ -8,7 +8,6 @@ music with auto-ducking, beat edits, audio cleanup and reframing. It runs on you
 
 [Download](https://github.com/kamalivaturi/kerf/releases/latest) ·
 [Website](https://kamalivaturi.github.io/kerf/) ·
-[Feature teardown](dev-docs/REVERSE_ENGINEERING.md) ·
 [Changelog](CHANGELOG.md) ·
 [Design brief](dev-docs/DESIGN.md) ·
 [☕ Buy me a coffee](https://buymeacoffee.com/kamalivaturi)
