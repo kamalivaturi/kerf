@@ -481,6 +481,18 @@ def test_transcribe_skips_files_without_audio(monkeypatch):
         features.run("enhance", str(silent), {}, TMP / "out")
 
 
+def test_stabilize_path_with_an_apostrophe():
+    """vidstab's transforms file was named after the clip: a quote in "Food A'fair" broke the filter arguments."""
+    if not media.has_filter("vidstabdetect"):
+        pytest.skip("this FFmpeg has no vidstab")
+    d = TMP / "Food A'fair"
+    d.mkdir(exist_ok=True)
+    clip = d / "c'lip, take 1.mp4"
+    shutil.copy(VIDEO, clip)
+    r = features.run("stabilize", str(clip), {"method": "vidstab"}, d / "out")
+    assert r["report"]["stabilized"] == 1
+
+
 def test_audio_only_media_and_ffmpeg_errors():
     """An audio file used as the timeline sat on the video track too: render divided by zero, video tools crashed."""
     wav = TMP / "voice.wav"

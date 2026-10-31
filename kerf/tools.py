@@ -274,7 +274,7 @@ def stabilize(tl, p, ctx):
     for c in _clips(out, p, track):
         dest = _out(ctx, c, "stab")
         if method == "vidstab":  # relative names + cwd: Windows drive colons break filter arguments
-            trf = dest.with_suffix(".trf").name
+            trf = re.sub(r"[^A-Za-z0-9._-]", "_", dest.stem) + ".trf"  # and so do quotes, commas and spaces
             media.ffmpeg("-ss", f"{c.src_in:.3f}", "-t", f"{c.dur:.3f}", "-i", c.path, "-vf",
                          f"vidstabdetect=shakiness={int(p['shakiness'])}:accuracy=15:result={trf}", "-f", "null", "-",
                          cwd=ctx.out_dir)
