@@ -163,6 +163,8 @@ def transcribe(path, language="", model=None):
     f = media.CACHE / f"{key}.json"
     if f.exists():
         return json.loads(f.read_text("utf-8"))
+    if not media.probe(str(path))["channels"]:  # no audio stream (B-roll, screen capture): nothing to hear
+        return dict(language=lang, language_probability=0.0, words=[], key=key)
     m, _ = _whisper(model)
     prompt = " ".join(x for x in (prof.get("prompt"), ", ".join(vocab[:80])) if x) or None
     segs, info = m.transcribe(

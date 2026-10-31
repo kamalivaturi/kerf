@@ -470,6 +470,17 @@ def test_still_image_timeline_renders_and_ends():
         features.run("render", dict(video=[[]]), {}, TMP / "out")
 
 
+def test_transcribe_skips_files_without_audio(monkeypatch):
+    """A video-only clip crashed faster-whisper (IndexError); now it simply has no words."""
+    from kerf import speech
+    silent = TMP / "no-audio.mp4"
+    media.ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x240:r=30:d=2", "-c:v", "libx264", silent)
+    monkeypatch.setattr(speech, "_whisper", lambda *a: pytest.fail("loaded Whisper for a file with no audio"))
+    assert speech.transcribe(str(silent))["words"] == []
+    with pytest.raises(ValueError, match="No audio to enhance"):  # was an FFmpeg crash
+        features.run("enhance", str(silent), {}, TMP / "out")
+
+
 def test_audio_only_media_and_ffmpeg_errors():
     """An audio file used as the timeline sat on the video track too: render divided by zero, video tools crashed."""
     wav = TMP / "voice.wav"

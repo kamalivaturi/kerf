@@ -70,8 +70,12 @@ def run(tl, p, ctx):
     done = {}
     for ti in parse_tracks(p["tracks"]):
         for c in (out.audio[ti] if ti < len(out.audio) else []):
+            if not media.probe(c.path)["channels"]:  # B-roll or stills without sound: nothing to enhance
+                continue
             if c.path not in done:
                 done[c.path] = enhance_file(c.path, p, ctx.out_dir)
             c.path = done[c.path]  # same timing: enhanced file starts at source t=0
+    if not done:
+        raise ValueError("No audio to enhance on the chosen tracks: pick the tracks with dialogue")
     out.name = f"{tl.name} - Enhanced"
     return dict(timeline=out, files=list(done.values()), report=dict(files=len(done), provider=p["provider"]))
