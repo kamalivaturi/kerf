@@ -517,6 +517,9 @@ def test_beats_on_long_music_across_blocks():
     assert bpm == pytest.approx(120, abs=0.2) and bt[-1] > 195
     off = [(b + 0.25) % 0.5 - 0.25 for b in bt]  # signed distance to the nearest click
     assert max(abs(o) for o in off) < 0.034  # within a frame at 30 fps, first beat to last (past the ~95 s block edge)
+    short = TMP / "pulse6.wav"  # a short clip with no real beat: the tempo stays in the 70-180 BPM search range
+    media.ffmpeg("-f", "lavfi", "-i", "aevalsrc='0.3*sin(2*PI*220*t)*lt(mod(t,3),2)':s=48000:d=6", short)
+    assert 70 <= sound.beats(str(short))[1] <= 180
 
 
 def test_quick_mask_reports_a_failed_encoder(monkeypatch):

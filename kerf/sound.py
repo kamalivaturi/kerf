@@ -165,12 +165,13 @@ def beats(path, sr=22050, hop=512):
     # refine on the peaks 16 and 256 beats away: a 0.1% tempo error drifts the last cut of an hour-long mix by 4 s
     for m in (16, 256):
         c = int(round(period * m))
-        if c + 4 >= len(flux):
+        if 2 * c >= len(flux):  # too little overlap that far out (short clips): the estimate would be noise
             break
         r = [flux[:len(flux) - lag] @ flux[lag:] for lag in range(c - 3, c + 4)]
         j = int(np.argmax(r[1:-1])) + 1
         y0, y1, y2 = r[j - 1:j + 2]
-        period = (c - 3 + j + (0.5 * (y0 - y2) / (y0 - 2 * y1 + y2) if (y0 - 2 * y1 + y2) else 0.0)) / m
+        d = 0.5 * (y0 - y2) / (y0 - 2 * y1 + y2) if (y0 - 2 * y1 + y2) else 0.0
+        period = (c - 3 + j + float(np.clip(d, -0.5, 0.5))) / m
     grid = np.arange(int(len(flux) / period)) * period  # the phase whose beat grid lands on the most onsets
     phase = int(np.argmax([flux[(i + grid[grid < len(flux) - i]).astype(int)].sum() for i in range(k)]))
     n_beats = int((len(flux) - phase) / period) + 1
