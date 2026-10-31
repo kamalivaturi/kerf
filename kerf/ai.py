@@ -98,7 +98,7 @@ def execute(tl, steps, ctx):
 
 def prompt_edit(tl, p, ctx):
     if not p["prompt"].strip():
-        raise ValueError("write what you want done in 'prompt'")
+        raise ValueError("Write what you want done in 'prompt'")
     summary, steps = plan(p["prompt"], tl, p["provider"], p["model"])
     items = [dict(id=i, label=f"{i + 1}. {s['feature']} {json.dumps(s['params'])} — {s['reason']}")
              for i, s in enumerate(steps)]

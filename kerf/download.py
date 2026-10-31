@@ -83,7 +83,7 @@ def run(tl, p, ctx):
     import yt_dlp
     urls = [u.strip() for u in re.split(r"[\s,]+", p["urls"]) if u.strip()]
     if not urls:
-        raise ValueError("paste at least one link in 'urls'")
+        raise ValueError("Paste at least one link in 'urls'")
     folder = Path(p["folder"] or Path.home() / "Kerf Downloads")
     folder.mkdir(parents=True, exist_ok=True)
     files = []

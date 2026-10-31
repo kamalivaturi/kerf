@@ -76,7 +76,8 @@ def run(tl, p, ctx):
     from . import settings
     key = p["pexels_key"] or settings.get("pexels_api_key")
     if p["source"] == "pexels" and not key:
-        raise ValueError("Pexels needs a free API key (pexels.com/api): set pexels_key or PEXELS_API_KEY")
+        raise ValueError("Pexels B-roll needs a free API key from pexels.com/api: add it in Settings, or set source "
+                         "to 'folder' to use your own footage")
     clips, used, missing = [], set(), []
     for it in selected(p, items):
         path = (pexels(it["query"], key, p["orientation"], ctx.out_dir) if p["source"] == "pexels"
