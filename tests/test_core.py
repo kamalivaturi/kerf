@@ -426,3 +426,30 @@ def test_engine_writes_its_locator(monkeypatch):
     loc = json.loads(server.LOCATOR.read_text())
     assert loc["helper"] == "/opt/kerf/helper" and loc["token_file"] == str(server.TOKEN_FILE) and loc["port"] > 0
     assert urllib.request.urlopen(f"http://127.0.0.1:{loc['port']}/health", timeout=5).status == 200
+
+
+def test_quick_mask_reports_a_failed_encoder(monkeypatch):
+    """An encoder that stops early is a plain error, and the decoding FFmpeg isn't left running."""
+    from kerf import tools
+    monkeypatch.setattr(tools, "_model", lambda name: None)
+    monkeypatch.setattr(tools, "mask_frame", lambda sess, rgb: rgb[..., 0].astype("float32") / 255)
+    monkeypatch.setattr(tools, "_encode", lambda out, alpha=False, tl=None: ["-c:v", "no_such_encoder", str(out)])
+    with pytest.raises(RuntimeError, match="encoding the matte failed"):
+        features.run("quick_mask", str(VIDEO), dict(output="matte"), TMP / "out")
+
+
+def test_quick_mask_keeps_frame_order(monkeypatch):
+    """Masks are computed a few frames at a time; they must land on the timeline in frame order."""
+    from kerf import tools
+    ramp = TMP / "ramp.mp4"  # frame n is grey level 40+6n: the fake model's mask is the frame itself
+    media.ffmpeg("-f", "lavfi", "-i", "nullsrc=s=256x256:r=30:d=1,geq=lum=40+N*6:cb=128:cr=128", "-c:v", "libx264",
+                 "-pix_fmt", "yuv420p", ramp)
+    monkeypatch.setattr(tools, "_model", lambda name: None)
+    monkeypatch.setattr(tools, "mask_frame", lambda sess, rgb: rgb[..., 0].astype("float32") / 255)
+    r = features.run("quick_mask", str(ramp), dict(output="matte", threshold=0.5, softness=1.0, smooth=0.0, feather=0),
+                     TMP / "out")
+    import numpy as np
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", r["files"][0], "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+                         capture_output=True, check=True).stdout
+    means = np.frombuffer(raw, np.uint8).reshape(-1, 256 * 256).mean(axis=1)
+    assert len(means) == 30 and all(b > a for a, b in zip(means, means[1:]))

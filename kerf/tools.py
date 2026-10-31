@@ -6,6 +6,7 @@ Everything that changes pixels is rendered by FFmpeg into a new clip that replac
 """
 from __future__ import annotations
 
+import contextlib
 import copy
 import json
 import math
@@ -13,6 +14,8 @@ import random
 import re
 import subprocess
 import urllib.request
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -470,10 +473,14 @@ def _model(name):
     return ort.InferenceSession(str(f), providers=prov)
 
 
+_MEAN = np.array((0.485, 0.456, 0.406), np.float32) * 255
+_ISTD = 1 / (np.array((0.229, 0.224, 0.225), np.float32) * 255)
+
+
 def mask_frame(sess, rgb, size=320):
     import cv2
-    x = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_AREA).astype(np.float32) / 255.0
-    x = ((x - (0.485, 0.456, 0.406)) / (0.229, 0.224, 0.225)).transpose(2, 0, 1)[None].astype(np.float32)
+    x = cv2.resize(rgb, (size, size), interpolation=cv2.INTER_AREA).astype(np.float32)
+    x = ((x - _MEAN) * _ISTD).transpose(2, 0, 1)[None]  # ImageNet normalisation, kept in float32
     m = sess.run(None, {sess.get_inputs()[0].name: x})[0][0, 0]
     m = (m - m.min()) / max(1e-6, float(m.max() - m.min()))
     return cv2.resize(m, (rgb.shape[1], rgb.shape[0]), interpolation=cv2.INTER_LINEAR)
@@ -500,25 +507,37 @@ def quick_mask(tl, p, ctx):
         wr = subprocess.Popen(["ffmpeg", "-y", "-v", "error", "-f", "rawvideo", "-pix_fmt", "rgba" if alpha_out else "gray",
                                "-s", f"{w}x{h}", "-r", f"{info['fps'] or tl.fps:.3f}", "-i", "-",
                                *_encode(dest, alpha=alpha_out)], stdin=subprocess.PIPE)
+        x0, y0, x1, y1 = box
         prev = None
+
+        def write(rgb, crop):
+            nonlocal prev
+            m = np.zeros((h, w), np.float32)
+            m[y0:y1, x0:x1] = np.clip((crop.result() - thr) / soft + .5, 0, 1)
+            if prev is not None:
+                m = sm * prev + (1 - sm) * m
+            prev = m
+            if feather:
+                m = cv2.GaussianBlur(m, (0, 0), feather)
+            a = (m * 255).astype(np.uint8)
+            wr.stdin.write(np.dstack([rgb, a]).tobytes() if alpha_out else a.tobytes())
+
         try:
-            while True:
-                buf = rd.stdout.read(w * h * 3)
-                if len(buf) < w * h * 3:
-                    break
-                rgb = np.frombuffer(buf, np.uint8).reshape(h, w, 3)
-                m = np.zeros((h, w), np.float32)
-                x0, y0, x1, y1 = box
-                m[y0:y1, x0:x1] = np.clip((mask_frame(sess, rgb[y0:y1, x0:x1]) - thr) / soft + .5, 0, 1)
-                if prev is not None:
-                    m = sm * prev + (1 - sm) * m
-                prev = m
-                if feather:
-                    m = cv2.GaussianBlur(m, (0, 0), feather)
-                a = (m * 255).astype(np.uint8)
-                wr.stdin.write(np.dstack([rgb, a]).tobytes() if alpha_out else a.tobytes())
+            # ONNX Runtime releases the GIL: a few frames in flight on the one session is ~1.5x faster on CPU
+            with ThreadPoolExecutor(4) as pool:
+                ahead = deque()
+                while len(buf := rd.stdout.read(w * h * 3)) == w * h * 3:
+                    rgb = np.frombuffer(buf, np.uint8).reshape(h, w, 3)
+                    ahead.append((rgb, pool.submit(mask_frame, sess, rgb[y0:y1, x0:x1])))
+                    if len(ahead) > 8:
+                        write(*ahead.popleft())
+                while ahead:  # smoothing needs the frames in order
+                    write(*ahead.popleft())
+        except BrokenPipeError:
+            pass  # the encoder stopped early: its exit code below says so
         finally:
-            wr.stdin.close()
+            with contextlib.suppress(OSError):  # else the decoding FFmpeg is never reaped
+                wr.stdin.close()
             wr.wait()
             rd.stdout.close()
             rd.wait()
