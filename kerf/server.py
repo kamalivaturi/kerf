@@ -105,14 +105,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _handle(self, fn):
         try:
-            self._send(200, fn())
+            res = 200, fn()
         except PermissionError as e:
-            self._send(402, dict(error=str(e)))
+            res = 402, dict(error=str(e))
         except (KeyError, ValueError, FileNotFoundError) as e:
-            self._send(400, dict(error=str(e), trace=traceback.format_exc(limit=4)))
+            res = 400, dict(error=str(e), trace=traceback.format_exc(limit=4))
         except Exception as e:
             log_error(self.path, e)
-            self._send(500, dict(error=f"{type(e).__name__}: {e}", trace=traceback.format_exc(limit=6)))
+            res = 500, dict(error=f"{type(e).__name__}: {e}", trace=traceback.format_exc(limit=6))
+        try:
+            self._send(*res)
+        except ConnectionError:  # the panel closed or reloaded before the answer arrived: not an engine error
+            pass
 
     def do_GET(self):
         u = urlparse(self.path)

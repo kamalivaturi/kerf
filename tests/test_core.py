@@ -544,3 +544,17 @@ def test_quick_mask_keeps_frame_order(monkeypatch):
                          capture_output=True, check=True).stdout
     means = np.frombuffer(raw, np.uint8).reshape(-1, 256 * 256).mean(axis=1)
     assert len(means) == 30 and all(b > a for a, b in zip(means, means[1:]))
+
+
+def test_client_hangup_is_not_logged_as_an_engine_error():
+    """15 of 23 logged 'errors' were panels closing mid-reply (WinError 10053/10054)."""
+    from kerf import server
+    before = server.ERRORS.read_text("utf-8") if server.ERRORS.exists() else ""
+    h = server.Handler.__new__(server.Handler)
+    h.path = "/host"
+
+    def hangup(code, obj):
+        raise ConnectionResetError(10054, "forcibly closed")
+    h._send = hangup
+    h._handle(lambda: dict(ok=True))
+    assert (server.ERRORS.read_text("utf-8") if server.ERRORS.exists() else "") == before
