@@ -6,6 +6,7 @@ import { EDITOR_NAME, host, IN_EDITOR, IN_UXP, Live, liveSequence, RunResult, se
 import { LANGS, setLang, t } from "./i18n";
 
 const HELP_URL = "https://github.com/kamalivaturi/kerf#readme";
+const PRIVACY_URL = "https://kamalivaturi.github.io/kerf/privacy.html";
 
 type Params = Record<string, string | number | boolean>;
 type Feature = {
@@ -475,7 +476,7 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
           </label>
         ))}
         <div className="actions"><button className="primary" onClick={save}>{saved ? "Saved ✓" : "Save settings"}</button></div>
-        <p className="help">Keys stay on this computer (~/.kerf/settings.json).</p>
+        <p className="help">Keys stay on this computer (~/.kerf/settings.json) and go only to their provider. Features that use a provider send it text, or audio for ElevenLabs. The privacy policy lists each one.</p>
         <h2>Licence</h2>
         <p className="help">{String(lic.edition ?? "…")}, {String(lic.plan ?? "…")}{lic.expires ? `, renews ${String(lic.expires).slice(0, 10)}` : ""}{lic.key ? `, ${lic.key}` : ""}</p>
         <div className="presets">
@@ -485,7 +486,10 @@ function Settings({ prefs, setPrefs, onClose }: { prefs: Prefs; setPrefs: (p: Pa
         </div>
         {licMsg && <div className="note">{licMsg}</div>}
       </>}
-      <div className="actions"><button className="ghost" onClick={() => reportBug().catch((e) => alert((e as Error).message))}>Report a bug</button></div>
+      <div className="actions">
+        <button className="ghost" onClick={() => reportBug().catch((e) => alert((e as Error).message))}>Report a bug</button>
+        <button className="ghost" onClick={() => openHelp(PRIVACY_URL)}>Privacy policy</button>
+      </div>
       {tab === "share" && <>
         <p className="help">Copy all your presets (every feature) as one block of text to share or back up; paste a block to import.</p>
         <textarea rows={6} value={bundle} onChange={(e) => setBundle(e.target.value)} placeholder='{"kerf_presets": 1, "features": {}}' aria-label="Preset bundle" />

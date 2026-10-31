@@ -161,4 +161,4 @@ Kerf is free and stays free. If it saves you editing time, you can
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-%E2%98%95-FFDD00?style=for-the-badge&labelColor=1a0f08)](https://buymeacoffee.com/kamalivaturi)
 
-Third-party licences: see [NOTICES.md](NOTICES.md).
+Third-party licences: see [NOTICES.md](NOTICES.md). What Kerf collects and sends: see [PRIVACY.md](PRIVACY.md).
