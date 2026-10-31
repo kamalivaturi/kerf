@@ -67,7 +67,8 @@ def build(tl, W, H, fps, alpha):
 
     layers = []
     for ti, tr in enumerate(tl.video):
-        clips = sorted((c for c in tr if c.enabled), key=lambda c: c.start)
+        # a zero-length still would be "-loop 1 -t 0", which FFmpeg reads as "loop forever"
+        clips = sorted((c for c in tr if c.enabled and c.dur > 1e-3), key=lambda c: c.start)
         if not clips:
             continue
         bg = "black@0.0" if (ti or alpha) else "black"
@@ -125,6 +126,8 @@ def run(tl, p, ctx):
     W, H = int(p["width"]) or tl.width, int(p["height"]) or tl.height
     fps = round(float(p["fps"]) or tl.fps, 3)
     alpha = p["format"] == "mov_alpha"
+    if tl.duration <= 1e-3:
+        raise ValueError("Nothing to render: the timeline is empty. Add clips to the sequence, then render again.")
     out = Path(p["output"]) if p["output"] else ctx.out_dir / f"{tl.name}.{'mov' if alpha else 'mp4'}"
     ins, graph = build(tl, W, H, fps, alpha)
     script = ctx.out_dir / f".{out.stem}.filter.txt"

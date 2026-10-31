@@ -21,6 +21,7 @@ from . import units
 # Resolve reads `center` as a fraction of the *timeline* size and applies scale on top of its fit-to-frame.
 # Keyframe <when> is media-start based (F(src_in) + F(t)) in both.
 EPS = 1e-4
+STILL = 5.0  # seconds a still image lasts when it is the whole timeline (Premiere's default still duration)
 
 
 def interp(kf, t):
@@ -131,9 +132,11 @@ class Timeline:
     @classmethod
     def from_media(cls, path, probe):
         info = probe(path)
-        c = Clip(path, 0.0, info["duration"], 0.0)
+        still = not info["fps"] and info["width"]  # an image: give it an editor's default still length
+        c = Clip(path, 0.0, info["duration"] or (STILL if still else 0.0), 0.0)
         return cls(info["fps"] or 30.0, info["width"] or 1920, info["height"] or 1080,
-                   os.path.splitext(os.path.basename(path))[0], [[c]], [[copy.copy(c)]])
+                   os.path.splitext(os.path.basename(path))[0], [[c] if info["width"] else []],  # audio-only: no picture
+                   [[copy.copy(c)]])
 
 
 # ---------------------------------------------------------------- edit operations

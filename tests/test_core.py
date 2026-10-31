@@ -453,6 +453,37 @@ def test_non_ascii_paths_for_images():
     assert Path(r["files"][0]).stat().st_size > 0
 
 
+def test_still_image_timeline_renders_and_ends():
+    """A still image as the whole timeline was a zero-length clip: render ran FFmpeg with -loop 1 -t 0 forever."""
+    import threading
+    pic = TMP / "still.png"
+    media.ffmpeg("-f", "lavfi", "-i", "testsrc2=s=320x240", "-frames:v", "1", pic)
+    tl = Timeline.from_media(str(pic), media.probe)
+    assert tl.duration == pytest.approx(5.0)
+    out = {}
+    t = threading.Thread(target=lambda: out.update(features.run("render", str(pic), {"quality": "draft"}, TMP / "out")),
+                         daemon=True)
+    t.start()
+    t.join(120)
+    assert not t.is_alive() and media.probe(out["files"][0])["duration"] == pytest.approx(5.0, abs=0.2)
+    with pytest.raises(ValueError, match="Nothing to render"):
+        features.run("render", dict(video=[[]]), {}, TMP / "out")
+
+
+def test_audio_only_media_and_ffmpeg_errors():
+    """An audio file used as the timeline sat on the video track too: render divided by zero, video tools crashed."""
+    wav = TMP / "voice.wav"
+    media.ffmpeg("-f", "lavfi", "-i", "sine=d=3", wav)
+    tl = Timeline.from_media(str(wav), media.probe)
+    assert tl.video == [[]] and tl.audio[0][0].dur == pytest.approx(3.0, abs=0.05)
+    r = features.run("render", str(wav), {"quality": "draft"}, TMP / "out")
+    assert media.probe(r["files"][0])["duration"] == pytest.approx(3.0, abs=0.2)
+    with pytest.raises(ValueError, match="No video"):
+        features.run("frame_export", str(wav), {"folder": str(TMP / "out")}, TMP / "out")
+    with pytest.raises(RuntimeError, match="FFmpeg failed: .*nope"):  # FFmpeg's reason, not just the command line
+        media.ffmpeg("-i", TMP / "nope.mp4", TMP / "x.mp4")
+
+
 def test_beats_on_long_music_across_blocks():
     """Beat detection runs in blocks (an hour-long mix needed ~7 GB), and every beat stays on the real click: the
     tempo used to come out 0.14% slow, so cuts drifted 0.25 s off the beat by the end of a 3-minute song."""
