@@ -428,6 +428,18 @@ def test_engine_writes_its_locator(monkeypatch):
     assert urllib.request.urlopen(f"http://127.0.0.1:{loc['port']}/health", timeout=5).status == 200
 
 
+def test_beats_on_long_music_across_blocks():
+    """Beat detection runs in blocks (an hour-long mix needed ~7 GB), and every beat stays on the real click: the
+    tempo used to come out 0.14% slow, so cuts drifted 0.25 s off the beat by the end of a 3-minute song."""
+    from kerf import sound
+    click = TMP / "click120-long.wav"  # clicks at every multiple of 0.5 s
+    media.ffmpeg("-f", "lavfi", "-i", "aevalsrc='0.8*sin(2*PI*1000*t)*lt(mod(t,0.5),0.03)':s=22050:d=200", click)
+    bt, bpm = sound.beats(str(click))
+    assert bpm == pytest.approx(120, abs=0.2) and bt[-1] > 195
+    off = [(b + 0.25) % 0.5 - 0.25 for b in bt]  # signed distance to the nearest click
+    assert max(abs(o) for o in off) < 0.034  # within a frame at 30 fps, first beat to last (past the ~95 s block edge)
+
+
 def test_quick_mask_reports_a_failed_encoder(monkeypatch):
     """An encoder that stops early is a plain error, and the decoding FFmpeg isn't left running."""
     from kerf import tools

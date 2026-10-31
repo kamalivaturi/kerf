@@ -146,19 +146,36 @@ def beats(path, sr=22050, hop=512):
     """Beat times (s) from spectral-flux onsets + autocorrelation tempo (70–180 BPM)."""
     a = media.load_audio(path, sr=sr)
     n = 2048
-    frames = np.lib.stride_tricks.sliding_window_view(a, n)[::hop] * np.hanning(n)
-    spec = np.abs(np.fft.rfft(frames, axis=1))
-    flux = np.maximum(0, np.diff(np.log1p(spec), axis=0)).sum(axis=1)
+    frames = np.lib.stride_tricks.sliding_window_view(a, n)[::hop]  # a view: no copy yet
+    flux, prev = [], None
+    for i in range(0, len(frames), 4096):  # in blocks: the whole spectrogram of an hour-long mix is ~7 GB
+        spec = np.log1p(np.abs(np.fft.rfft(frames[i:i + 4096] * np.hanning(n), axis=1)))
+        flux.append(np.maximum(0, np.diff(spec if prev is None else np.vstack([prev, spec]), axis=0)).sum(axis=1))
+        prev = spec[-1:]
+    flux = np.concatenate(flux)
     flux = (flux - flux.mean()) / (flux.std() + 1e-9)
     fps = sr / hop
-    ac = np.correlate(flux, flux, "full")[len(flux) - 1:]
     lo, hi = int(fps * 60 / 180), int(fps * 60 / 70)
+    ac = np.zeros(hi + 1)  # autocorrelation at the tempo lags only (a full one is O(n²))
+    for lag in range(lo - 1, hi + 1):
+        ac[lag] = flux[:len(flux) - lag] @ flux[lag:]
     k = lo + int(np.argmax(ac[lo:hi]))
     y0, y1, y2 = ac[k - 1], ac[k], ac[k + 1]  # parabolic interpolation: sub-frame tempo accuracy
     period = k + (0.5 * (y0 - y2) / (y0 - 2 * y1 + y2) if (y0 - 2 * y1 + y2) else 0.0)
-    phase = int(np.argmax([flux[i::k].sum() for i in range(k)]))
+    # refine on the peaks 16 and 256 beats away: a 0.1% tempo error drifts the last cut of an hour-long mix by 4 s
+    for m in (16, 256):
+        c = int(round(period * m))
+        if c + 4 >= len(flux):
+            break
+        r = [flux[:len(flux) - lag] @ flux[lag:] for lag in range(c - 3, c + 4)]
+        j = int(np.argmax(r[1:-1])) + 1
+        y0, y1, y2 = r[j - 1:j + 2]
+        period = (c - 3 + j + (0.5 * (y0 - y2) / (y0 - 2 * y1 + y2) if (y0 - 2 * y1 + y2) else 0.0)) / m
+    grid = np.arange(int(len(flux) / period)) * period  # the phase whose beat grid lands on the most onsets
+    phase = int(np.argmax([flux[(i + grid[grid < len(flux) - i]).astype(int)].sum() for i in range(k)]))
     n_beats = int((len(flux) - phase) / period) + 1
-    return [(phase + j * period) / fps for j in range(n_beats)], round(60 * fps / period, 1)
+    lag = (hop + n / 2) / sr  # flux[i] is the change into frame i + 1, whose window is centred half a window in
+    return [(phase + j * period) / fps + lag for j in range(n_beats)], round(60 * fps / period, 1)
 
 
 def beat_sync(tl, p, ctx):
