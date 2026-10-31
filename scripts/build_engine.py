@@ -6,6 +6,7 @@
 The folder is self-contained: the desktop app (desktop/) bundles it, and it is also the portable build
 (kerf-engine serve → http://127.0.0.1:7878/app/). Run from the repo root after `npm run build` in ui/.
 """
+import hashlib
 import io
 import platform
 import shutil
@@ -19,12 +20,17 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "engine-dist"
 EXE = ".exe" if sys.platform == "win32" else ""
+# ffmpeg.martin-riedl.de stops building for Intel Macs in January 2027 (no more release builds), so the Intel build uses
+# the last one, pinned by URL and checked against its published SHA-256. Apple silicon keeps following the latest release.
+MAC_INTEL = "https://ffmpeg.martin-riedl.de/download/macos/amd64/1789931006_9.0.2"
 FFMPEG = {  # static builds (GPL: includes libvidstab for the stabilizer)
     "win32": ["https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"],
     "linux": ["https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"],
-    "darwin": [f"https://ffmpeg.martin-riedl.de/redirect/latest/macos/{'arm64' if platform.machine() == 'arm64' else 'amd64'}/release/{n}.zip"
-               for n in ("ffmpeg", "ffprobe")],
+    "darwin": [f"https://ffmpeg.martin-riedl.de/redirect/latest/macos/arm64/release/{n}.zip" for n in ("ffmpeg", "ffprobe")]
+              if platform.machine() == "arm64" else [f"{MAC_INTEL}/{n}.zip" for n in ("ffmpeg", "ffprobe")],
 }
+PINNED_SHA256 = {f"{MAC_INTEL}/ffmpeg.zip": "7c6b4125b191cbf773832dc51f424cf2b6bb7da43007d1e066f95909e47cacd4",
+                 f"{MAC_INTEL}/ffprobe.zip": "2322438ed2f6319a691291b247d09c69dcaa3a982460d1f269a7e1af335cfdfd"}
 EXCLUDE = ["torch", "torchaudio", "torchvision", "tensorflow", "jax", "scipy", "pandas", "matplotlib", "sklearn", "numba",
            "transformers", "librosa", "PyQt5", "PyQt6", "PySide2", "PySide6", "tkinter", "gi", "IPython", "jupyter", "notebook",
            "pytest", "sympy", "playwright", "selenium"]
@@ -35,6 +41,8 @@ def fetch_ffmpeg(dest):
     for url in FFMPEG["darwin" if sys.platform == "darwin" else "win32" if sys.platform == "win32" else "linux"]:
         print("downloading", url)
         blob = urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "kerf-build"}), timeout=600).read()
+        if url in PINNED_SHA256 and hashlib.sha256(blob).hexdigest() != PINNED_SHA256[url]:
+            sys.exit(f"{url}: SHA-256 does not match the pinned value")
         if url.endswith(".zip"):
             with zipfile.ZipFile(io.BytesIO(blob)) as z:
                 members = [(m, z.read(m)) for m in z.namelist()]

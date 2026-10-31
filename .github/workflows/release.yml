@@ -15,6 +15,8 @@ jobs:
         include:
           - { os: windows-latest, name: windows-x64 }
           - { os: macos-latest, name: macos-arm64 }
+          # Intel Mac: build_engine.py pins the last martin-riedl.de Intel ffmpeg (that site stops Intel builds in January 2027).
+          # GitHub has also announced it will retire its Intel macOS runners (planned for August 2027): drop this line then.
           - { os: macos-15-intel, name: macos-x64 }
           - { os: ubuntu-22.04, name: linux-x64 }
     runs-on: ${{ matrix.os }}
