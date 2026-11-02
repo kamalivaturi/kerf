@@ -561,3 +561,18 @@ def test_client_hangup_is_not_logged_as_an_engine_error():
     h._send = hangup
     h._handle(lambda: dict(ok=True))
     assert (server.ERRORS.read_text("utf-8") if server.ERRORS.exists() else "") == before
+
+
+def test_kerf_fx_words_file(monkeypatch):
+    """Kerf FX's Transcribe button: word timings as start<TAB>end<TAB>word, only inside ~/.kerf/captions."""
+    from kerf import captions, speech
+    words = [dict(w="नमस्ते", s=0.5, e=0.9), dict(w="Kerf", s=1.0, e=1.4)]
+    monkeypatch.setattr(speech, "transcribe", lambda path, language="", model=None: dict(language="hi", words=words))
+    out = media.HOME / "captions" / "0123abcd.tsv"
+    r = captions.words_file(str(VIDEO), "hindi", str(out))
+    assert r["words"] == 2 and out.read_text("utf-8") == "0.500\t0.900\tनमस्ते\n1.000\t1.400\tKerf\n"
+    with pytest.raises(ValueError, match="captions folder"):
+        captions.words_file(str(VIDEO), "", str(TMP / "elsewhere.tsv"))
+    monkeypatch.setattr(speech, "transcribe", lambda path, language="", model=None: dict(language="en", words=[]))
+    with pytest.raises(ValueError, match="no speech"):
+        captions.words_file(str(VIDEO), "", str(out))

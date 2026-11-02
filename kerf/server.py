@@ -173,6 +173,7 @@ class Handler(BaseHTTPRequestHandler):
             "/mogrt/build": lambda: mogrt.build([s for s in mogrt.catalog() if not b.get("ids") or s["id"] in b["ids"]]),
             "/captions/preview": lambda: captions.preview(b.get("path", ""), b.get("params", {}), float(b.get("t", 1.0)),
                                                           b.get("aspect", "auto"), b.get("safe", True), b.get("size")),
+            "/captions/words": lambda: captions.words_file(b["path"], b.get("language", ""), b["out"]),
             "/license/activate": lambda: license.activate(b["key"]),
             "/license/deactivate": license.deactivate,
             "/fx/save": lambda: tools.fx_save(b["name"], b["chain"]),

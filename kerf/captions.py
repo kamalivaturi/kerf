@@ -227,6 +227,24 @@ def aspect_of(w, h):
     return min(SAFE_ZONES, key=lambda k: abs(math.log(w / h * SAFE_ZONES[k][0][1] / SAFE_ZONES[k][0][0])))
 
 
+def words_file(path, language, out):
+    """Word timings for Kerf FX's Captions mode in Resolve: start<TAB>end<TAB>word lines (UTF-8), written where
+    the effect looks for them. Only ever inside ~/.kerf/captions, whatever `out` asks for."""
+    from pathlib import Path
+    from .speech import transcribe
+    out = Path(out).resolve()
+    if out.parent != (media.HOME / "captions").resolve() or out.suffix != ".tsv":
+        raise ValueError("Kerf FX transcripts are written to the captions folder in ~/.kerf only")
+    data = transcribe(str(path), language)
+    if not data["words"]:
+        raise ValueError(f"Kerf heard no speech in {Path(path).name}: check its audio, or pick its language")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_suffix(".part")
+    tmp.write_text("".join(f"{w['s']:.3f}\t{w['e']:.3f}\t{w['w']}\n" for w in data["words"]), "utf-8")
+    tmp.replace(out)  # the effect never sees half a file
+    return dict(file=str(out), words=len(data["words"]), language=data["language"])
+
+
 def preview(path="", params=None, t=1.0, aspect="auto", safe=True, size=None):
     """One rendered frame of the caption style (sample words, mid-animation at t) with safe-zone guides."""
     import base64
