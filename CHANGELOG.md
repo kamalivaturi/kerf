@@ -2,9 +2,15 @@
 
 ## Unreleased
 
-- **DaVinci Resolve is Kerf FX only.** Kerf in Resolve is the seven Kerf FX effects (Effects › OpenFX › Kerf), with
-  Resolve's own keyframes and live preview. The Workspace › Scripts › Kerf window is gone: updating Kerf removes it.
-  Timeline features (silences, captions, AI edits) are in the Premiere Pro and After Effects panels.
+- **Kerf FX is one effect with a Mode menu.** In Resolve, add Effects › OpenFX › Kerf › Kerf FX and pick Shake, Zoom,
+  RGB split, Vignette, Letterbox, Speed ramp, Motion blur or Captions; only that mode's controls show.
+- **Captions in DaVinci Resolve.** Kerf FX's Captions mode draws word-timed captions on the clip in 15 templates
+  (Apple-style fade up and blur in, subtle and minimal ones, karaoke, highlight, box, pop, one word, subtitles), from
+  an SRT or from Kerf's own transcript: pick the clip's media file and press Transcribe with Kerf. Hindi, Marathi,
+  Bengali, Tamil, Telugu, Kannada, Malayalam, Gujarati, Punjabi and Odia letters join as they should.
+- **DaVinci Resolve is Kerf FX only.** Kerf in Resolve is Kerf FX (Effects › OpenFX › Kerf), with Resolve's own
+  keyframes and live preview. The Workspace › Scripts › Kerf window is gone: updating Kerf removes it.
+  Timeline features (silences, AI edits) are in the Premiere Pro and After Effects panels.
 - **Kerf FX shows up in DaVinci Resolve 21.** Resolve 21 lists OpenFX plugins only from the standard folder
   (Windows `C:\Program Files\Common Files\OFX\Plugins`, macOS `/Library/OFX/Plugins`, Linux `/usr/OFX/Plugins`), not
   from `OFX_PLUGIN_PATH`. Kerf FX now installs there, with one admin prompt per new Kerf FX version; the old per-user

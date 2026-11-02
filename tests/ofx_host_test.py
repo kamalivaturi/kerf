@@ -9,9 +9,11 @@ arguments, and paramGetValueAtTime is variadic.
 """
 import ctypes as C
 import math
+import os
 import platform
 import struct
 import sys
+import time
 import zlib
 from pathlib import Path
 
@@ -248,25 +250,31 @@ def _param_get_handle(ps, name, out, out_props):
     return OK
 
 
-def _param_value(param, t, out):
+def _param_value(param, t, out, out2=None, out3=None):
     p = objects.get(param)
     if not isinstance(p, dict) or "type" not in p:
         return BAD_HANDLE
-    v = overrides.get(p["name"], objects[p["props"]].get("OfxParamPropDefault", [0])[0])
+    default = objects[p["props"]].get("OfxParamPropDefault", [0])
+    v = overrides.get(p["name"], default if p["type"] == "OfxParamTypeRGB" else default[0])
     if p["type"] == "OfxParamTypeDouble":
         C.cast(out, C.POINTER(C.c_double))[0] = float(v)
+    elif p["type"] == "OfxParamTypeRGB":  # one pointer per component
+        for ptr_, x in zip((out, out2, out3), v):
+            C.cast(ptr_, C.POINTER(C.c_double))[0] = float(x)
+    elif p["type"] == "OfxParamTypeString":
+        _write(out, cstr(str(v or "")))
     else:
         C.cast(out, C.POINTER(C.c_int))[0] = int(v)
     return OK
 
 
-PARAM_SUITE = [  # order of OfxParameterSuiteV1; paramGetValueAtTime is variadic, the value pointer is the 3rd arg
+PARAM_SUITE = [  # order of OfxParameterSuiteV1; the get-value calls are variadic: the value pointers come after
     (F(C.c_int, H, S, S, P), _param_define),
     (F(C.c_int, H, S, P, P), _param_get_handle),
     (F(C.c_int, H, P), unsupported),
     (F(C.c_int, H, P), lambda p, out: (_write(out, objects[p]["props"]), OK)[1]),
     (F(C.c_int, H, P), lambda p, out: _param_value(p, 0.0, out)),
-    (F(C.c_int, H, C.c_double, P), _param_value),
+    (F(C.c_int, H, C.c_double, P, P, P), _param_value),
 ] + [(F(C.c_int, H), unsupported)] * 12
 
 
@@ -305,7 +313,26 @@ def png(path, frame):
                      + chunk(b"IDAT", zlib.compress(b"".join(rows))) + chunk(b"IEND", b""))
 
 
-# Per effect: (settings, frame) pairs: defaults first, then extremes that must stay stable.
+# Kerf FX is one effect: the Mode menu picks what it does; each mode's params are "<prefix>_<name>".
+MODES = ["Shake", "Zoom", "RGBSplit", "Vignette", "Letterbox", "SpeedRamp", "MotionBlur", "Captions"]
+PREFIX = ["shake", "zoom", "split", "vignette", "letterbox", "ramp", "blur", "cap"]
+TEST = ROOT / "build" / "ofx" / "test"
+WORDS = TEST / "words.tsv"  # Kerf transcript: start<TAB>end<TAB>word (seconds)
+INDIC = TEST / "indic.tsv"
+SRT = TEST / "subs.srt"
+
+
+def caption_files():
+    TEST.mkdir(parents=True, exist_ok=True)
+    text = "Make every word count with Kerf captions in Resolve today".split()
+    WORDS.write_text("".join(f"{0.3 * i + 0.2:.2f}\t{0.3 * i + 0.45:.2f}\t{w}\n" for i, w in enumerate(text)), "utf-8")
+    # Hindi, Tamil, Telugu, Punjabi, Bengali, Kannada, Malayalam, Gujarati, Odia: conjuncts and vowel signs need shaping
+    indic = ["नमस्ते", "दोस्तों", "क्षमा", "வணக்கம்", "నమస్తే", "ਸਤਿ", "নমস্কার", "ನಮಸ್ಕಾರ", "നമസ്കാരം", "નમસ્તે", "ନମସ୍କାର"]
+    INDIC.write_text("".join(f"{0.4 * i + 0.2:.2f}\t{0.4 * i + 0.55:.2f}\t{w}\n" for i, w in enumerate(indic)), "utf-8")
+    SRT.write_text("﻿1\n00:00:00,500 --> 00:00:02,500\nSubtitles from Resolve\nwork too\n\n", "utf-8")
+
+
+# Per mode: (settings, frame) pairs: defaults first, then extremes that must stay stable.
 CASES = {
     "Shake": [({}, 5), ({"amplitude": 400, "rotation": 45, "frequency": 40}, 17), ({"axis": 1, "hideEdges": 0}, 3)],
     "Zoom": [({}, 9), ({"amount": 400, "direction": 1, "ease": 2}, 4), ({"at": 1, "centerX": 0, "centerY": 100}, 85)],
@@ -315,6 +342,12 @@ CASES = {
     "SpeedRamp": [({}, 30), ({"curve": 6, "rampBlur": 1}, 60), ({"curve": 8, "smooth": 0, "reverse": 1}, 40),
                   ({"curve": 0, "strength": 0.5}, 1), ({"curve": 9}, 30)],  # clip ends map to themselves
     "MotionBlur": [({}, 20), ({"mode": 1, "length": 120, "angle": 30}, 0), ({"amount": 3}, 89)],
+    "Captions": [({"file": str(WORDS), "template": 1}, 30), ({"file": str(WORDS), "template": 13}, 45),
+                 ({"file": str(WORDS), "template": 8, "words": 12}, 30), ({"file": str(WORDS), "template": 11, "case": 1}, 50),
+                 ({"file": str(WORDS), "template": 4, "custom": 1, "highlight": (1, 0, 0), "size": 400}, 40),
+                 ({"file": str(SRT), "template": 0, "raise": 70}, 40), ({"file": str(INDIC), "template": 10}, 30),
+                 ({"file": str(WORDS), "template": 6, "offset": -0.5}, 20),  # typewriter, captions moved earlier
+                 ({"media": "Z:/no such clip.mp4"}, 10)],  # no transcript yet: a status line says what to do
 }
 
 
@@ -329,43 +362,77 @@ def grad(frame, dx, dy):
 SIZES = [(320, 180, 1.0), (160, 90, 0.5), (108, 192, 1.0)]  # 16:9, half-res proxy render, 9:16
 
 
+def secret(desc, name):
+    """Whether the plugin hid this param (or group) for the current mode."""
+    h = objects[objects[desc].params][name]
+    return bool(objects[objects[h]["props"]].get("OfxParamPropSecret", [0])[0])
+
+
+def instance(call, desc, ctx, w, h, scale, mode):
+    inst = new(Effect())
+    e = objects[inst]
+    e.params, e.clips = objects[desc].params, objects[desc].clips
+    objects[e.props].update(OfxImageEffectPropProjectExtent=[w / scale, h / scale], OfxImageEffectPropContext=[ctx])
+    overrides.clear()
+    overrides["mode"] = mode
+    assert call(b"OfxActionCreateInstance", inst) == 0, f"{MODES[mode]}: create instance"
+    return inst
+
+
+def render(call, inst, w, h, scale, t):
+    state["size"] = (w, h)
+    state["source"], state["output"] = source_at(t), Frame(w, h, blank=True)
+    return call(b"OfxImageEffectActionRender", inst, props(OfxPropTime=float(t), OfxImageEffectPropRenderWindow=[0, 0, w, h],
+                                                           OfxImageEffectPropRenderScale=[scale, scale]))
+
+
+def changed(call, inst, name):
+    """The host telling the plugin a param changed (the user picked a mode, pressed a button)."""
+    return call(b"OfxActionInstanceChanged", inst, props(OfxPropType="OfxTypeParameter", OfxPropName=name, OfxPropTime=0.0,
+                                                         OfxPropChangeReason="OfxChangeUserEdited",
+                                                         OfxImageEffectPropRenderScale=[1.0, 1.0]))
+
+
 def main():
     bundle = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "build" / "panels" / "KerfFX.ofx.bundle"
+    home = TEST / "home"  # a Kerf home with no engine running (port 1 refuses), before the plugin reads the env
+    (home / "captions").mkdir(parents=True, exist_ok=True)
+    (home / "engine.json").write_text('{"port": 1}')
+    for f in (home / "captions").glob("*"):
+        f.unlink()
+    os.environ["KERF_HOME_DIR"] = str(home)
+    caption_files()
     lib = C.CDLL(str(bundle / "Contents" / ARCH / "KerfFX.ofx"))
     lib.OfxGetPlugin.restype = C.POINTER(OfxPlugin)
-    out_dir = ROOT / "build" / "ofx" / "test"
-    out_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = TEST
     n, fails = lib.OfxGetNumberOfPlugins(), []
-    assert n == len(CASES), f"plugin count {n}"
-    for i in range(n):
-        plug = lib.OfxGetPlugin(i).contents
-        name = plug.pluginIdentifier.decode().rsplit(".", 1)[1]
-        SETHOST(plug.setHost)(C.pointer(HOST))
-        entry = MAIN(plug.mainEntry)
-        call = lambda action, h=None, args=None: entry(action, h, args, None)  # noqa: E731
-        assert call(b"OfxActionLoad") == 0, f"{name}: load"
-        for ctx in ("OfxImageEffectContextFilter", "OfxImageEffectContextGeneral"):  # Edit/Color pages, Fusion page
-            desc = new(Effect())  # a fresh descriptor per context, as hosts do
-            assert call(b"OfxActionDescribe", desc) == 0, f"{name}: describe"
-            assert ctx in objects[objects[desc].props]["OfxImageEffectPropSupportedContexts"], f"{name}: no {ctx}"
-            assert call(b"OfxImageEffectActionDescribeInContext", desc, props(OfxImageEffectPropContext=ctx)) == 0, (
-                f"{name}: describe in {ctx}")
-            short = ctx.rsplit("Context", 1)[1]
+    assert n == 1, f"plugin count {n}: Kerf FX is one effect"
+    plug = lib.OfxGetPlugin(0).contents
+    assert plug.pluginIdentifier == b"com.kerf.fx", plug.pluginIdentifier
+    SETHOST(plug.setHost)(C.pointer(HOST))
+    entry = MAIN(plug.mainEntry)
+    call = lambda action, h=None, args=None: entry(action, h, args, None)  # noqa: E731
+    assert call(b"OfxActionLoad") == 0, "load"
+    for ctx in ("OfxImageEffectContextFilter", "OfxImageEffectContextGeneral"):  # Edit/Color pages, Fusion page
+        desc = new(Effect())  # a fresh descriptor per context, as hosts do
+        assert call(b"OfxActionDescribe", desc) == 0, "describe"
+        assert objects[objects[desc].props]["OfxPropLabel"] == ["Kerf FX"]
+        assert ctx in objects[objects[desc].props]["OfxImageEffectPropSupportedContexts"], f"no {ctx}"
+        assert call(b"OfxImageEffectActionDescribeInContext", desc, props(OfxImageEffectPropContext=ctx)) == 0, (
+            f"describe in {ctx}")
+        short = ctx.rsplit("Context", 1)[1]
+        for mi, name in enumerate(MODES):
             for w, h, scale in SIZES:
-                inst = new(Effect())
-                e = objects[inst]
-                e.params, e.clips = objects[desc].params, objects[desc].clips
-                objects[e.props].update(OfxImageEffectPropProjectExtent=[w / scale, h / scale],
-                                        OfxImageEffectPropContext=[ctx])
-                assert call(b"OfxActionCreateInstance", inst) == 0, f"{name}: create instance"
+                inst = instance(call, desc, ctx, w, h, scale, mi)
+                wrong = [p for p in objects[objects[desc].params] if "_" in p and  # every mode's group and params
+                         secret(desc, p) != (p.split("_", 1)[1 if p.startswith("g_") else 0] != PREFIX[mi])]
+                if wrong:
+                    fails.append(f"{name}: shows or hides the wrong controls: {wrong[:4]}")
                 for k, (settings, t) in enumerate(CASES[name]):
                     overrides.clear()
-                    overrides.update(settings)
-                    state["size"] = (w, h)
-                    state["source"], state["output"] = source_at(t), Frame(w, h, blank=True)
-                    st = call(b"OfxImageEffectActionRender", inst,
-                              props(OfxPropTime=float(t), OfxImageEffectPropRenderWindow=[0, 0, w, h],
-                                    OfxImageEffectPropRenderScale=[scale, scale]))
+                    overrides["mode"] = mi
+                    overrides.update({f"{PREFIX[mi]}_{key}": v for key, v in settings.items()})
+                    st = render(call, inst, w, h, scale, t)
                     out, label = state["output"], f"{name} {short} {w}x{h} case {k}"
                     vals = list(out.buf)
                     if st != 0:
@@ -394,11 +461,49 @@ def main():
                     if st != FAILED:
                         fails.append(f"{name}: render with no Source gave status {st}, expected kOfxStatFailed")
                 assert call(b"OfxActionDestroyInstance", inst) == 0
-        assert call(b"OfxActionUnload") == 0
-        print(f"ok   {name}")
+            if short == "Filter":
+                print(f"ok   {name}")
+
+    # Picking another mode swaps the controls shown.
+    w, h = SIZES[0][:2]
+    inst = instance(call, desc, "OfxImageEffectContextFilter", w, h, 1.0, 7)
+    overrides["mode"] = 2
+    if changed(call, inst, "mode") != 0 or secret(desc, "g_split") or not secret(desc, "g_cap"):
+        fails.append("changing the mode did not swap the controls")
+    # Transcribe with Kerf not running: the frame says so, nothing blocks or crashes.
+    overrides.update(mode=7, cap_media=str(TEST / "clip.mp4"), cap_language=2)
+    assert changed(call, inst, "cap_transcribe") == 0
+    for _ in range(100):
+        errs = list((home / "captions").glob("*.err"))
+        if errs and not list((home / "captions").glob("*.pending")):
+            break
+        time.sleep(0.05)
+    if not errs or "isn't running" not in errs[0].read_text("utf-8"):
+        fails.append(f"Transcribe without Kerf running: {[e.read_text('utf-8') for e in errs] or 'no message'}")
+    elif render(call, inst, w, h, 1.0, 10) != 0 or all(abs(a - b) < 1e-6 for a, b in zip(state["output"].buf, state["source"].buf)):
+        fails.append("Transcribe without Kerf running: the frame shows no message")
+    assert call(b"OfxActionDestroyInstance", inst) == 0
+    print("ok   mode switch, Transcribe button")
+
+    # Every caption template, larger, to look at.
+    w, h = 640, 360
+    for i in range(15):
+        inst = instance(call, desc, "OfxImageEffectContextFilter", w, h, 1.0, 7)
+        overrides.update(cap_file=str(INDIC if i in (1, 10) else WORDS), cap_template=i)
+        if render(call, inst, w, h, 1.0, 45 if i not in (1, 10) else 60) != 0:
+            fails.append(f"caption template {i}: render failed")
+        png(out_dir / f"Captions_template_{i:02}.png", state["output"])
+        assert call(b"OfxActionDestroyInstance", inst) == 0
+    inst = instance(call, desc, "OfxImageEffectContextFilter", w, h, 1.0, 7)  # every script at once, to look at
+    overrides.update(cap_file=str(INDIC), cap_template=8, cap_words=12)
+    render(call, inst, w, h, 1.0, 9)
+    png(out_dir / "Captions_indian_scripts.png", state["output"])
+    assert call(b"OfxActionDestroyInstance", inst) == 0
+    print("ok   15 caption templates")
+    assert call(b"OfxActionUnload") == 0
     state["size"] = SIZES[0][:2]
     png(out_dir / "Source.png", source_at(0))
-    print("\n".join(fails) or f"all {n} effects pass; previews in {out_dir}")
+    print("\n".join(fails) or f"all {len(MODES)} modes pass; previews in {out_dir}")
     sys.exit(1 if fails else 0)
 
 

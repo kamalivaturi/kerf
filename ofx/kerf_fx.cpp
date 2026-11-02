@@ -1,14 +1,16 @@
-// Kerf FX: OpenFX effects for DaVinci Resolve (and any OFX host). Live, keyframeable versions of the Kerf toolkit
-// effects that work on a clip in place: Shake, Zoom (eased), RGB Split, Vignette, Letterbox, Speed Ramp, Motion Blur.
+// Kerf FX: one OpenFX effect for DaVinci Resolve (and any OFX host) with a Mode menu: Shake, Zoom (eased),
+// RGB Split, Vignette, Letterbox, Speed Ramp, Motion Blur and Captions. Only the chosen mode's controls show.
 // Plain OpenFX C API, 32-bit float RGBA (Resolve's processing format), rows split across CPU threads.
 // Speed Ramp and Motion Blur read other frames of the clip (temporal clip access), so they never change its length.
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <deque>
+#include <string>
 #include <thread>
 #include <vector>
 
+#include "captions.h"
 #include "ofxImageEffect.h"
 
 static OfxHost *gHost;
@@ -16,32 +18,39 @@ static const OfxPropertySuiteV1 *P;
 static const OfxImageEffectSuiteV1 *E;
 static const OfxParameterSuiteV1 *Pa;
 
-enum Kind { SHAKE, ZOOM, SPLIT, VIGNETTE, LETTERBOX, SPEEDRAMP, MOTIONBLUR, KINDS };
-static const char *LABELS[KINDS] = {"Kerf Shake",     "Kerf Zoom",       "Kerf RGB Split", "Kerf Vignette",
-                                    "Kerf Letterbox", "Kerf Speed Ramp", "Kerf Motion Blur"};
-static const char *ABOUT[KINDS] = {
-    "Camera shake that moves, rotates and hides its own edges. Keyframe Amplitude for impacts.",
-    "Eased zoom in or out at the start or end of the clip, around any point.",
-    "Pulls red and blue apart for a glitch / impact look.",
-    "Darkens the frame edges.",
-    "Cinema bars for any aspect ratio (2.39, 1.85, 4:3...).",
-    "One-click speed ramps inside the clip (same length): pick a curve, set the strength, blur the fast parts.",
-    "Motion blur from the camera's own movement (automatic), or a directional blur you aim."};
-static bool temporal(int k) { return k == SPEEDRAMP || k == MOTIONBLUR; }
+enum Kind { SHAKE, ZOOM, SPLIT, VIGNETTE, LETTERBOX, SPEEDRAMP, MOTIONBLUR, CAPTIONS, KINDS };
+static const char *MODES[KINDS] = {"Shake",      "Zoom",       "RGB split",   "Vignette",
+                                   "Letterbox",  "Speed ramp", "Motion blur", "Captions"};
+static const char *PREFIX[KINDS] = {"shake", "zoom", "split", "vignette", "letterbox", "ramp", "blur", "cap"};
+static const char *ABOUT =
+    "Kerf's effects in one: pick a Mode. Shake, eased Zoom, RGB split, Vignette, Letterbox, Speed ramp and Motion "
+    "blur work on the clip in place; Captions draws word-timed captions from an SRT or a Kerf transcript.";
 static const double PI = 3.14159265358979;
 
 // ------------------------------------------------------------------------------------------------ params
+// Every mode's params are named "<prefix>_<name>" and sit in the group "g_<prefix>", so modes never share a name
+// (several have an "amount") and a whole mode can be shown or hidden at once.
+static Kind gKind;                              // the mode whose params are being defined
+static std::vector<std::string> gNames[KINDS];  // each mode's params, to show only the chosen mode's
+static std::string key(int k, const char *name) { return std::string(PREFIX[k]) + "_" + name; }
+
 static OfxPropertySetHandle define(OfxParamSetHandle ps, const char *type, const char *name, const char *label,
                                    const char *hint) {
+  std::string full = key(gKind, name);
+  if (std::find(gNames[gKind].begin(), gNames[gKind].end(), full) == gNames[gKind].end())
+    gNames[gKind].push_back(full);
+  if (!ps) return nullptr;  // only collecting names
   OfxPropertySetHandle p;
-  Pa->paramDefine(ps, type, name, &p);
+  Pa->paramDefine(ps, type, full.c_str(), &p);
   P->propSetString(p, kOfxPropLabel, 0, label);
   P->propSetString(p, kOfxParamPropHint, 0, hint);
+  P->propSetString(p, kOfxParamPropParent, 0, (std::string("g_") + PREFIX[gKind]).c_str());
   return p;
 }
 static void number(OfxParamSetHandle ps, const char *name, const char *label, double def, double lo, double hi,
                    const char *hint) {
   OfxPropertySetHandle p = define(ps, kOfxParamTypeDouble, name, label, hint);
+  if (!p) return;
   P->propSetDouble(p, kOfxParamPropDefault, 0, def);
   P->propSetDouble(p, kOfxParamPropMin, 0, lo);
   P->propSetDouble(p, kOfxParamPropMax, 0, hi);
@@ -51,14 +60,41 @@ static void number(OfxParamSetHandle ps, const char *name, const char *label, do
 static void choice(OfxParamSetHandle ps, const char *name, const char *label, std::vector<const char *> options, int def,
                    const char *hint) {
   OfxPropertySetHandle p = define(ps, kOfxParamTypeChoice, name, label, hint);
+  if (!p) return;
   for (int i = 0; i < (int)options.size(); i++) P->propSetString(p, kOfxParamPropChoiceOption, i, options[i]);
   P->propSetInt(p, kOfxParamPropDefault, 0, def);
 }
 static void toggle(OfxParamSetHandle ps, const char *name, const char *label, int def, const char *hint) {
-  P->propSetInt(define(ps, kOfxParamTypeBoolean, name, label, hint), kOfxParamPropDefault, 0, def);
+  OfxPropertySetHandle p = define(ps, kOfxParamTypeBoolean, name, label, hint);
+  if (p) P->propSetInt(p, kOfxParamPropDefault, 0, def);
+}
+static void text(OfxParamSetHandle ps, const char *name, const char *label, bool file, const char *hint) {
+  OfxPropertySetHandle p = define(ps, kOfxParamTypeString, name, label, hint);
+  if (!p) return;
+  P->propSetString(p, kOfxParamPropStringMode, 0, file ? kOfxParamStringIsFilePath : kOfxParamStringIsSingleLine);
+  if (file) P->propSetInt(p, kOfxParamPropStringFilePathExists, 0, 1);
+  P->propSetString(p, kOfxParamPropDefault, 0, "");
+  P->propSetInt(p, kOfxParamPropAnimates, 0, 0);
+}
+static void button(OfxParamSetHandle ps, const char *name, const char *label, const char *hint) {
+  define(ps, kOfxParamTypePushButton, name, label, hint);
+}
+static void rgb(OfxParamSetHandle ps, const char *name, const char *label, double r, double g, double b,
+                const char *hint) {
+  OfxPropertySetHandle p = define(ps, kOfxParamTypeRGB, name, label, hint);
+  if (!p) return;
+  P->propSetDouble(p, kOfxParamPropDefault, 0, r);
+  P->propSetDouble(p, kOfxParamPropDefault, 1, g);
+  P->propSetDouble(p, kOfxParamPropDefault, 2, b);
+}
+static std::vector<const char *> list(const char *const *items) {
+  std::vector<const char *> v;
+  while (*items) v.push_back(*items++);
+  return v;
 }
 
 static void describeParams(Kind k, OfxParamSetHandle ps) {
+  gKind = k;
   switch (k) {
     case SHAKE:
       number(ps, "amplitude", "Amplitude (px)", 28, 0, 400, "How far the frame moves, in pixels at 1080p");
@@ -108,9 +144,33 @@ static void describeParams(Kind k, OfxParamSetHandle ps) {
       number(ps, "length", "Length (px)", 40, 0, 400, "Directional mode: blur length, at 1080p");
       number(ps, "angle", "Angle (deg)", 0, -180, 180, "Directional mode: blur direction");
       break;
+    case CAPTIONS:
+      text(ps, "file", "Captions file", true,
+           "An SRT (Resolve's own subtitles export one) or a Kerf transcript. Leave empty to transcribe below");
+      text(ps, "media", "Media to transcribe", true, "This clip's media file: Kerf listens to it and times every word");
+      choice(ps, "language", "Language", list(captions::LANGUAGES), 0,
+             "The language spoken; Hinglish and Tanglish write Hindi or Tamil words in Latin letters");
+      button(ps, "transcribe", "Transcribe with Kerf", "Needs Kerf running. The captions appear when it finishes");
+      choice(ps, "template", "Template", list(captions::TEMPLATES), 1, "The caption look and how words appear");
+      number(ps, "size", "Size (%)", 100, 20, 400, "Text size, relative to the template");
+      number(ps, "raise", "Raise (%)", 0, -50, 70, "Move the captions up (or down, below 0), as % of the height");
+      number(ps, "words", "Words per caption", 0, 0, 12, "0 uses the template's number");
+      choice(ps, "case", "Letters", {"As the template", "UPPERCASE", "As spoken"}, 0, "Upper case or as transcribed");
+      toggle(ps, "custom", "Custom colours", 0, "Use the two colours below instead of the template's");
+      rgb(ps, "color", "Text colour", 1, 1, 1, "The words' colour, with Custom colours on");
+      rgb(ps, "highlight", "Highlight colour", 1, 0.83, 0, "The spoken word's colour, box or glow");
+      number(ps, "offset", "Sync (s)", 0, -10, 10, "Move the captions later (+) or earlier (-) to match the voice");
+      text(ps, "font", "Font file", true, "Optional: a .ttf or .otf to use instead of the template's font");
+      break;
     default:
       break;
   }
+}
+
+// Each mode's param names, without a host (for showing and hiding them even when the host cached descriptions).
+static void collectNames() {
+  if (!gNames[0].empty()) return;
+  for (int k = 0; k < KINDS; k++) describeParams((Kind)k, nullptr);
 }
 
 static OfxParamHandle param(OfxImageEffectHandle fx, const char *name) {
@@ -129,6 +189,27 @@ static int pick(OfxImageEffectHandle fx, const char *name, double t) {
   int v = 0;
   Pa->paramGetValueAtTime(param(fx, name), t, &v);
   return v;
+}
+static std::string str(OfxImageEffectHandle fx, const char *name) {
+  char *v = nullptr;
+  Pa->paramGetValue(param(fx, name), &v);
+  return v ? v : "";
+}
+
+// Show the chosen mode's group and params, hide the others'.
+static void showMode(OfxImageEffectHandle fx) {
+  collectNames();
+  int mode = 0;
+  Pa->paramGetValue(param(fx, "mode"), &mode);
+  auto secret = [&](const std::string &name, bool hide) {
+    OfxParamHandle h = param(fx, name.c_str());
+    OfxPropertySetHandle ps;
+    if (h && Pa->paramGetPropertySet(h, &ps) == kOfxStatOK) P->propSetInt(ps, kOfxParamPropSecret, 0, hide ? 1 : 0);
+  };
+  for (int k = 0; k < KINDS; k++) {
+    secret(std::string("g_") + PREFIX[k], k != mode);
+    for (auto &n : gNames[k]) secret(n, k != mode);
+  }
 }
 
 // ------------------------------------------------------------------------------------------------ images
@@ -303,12 +384,15 @@ static void shiftBetween(const Img &a, const Img &b, double &dx, double &dy) {
 }
 
 // ------------------------------------------------------------------------------------------------ render
-static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in) {
+static OfxStatus render(OfxImageEffectHandle fx, OfxPropertySetHandle in) {
   double t = 0, rs[2] = {1, 1};
   OfxRectI w;
   P->propGetDouble(in, kOfxPropTime, 0, &t);
   P->propGetIntN(in, kOfxImageEffectPropRenderWindow, 4, &w.x1);
   P->propGetDoubleN(in, kOfxImageEffectPropRenderScale, 2, rs);
+  Kind k = (Kind)std::clamp(pick(fx, "mode", t), 0, KINDS - 1);
+  auto N = [&](const char *name) { return num(fx, key(k, name).c_str(), t); };
+  auto I = [&](const char *name) { return pick(fx, key(k, name).c_str(), t); };
 
   Img src, dst;
   if (!fetch(fx, kOfxImageEffectOutputClipName, t, dst)) return kOfxStatFailed;
@@ -347,22 +431,22 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
   double s = 1, a = 0, dx = 0, dy = 0, zx = cx, zy = cy;
   bool affine = false;
   if (k == SHAKE) {
-    double amp = num(fx, "amplitude", t) * k1080, freq = num(fx, "frequency", t), seed = num(fx, "seed", t);
-    double rot = num(fx, "rotation", t) * PI / 180, sec = t / fps;
-    int axis = pick(fx, "axis", t);
+    double amp = N("amplitude") * k1080, freq = N("frequency"), seed = N("seed");
+    double rot = N("rotation") * PI / 180, sec = t / fps;
+    int axis = I("axis");
     dx = axis == 2 ? 0 : amp * wave(sec * freq, seed);
     dy = axis == 1 ? 0 : amp * wave(sec * freq * 0.93, seed + 11);
     a = rot * wave(sec * freq * 0.71, seed + 23);
-    if (pick(fx, "hideEdges", t))  // enough overscan for the largest move and tilt
+    if (I("hideEdges"))  // enough overscan for the largest move and tilt
       s = 1 + 2 * amp / std::min(W, H) + std::sin(rot) * std::max(W, H) / std::min(W, H);
     affine = true;
   } else if (k == ZOOM) {
-    double amount = num(fx, "amount", t) / 100, frames = std::max(1.0, num(fx, "duration", t) * fps);
-    double start = pick(fx, "at", t) == 0 ? range[0] : range[1] - frames;
-    double e = ease(pick(fx, "ease", t), (t - start) / frames);
-    s = pick(fx, "direction", t) == 0 ? 1 + (amount - 1) * e : amount + (1 - amount) * e;
-    zx = (cx - W / 2) + W * num(fx, "centerX", t) / 100;
-    zy = (cy - H / 2) + H * num(fx, "centerY", t) / 100;
+    double amount = N("amount") / 100, frames = std::max(1.0, N("duration") * fps);
+    double start = I("at") == 0 ? range[0] : range[1] - frames;
+    double e = ease(I("ease"), (t - start) / frames);
+    s = I("direction") == 0 ? 1 + (amount - 1) * e : amount + (1 - amount) * e;
+    zx = (cx - W / 2) + W * N("centerX") / 100;
+    zy = (cy - H / 2) + H * N("centerY") / 100;
     affine = true;
   }
 
@@ -375,7 +459,7 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
       }
     });
   } else if (k == SPLIT) {
-    double amt = num(fx, "amount", t) * k1080, ang = num(fx, "angle", t) * PI / 180;
+    double amt = N("amount") * k1080, ang = N("angle") * PI / 180;
     double ox = amt * std::cos(ang), oy = amt * std::sin(ang);
     rows(w.y1, w.y2, [&](int y) {
       for (int x = w.x1; x < w.x2; x++) {
@@ -390,8 +474,8 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
       }
     });
   } else if (k == VIGNETTE) {
-    double amount = num(fx, "amount", t), size = num(fx, "size", t), soft = num(fx, "softness", t);
-    double round = num(fx, "roundness", t), aspect = W / H;
+    double amount = N("amount"), size = N("size"), soft = N("softness");
+    double round = N("roundness"), aspect = W / H;
     rows(w.y1, w.y2, [&](int y) {
       for (int x = w.x1; x < w.x2; x++) {
         double nx = (x + 0.5 - cx) / (W / 2), ny = (y + 0.5 - cy) / (H / 2);
@@ -405,8 +489,8 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
       }
     });
   } else if (k == LETTERBOX) {
-    double target = num(fx, "aspect", t);
-    float op = (float)num(fx, "opacity", t);
+    double target = N("aspect");
+    float op = (float)N("opacity");
     double vw = std::min(W, H * target), vh = std::min(H, W / target);  // the picture area left between the bars
     rows(w.y1, w.y2, [&](int y) {
       for (int x = w.x1; x < w.x2; x++) {
@@ -430,9 +514,9 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
       });
     };
     if (k == SPEEDRAMP) {
-      double span = last - first, s = num(fx, "strength", t);
-      int curve = pick(fx, "curve", t);
-      bool back = pick(fx, "reverse", t), smooth = pick(fx, "smooth", t);
+      double span = last - first, s = N("strength");
+      int curve = I("curve");
+      bool back = I("reverse"), smooth = I("smooth");
       auto pos = [&](double p) {  // clip position -> source position, both 0..1
         double q = p + s * (rampCurve(curve, p) - p);
         return back ? 1 - q : q;
@@ -442,7 +526,7 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
       } else {
         double p = std::clamp((t - first) / span, 0.0, 1.0), e = 0.5 / span;
         double speed = std::fabs(pos(std::min(1.0, p + e)) - pos(std::max(0.0, p - e))) / (2 * e);
-        double at = first + pos(p) * span, spread = std::min(6.0, num(fx, "rampBlur", t) * std::max(0.0, speed - 1));
+        double at = first + pos(p) * span, spread = std::min(6.0, N("rampBlur") * std::max(0.0, speed - 1));
         int n = spread > 0.25 ? 1 + 2 * (int)std::ceil(spread) : 1;
         std::vector<std::pair<const Img *, float>> taps;  // (frame, weight)
         for (int i = 0; i < n; i++) {
@@ -472,9 +556,9 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
         }
       }
     } else {
-      double amount = num(fx, "amount", t), vx = 0, vy = 0;
-      if (pick(fx, "mode", t) == 1) {
-        double len = num(fx, "length", t) * k1080 * amount, ang = num(fx, "angle", t) * PI / 180;
+      double amount = N("amount"), vx = 0, vy = 0;
+      if (I("mode") == 1) {
+        double len = N("length") * k1080 * amount, ang = N("angle") * PI / 180;
         vx = len * std::cos(ang), vy = len * std::sin(ang);
       } else {
         const Img *prev = frames.at((int)std::floor(t) - 1), *next = frames.at((int)std::floor(t) + 1);
@@ -488,6 +572,28 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
       if (std::hypot(vx, vy) < 0.5) copy(src);
       else directional(src, dst, w, vx, vy);
     }
+  } else if (k == CAPTIONS) {
+    rows(w.y1, w.y2, [&](int y) {  // the picture as it is, then the captions over it
+      for (int x = w.x1; x < w.x2; x++) {
+        const float *i = src.in(x, y) ? src.px(x, y) : nullptr;
+        float *o = dst.px(x, y);
+        for (int c = 0; c < 4; c++) o[c] = i ? i[c] : 0;
+      }
+    });
+    captions::Settings s;
+    s.file = str(fx, key(k, "file").c_str());
+    s.media = str(fx, key(k, "media").c_str());
+    s.language = captions::LANGUAGE_CODES[std::clamp(I("language"), 0, (int)list(captions::LANGUAGES).size() - 1)];
+    s.font = str(fx, key(k, "font").c_str());
+    s.tmpl = I("template"), s.words = (int)std::lround(N("words")), s.letterCase = I("case");
+    s.size = N("size"), s.raise = N("raise"), s.offset = N("offset");
+    s.customColors = I("custom") != 0;
+    Pa->paramGetValueAtTime(param(fx, key(k, "color").c_str()), t, &s.color[0], &s.color[1], &s.color[2]);
+    Pa->paramGetValueAtTime(param(fx, key(k, "highlight").c_str()), t, &s.highlight[0], &s.highlight[1],
+                            &s.highlight[2]);
+    captions::Canvas c{(float *)dst.data, dst.b.x1, dst.b.y1, dst.b.x2, dst.b.y2, dst.row, w.x1, w.y1, w.x2, w.y2,
+                       cx - W / 2, cy - H / 2, W, H};
+    captions::draw(s, t / fps, c);  // OFX time is the clip's frame; its seconds match the media's transcript
   }
   E->clipReleaseImage(src.h);
   E->clipReleaseImage(dst.h);
@@ -495,11 +601,11 @@ static OfxStatus render(Kind k, OfxImageEffectHandle fx, OfxPropertySetHandle in
 }
 
 // ------------------------------------------------------------------------------------------------ actions
-static OfxStatus describe(Kind k, OfxImageEffectHandle fx) {
+static OfxStatus describe(OfxImageEffectHandle fx) {
   OfxPropertySetHandle p;
   E->getPropertySet(fx, &p);
-  P->propSetString(p, kOfxPropLabel, 0, LABELS[k]);
-  P->propSetString(p, kOfxPropPluginDescription, 0, ABOUT[k]);
+  P->propSetString(p, kOfxPropLabel, 0, "Kerf FX");
+  P->propSetString(p, kOfxPropPluginDescription, 0, ABOUT);
   P->propSetString(p, kOfxImageEffectPluginPropGrouping, 0, "Kerf");
   P->propSetString(p, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);  // Edit/Color pages
   P->propSetString(p, kOfxImageEffectPropSupportedContexts, 1, kOfxImageEffectContextGeneral);  // Fusion page
@@ -509,25 +615,52 @@ static OfxStatus describe(Kind k, OfxImageEffectHandle fx) {
   P->propSetString(p, kOfxImageEffectPluginRenderThreadSafety, 0, kOfxImageEffectRenderFullySafe);
   P->propSetInt(p, kOfxImageEffectPropSupportsMultiResolution, 0, 1);
   P->propSetInt(p, kOfxImageEffectPropSupportsTiles, 0, 0);
-  P->propSetInt(p, kOfxImageEffectPropTemporalClipAccess, 0, temporal(k) ? 1 : 0);
+  P->propSetInt(p, kOfxImageEffectPropTemporalClipAccess, 0, 1);  // Speed ramp and Motion blur read other frames
   P->propSetInt(p, kOfxImageEffectPropSupportsMultipleClipDepths, 0, 0);
   return kOfxStatOK;
 }
 
-static OfxStatus describeInContext(Kind k, OfxImageEffectHandle fx) {
+static OfxStatus describeInContext(OfxImageEffectHandle fx) {
   OfxPropertySetHandle c;
   E->clipDefine(fx, kOfxImageEffectSimpleSourceClipName, &c);
   P->propSetString(c, kOfxImageEffectPropSupportedComponents, 0, kOfxImageComponentRGBA);
-  P->propSetInt(c, kOfxImageEffectPropTemporalClipAccess, 0, temporal(k) ? 1 : 0);  // reads other frames
+  P->propSetInt(c, kOfxImageEffectPropTemporalClipAccess, 0, 1);
   E->clipDefine(fx, kOfxImageEffectOutputClipName, &c);
   P->propSetString(c, kOfxImageEffectPropSupportedComponents, 0, kOfxImageComponentRGBA);
   OfxParamSetHandle ps;
   E->getParamSet(fx, &ps);
-  describeParams(k, ps);
+  OfxPropertySetHandle p;
+  Pa->paramDefine(ps, kOfxParamTypeChoice, "mode", &p);
+  P->propSetString(p, kOfxPropLabel, 0, "Mode");
+  P->propSetString(p, kOfxParamPropHint, 0, "What Kerf FX does to this clip; only this mode's controls show");
+  for (int k = 0; k < KINDS; k++) P->propSetString(p, kOfxParamPropChoiceOption, k, MODES[k]);
+  P->propSetInt(p, kOfxParamPropDefault, 0, 0);
+  P->propSetInt(p, kOfxParamPropAnimates, 0, 0);
+  for (int k = 0; k < KINDS; k++) {
+    Pa->paramDefine(ps, kOfxParamTypeGroup, (std::string("g_") + PREFIX[k]).c_str(), &p);
+    P->propSetString(p, kOfxPropLabel, 0, MODES[k]);
+    P->propSetInt(p, kOfxParamPropGroupOpen, 0, 1);
+    describeParams((Kind)k, ps);
+  }
   return kOfxStatOK;
 }
 
-static OfxStatus mainEntry(Kind k, const char *action, const void *handle, OfxPropertySetHandle in) {
+static OfxStatus instanceChanged(OfxImageEffectHandle fx, OfxPropertySetHandle in) {
+  char *name = nullptr;
+  P->propGetString(in, kOfxPropName, 0, &name);
+  if (!name) return kOfxStatReplyDefault;
+  if (!std::strcmp(name, "mode")) {
+    showMode(fx);
+  } else if (key(CAPTIONS, "transcribe") == name) {
+    int lang = 0;
+    Pa->paramGetValue(param(fx, key(CAPTIONS, "language").c_str()), &lang);
+    lang = std::clamp(lang, 0, (int)list(captions::LANGUAGES).size() - 1);
+    captions::transcribe(str(fx, key(CAPTIONS, "media").c_str()), captions::LANGUAGE_CODES[lang]);
+  }
+  return kOfxStatOK;
+}
+
+static OfxStatus mainEntry(const char *action, const void *handle, OfxPropertySetHandle in) {
   auto fx = (OfxImageEffectHandle)handle;
   if (!std::strcmp(action, kOfxActionLoad)) {
     if (!gHost) return kOfxStatErrMissingHostFeature;
@@ -536,36 +669,30 @@ static OfxStatus mainEntry(Kind k, const char *action, const void *handle, OfxPr
     Pa = (const OfxParameterSuiteV1 *)gHost->fetchSuite(gHost->host, kOfxParameterSuite, 1);
     return P && E && Pa ? kOfxStatOK : kOfxStatErrMissingHostFeature;
   }
-  if (!std::strcmp(action, kOfxActionDescribe)) return describe(k, fx);
-  if (!std::strcmp(action, kOfxImageEffectActionDescribeInContext)) return describeInContext(k, fx);
-  if (!std::strcmp(action, kOfxImageEffectActionRender)) return render(k, fx, in);
-  if (!std::strcmp(action, kOfxActionCreateInstance) || !std::strcmp(action, kOfxActionDestroyInstance) ||
-      !std::strcmp(action, kOfxActionUnload))
+  if (!std::strcmp(action, kOfxActionDescribe)) return describe(fx);
+  if (!std::strcmp(action, kOfxImageEffectActionDescribeInContext)) return describeInContext(fx);
+  if (!std::strcmp(action, kOfxImageEffectActionRender)) return render(fx, in);
+  if (!std::strcmp(action, kOfxActionInstanceChanged)) return instanceChanged(fx, in);
+  if (!std::strcmp(action, kOfxActionCreateInstance)) {
+    showMode(fx);
     return kOfxStatOK;
+  }
+  if (!std::strcmp(action, kOfxActionDestroyInstance) || !std::strcmp(action, kOfxActionUnload)) return kOfxStatOK;
   return kOfxStatReplyDefault;
 }
 
-template <int K>
 static OfxStatus entry(const char *action, const void *handle, OfxPropertySetHandle in, OfxPropertySetHandle) {
   try {
-    return mainEntry((Kind)K, action, handle, in);
+    return mainEntry(action, handle, in);
   } catch (...) {  // never let an exception cross into the host
     return kOfxStatFailed;
   }
 }
 static void setHost(OfxHost *h) { gHost = h; }
 
-static OfxPlugin PLUGINS[KINDS] = {
-    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.Shake", 1, 0, setHost, entry<SHAKE>},
-    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.Zoom", 1, 0, setHost, entry<ZOOM>},
-    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.RGBSplit", 1, 0, setHost, entry<SPLIT>},
-    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.Vignette", 1, 0, setHost, entry<VIGNETTE>},
-    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.Letterbox", 1, 0, setHost, entry<LETTERBOX>},
-    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.SpeedRamp", 1, 0, setHost, entry<SPEEDRAMP>},
-    {kOfxImageEffectPluginApi, 1, "com.kerf.fx.MotionBlur", 1, 0, setHost, entry<MOTIONBLUR>},
-};
+static OfxPlugin PLUGIN = {kOfxImageEffectPluginApi, 1, "com.kerf.fx", 1, 0, setHost, entry};
 
 extern "C" {
-OfxExport int OfxGetNumberOfPlugins(void) { return KINDS; }
-OfxExport OfxPlugin *OfxGetPlugin(int nth) { return nth >= 0 && nth < KINDS ? &PLUGINS[nth] : nullptr; }
+OfxExport int OfxGetNumberOfPlugins(void) { return 1; }
+OfxExport OfxPlugin *OfxGetPlugin(int nth) { return nth == 0 ? &PLUGIN : nullptr; }
 }

@@ -60,4 +60,7 @@ server you configure, GitHub (updates, the MOGRT pack). Their own terms apply to
 ## The Kerf helper and panels
 
 The installer and helper are built with Tauri (MIT or Apache-2.0) and Rust crates under permissive licences; the
-panels with React (MIT) and Vite (MIT). Kerf FX is built against the OpenFX headers (BSD-3-Clause).
+panels with React (MIT) and Vite (MIT). Kerf FX is built against the OpenFX headers (BSD-3-Clause) and includes
+HarfBuzz (the "Old MIT" licence, Copyright © the HarfBuzz authors) for text shaping and stb_truetype (MIT or public
+domain, Sean Barrett) for drawing glyphs. Captions use the fonts already on your computer (on Windows, Segoe UI and
+Nirmala UI); Kerf FX does not include or redistribute any font.

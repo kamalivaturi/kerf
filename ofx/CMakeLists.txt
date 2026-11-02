@@ -7,8 +7,13 @@ project(KerfFX CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")  # static CRT: no Visual C++ redistributable needed
 
-add_library(KerfFX MODULE kerf_fx.cpp)
-target_include_directories(KerfFX PRIVATE ${OFX_INCLUDE})
+# HarfBuzz's single-file build (text shaping, needed for Indian scripts); stb_truetype is header-only
+add_library(KerfFX MODULE kerf_fx.cpp captions.cpp ${HB_DIR}/src/harfbuzz.cc)
+target_include_directories(KerfFX PRIVATE ${OFX_INCLUDE} ${HB_DIR}/src ${STB_DIR})
+if(MSVC)
+  target_compile_options(KerfFX PRIVATE /utf-8 /bigobj)
+  target_link_libraries(KerfFX PRIVATE ws2_32)  # the Transcribe button talks to the local engine
+endif()
 set_target_properties(KerfFX PROPERTIES PREFIX "" SUFFIX ".ofx" CXX_VISIBILITY_PRESET hidden)
 find_package(Threads REQUIRED)
 target_link_libraries(KerfFX PRIVATE Threads::Threads)
