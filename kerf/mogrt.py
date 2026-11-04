@@ -183,6 +183,38 @@ def _index(stamp):  # the parsed index, re-read only when the file changes
     return json.loads(INDEX.read_text("utf-8"))
 
 
+TILE = (312, 176)  # the Graphics grid's 156 x 88 card, at twice the size for sharp screens
+
+
+def tile(e, animated=False):
+    """The Graphics grid's card picture, made once next to the preview: 16:9 at the card's size, cropped to the
+    caption line for 9:16 templates (Premiere's panel can't crop a tall image with CSS), and for hover a 30 fps GIF
+    from the MP4 (the 15 fps, 360 px preview GIF stutters when the panel scales it down live)."""
+    src = Path(e.get("mp4" if animated else "png") or "")
+    if not src.is_file():
+        return None
+    out = src.with_name(src.stem + (".tile.gif" if animated else ".tile.png"))
+    if out.is_file() and out.stat().st_mtime >= src.stat().st_mtime:
+        return out
+    info = media.probe(str(src))
+    w, h = info["width"], info["height"]
+    ch = min(h, round(w * TILE[1] / TILE[0]))  # a 16:9 band of the full width
+    y = min(max(0, round(h * 0.72 - ch / 2)), h - ch) if h > w else (h - ch) // 2  # tall: the caption sits ~72% down
+    tmp = out.with_name(out.stem + ".part" + out.suffix)
+    if animated:
+        media.ffmpeg("-i", src, "-filter_complex", f"crop={w}:{ch}:0:{y},scale={TILE[0]}:{TILE[1]}:flags=lanczos,fps=30,"
+                     "split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3",
+                     "-loop", "0", tmp)
+    else:
+        import cv2
+        import numpy as np
+        img = cv2.imdecode(np.fromfile(str(src), np.uint8), cv2.IMREAD_COLOR)
+        img = cv2.resize(img[y:y + ch, :w], TILE, interpolation=cv2.INTER_AREA)
+        cv2.imencode(".png", img)[1].tofile(str(tmp))
+    tmp.replace(out)  # two requests for the same card never see half a file
+    return out
+
+
 def entry(eid):
     """One library entry by id, for the panel's preview images: the Graphics grid asks for ~200 of them at once, and
     library() re-parses the index and checks every .mogrt on disk (~40 ms each time)."""

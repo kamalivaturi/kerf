@@ -578,6 +578,26 @@ def test_kerf_fx_words_file(monkeypatch):
         captions.words_file(str(VIDEO), "", str(out))
 
 
+def test_mogrt_grid_tiles_show_the_caption():
+    """9:16 cards were black in Premiere (its panel can't crop a tall image with CSS): the engine makes a card-sized
+    tile cropped to the caption line, and a 30 fps hover GIF from the MP4."""
+    import numpy as np
+    from kerf import mogrt
+    d = TMP / "tiles"
+    d.mkdir(exist_ok=True)
+    png, mp4 = d / "tall.png", d / "tall.mp4"  # 9:16, white caption band 70-74% down, like the pack's posters
+    media.ffmpeg("-f", "lavfi", "-i", "color=black:s=360x640,drawbox=y=450:w=360:h=24:color=white:t=fill", "-frames:v", "1", png)
+    media.ffmpeg("-f", "lavfi", "-i", "color=black:s=540x960:r=30:d=1,drawbox=y=675:w=540:h=36:color=white:t=fill",
+                 "-pix_fmt", "yuv420p", mp4)
+    still = mogrt.tile(dict(png=str(png)))
+    import cv2
+    img = cv2.imdecode(np.fromfile(str(still), np.uint8), cv2.IMREAD_GRAYSCALE)
+    rows = np.where(img.max(axis=1) > 128)[0]
+    assert img.shape == (176, 312) and len(rows) and 40 < rows.mean() < 136  # the caption band is in the card
+    gif = mogrt.tile(dict(mp4=str(mp4)), animated=True)
+    assert gif.suffix == ".gif" and media.probe(str(gif))["width"] == 312 and mogrt.tile(dict(png=str(png))) == still
+
+
 def test_mogrt_preview_lookup_follows_the_index():
     """The Graphics grid's ~200 preview requests look entries up by id without rescanning the library, yet a newly
     built template is found as soon as the index changes."""

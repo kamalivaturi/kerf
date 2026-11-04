@@ -145,8 +145,11 @@ class Handler(BaseHTTPRequestHandler):
             "/host": hosts.status,
         }
         if u.path == "/mogrt/media":  # previews of library entries only (never arbitrary paths)
-            e = mogrt.entry(q.get("id"))
-            f = Path(e.get(q.get("kind", "gif")) or "") if e else None
+            e, kind = mogrt.entry(q.get("id")), q.get("kind", "gif")
+            try:  # the grid's card pictures are made on first use; a failure is just no picture
+                f = (mogrt.tile(e, kind == "tilegif") if kind in ("tile", "tilegif") else Path(e.get(kind) or "")) if e else None
+            except Exception:
+                f = None
             if not f or not f.is_file():
                 return self._send(404, dict(error="no preview"))
             return self._bytes(f.read_bytes(), mimetypes.guess_type(f.name)[0] or "application/octet-stream")

@@ -151,8 +151,10 @@ export default function Graphics({ onCaptions, onClose, vertical }: { onCaptions
   // All the URLs land in one update, so the grid renders once, not once per template.
   useEffect(() => {
     const lib = info?.library || [];
-    Promise.all(lib.map(async (e) => [e.id, { png: e.png ? await api.mediaUrl(e.id, "png") : undefined,
-      gif: e.gif ? await api.mediaUrl(e.id, "gif") : undefined }] as const)).then((all) => setUrls(Object.fromEntries(all)));
+    // card-sized pictures the engine crops (9:16 to its caption line) and a 30 fps hover GIF made from the MP4
+    Promise.all(lib.map(async (e) => [e.id, { png: e.png ? await api.mediaUrl(e.id, "tile") : undefined,
+      gif: e.mp4 ? await api.mediaUrl(e.id, "tilegif") : e.gif ? await api.mediaUrl(e.id, "gif") : undefined }] as const))
+      .then((all) => setUrls(Object.fromEntries(all)));
   }, [info]);
   const list = useMemo(() => {
     const needle = q.trim().toLowerCase();

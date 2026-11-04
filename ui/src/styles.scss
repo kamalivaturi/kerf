@@ -251,7 +251,6 @@ pre.news { max-height: 420px; overflow-y: auto; white-space: pre-wrap; }
 // a 16:9 frame for every card: a 9:16 caption shows the band where its words sit, not a tall black slab
 .mg-thumb { display: block; width: 156px; height: 88px; overflow: hidden; border-radius: var(--radius-inner); background: var(--color-paper);
   img { display: block; width: 156px; height: 88px; object-fit: contain; } }
-.mg-card.tall .mg-thumb img { height: auto; margin-top: -152px; } // 156 x 277 scaled: the caption line sits about 71% down
 .mg-name { font-size: var(--text-xs); margin-top: var(--space-2xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-muted); }
 .mg-stage { position: relative; overflow: hidden; border-radius: var(--radius-inner); background: var(--color-paper-3); flex: 0 0 auto;
   &.imported { height: 84px; width: 150px; display: flex; align-items: center; justify-content: center; color: var(--color-muted); } }

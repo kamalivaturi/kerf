@@ -35,7 +35,7 @@ export const api = {
   async post(path: string, body: unknown) {
     return parse(await fetch((await BASE()) + path, { method: "POST", headers: await headers(), body: JSON.stringify(body) }));
   },
-  async mediaUrl(id: string, kind: "gif" | "mp4" | "png") {
+  async mediaUrl(id: string, kind: "gif" | "mp4" | "png" | "tile" | "tilegif") {
     await headers();
     return `${await BASE()}/mogrt/media?id=${encodeURIComponent(id)}&kind=${kind}&token=${encodeURIComponent(token)}`;
   },
