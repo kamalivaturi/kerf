@@ -6,6 +6,7 @@ Library layout (~/.kerf/mogrt/):  pack/ (Kerf-built)  custom/ (Studio)  user/ (i
 from __future__ import annotations
 
 import copy
+import functools
 import json
 import os
 import re
@@ -175,6 +176,19 @@ def _safe(s):
 def library():
     entries = json.loads(INDEX.read_text("utf-8")) if INDEX.exists() else []
     return [e for e in entries if Path(e["file"]).exists()]
+
+
+@functools.lru_cache(maxsize=1)
+def _index(stamp):  # the parsed index, re-read only when the file changes
+    return json.loads(INDEX.read_text("utf-8"))
+
+
+def entry(eid):
+    """One library entry by id, for the panel's preview images: the Graphics grid asks for ~200 of them at once, and
+    library() re-parses the index and checks every .mogrt on disk (~40 ms each time)."""
+    if not INDEX.exists():
+        return None
+    return next((e for e in _index(INDEX.stat().st_mtime_ns) if e["id"] == eid), None)
 
 
 def _merge_index(new):

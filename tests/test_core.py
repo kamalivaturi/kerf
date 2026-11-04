@@ -576,3 +576,23 @@ def test_kerf_fx_words_file(monkeypatch):
     monkeypatch.setattr(speech, "transcribe", lambda path, language="", model=None: dict(language="en", words=[]))
     with pytest.raises(ValueError, match="no speech"):
         captions.words_file(str(VIDEO), "", str(out))
+
+
+def test_mogrt_preview_lookup_follows_the_index():
+    """The Graphics grid's ~200 preview requests look entries up by id without rescanning the library, yet a newly
+    built template is found as soon as the index changes."""
+    import time
+    from kerf import mogrt
+    old = mogrt.INDEX.read_text("utf-8") if mogrt.INDEX.exists() else None
+    try:
+        mogrt.INDEX.parent.mkdir(parents=True, exist_ok=True)
+        mogrt.INDEX.write_text(json.dumps([dict(id="a", file="a.mogrt", png="a.png")]), "utf-8")
+        assert mogrt.entry("a")["png"] == "a.png" and mogrt.entry("b") is None
+        time.sleep(0.05)  # a later modification time
+        mogrt.INDEX.write_text(json.dumps([dict(id="a", file="a.mogrt"), dict(id="b", file="b.mogrt", png="b.png")]), "utf-8")
+        assert mogrt.entry("b")["png"] == "b.png"
+    finally:
+        if old is None:
+            mogrt.INDEX.unlink(missing_ok=True)
+        else:
+            mogrt.INDEX.write_text(old, "utf-8")

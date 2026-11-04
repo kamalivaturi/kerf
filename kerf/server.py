@@ -145,7 +145,7 @@ class Handler(BaseHTTPRequestHandler):
             "/host": hosts.status,
         }
         if u.path == "/mogrt/media":  # previews of library entries only (never arbitrary paths)
-            e = next((x for x in mogrt.library() if x["id"] == q.get("id")), None)
+            e = mogrt.entry(q.get("id"))
             f = Path(e.get(q.get("kind", "gif")) or "") if e else None
             if not f or not f.is_file():
                 return self._send(404, dict(error="no preview"))
