@@ -17,6 +17,7 @@
   --color-paper-3: #23201d;
   --color-rule: #34302c;
   --color-rule-strong: #4a443f;
+  --color-border-input: #746c64; // a field's edge must show at 3:1 on the paper (WCAG 1.4.11); dividers stay quiet
   --color-ink: #ece6e0;
   --color-ink-2: #c9c1b9;
   --color-muted: #a1978e;
@@ -36,6 +37,7 @@
   --color-paper-3: #eee9e4;
   --color-rule: #ddd5ce;
   --color-rule-strong: #c4bab1;
+  --color-border-input: #877e75;
   --color-ink: #1d1814;
   --color-ink-2: #3d352e;
   --color-muted: #6a5f56;
@@ -106,10 +108,10 @@ button, .kbtn {
 .kbtn:focus { outline: none; border-color: var(--color-focus); }
 
 input, select, textarea {
-  font: inherit; color: var(--color-ink); background: var(--color-paper); border: 1px solid var(--color-rule);
+  font: inherit; color: var(--color-ink); background: var(--color-paper); border: 1px solid var(--color-border-input);
   border-radius: var(--radius-control); min-height: var(--control); padding: 0 var(--space-xs); width: 100%;
   transition: border-color var(--dur-micro) var(--ease-out);
-  &:hover { border-color: var(--color-rule-strong); }
+  &:hover { border-color: var(--color-muted); }
   &:focus-visible { outline: 2px solid var(--color-focus); outline-offset: -2px; }
   &:disabled { opacity: 0.55; cursor: not-allowed; }
 }
@@ -300,7 +302,8 @@ pre.news { max-height: 420px; overflow-y: auto; white-space: pre-wrap; }
   &.split { display: flex; align-items: stretch; gap: 0; padding: 0; overflow: hidden; height: var(--control);
     background: var(--color-paper-3); border: 1px solid var(--color-rule); border-radius: var(--radius-control);
     button { flex: 1; min-height: 0; height: 100%; border: 0; border-radius: 0; background: none; &:hover { background: var(--color-hover); } }
-    input[type="color"] { width: 76px; flex: 0 0 76px; // Premiere shows a colour input as its hex text: room for #RRGGBB height: 100%; min-height: 0; padding: var(--space-2xs); border: 0; border-left: 1px solid var(--color-rule);
+    // Premiere shows a colour input as its hex text: 76 px leaves room for #RRGGBB
+    input[type="color"] { width: 76px; flex: 0 0 76px; height: 100%; min-height: 0; padding: var(--space-2xs); border: 0; border-left: 1px solid var(--color-rule);
       border-radius: 0; background: none; cursor: pointer; } } }
 .tk-mini { min-height: 28px; padding: 0 var(--space-xs); font-size: var(--text-sm); font-weight: 500; &.on { color: var(--color-accent); } }
 .tk-field { display: flex; flex-direction: column; gap: var(--space-2xs); margin-top: var(--space-xs); font-size: var(--text-sm); color: var(--color-muted);
