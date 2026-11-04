@@ -274,8 +274,30 @@ EDITORS = {
 }
 
 
+# One plain line per tool for the panels' tool cards: what it does for the edit, not how to set it up (that is `help`).
+SUMMARY = {
+    "silences": "Cut the pauses and dead air out of a talk.", "transcript": "Read and fix the transcript, sentence by sentence.",
+    "repeat": "Find repeated takes and keep the last one.", "profanity": "Beep, mute or cut the swear words.",
+    "captions": "Word-by-word animated captions from the voice.", "zoom": "Punch-in zooms on cuts, speech and emphasis.",
+    "broll": "B-roll over the talk, matched to what is said.", "podcast": "Switch cameras to whoever is talking.",
+    "angles": "Cut between camera angles at the right moments.", "viral": "Find the strongest short clips in a long video.",
+    "resize": "Reframe to 9:16, 4:5 or 1:1, face kept centred.", "chapters": "YouTube chapters from what is said.",
+    "enhance": "Clean up dialogue and level the loudness.", "music": "Music under the edit, ducked while people talk.",
+    "sfx": "A sound effect on every cut.", "dub": "Translate and dub the voice with ElevenLabs.",
+    "voiceover": "Read your script aloud with an offline voice.", "beat_sync": "Cut your clips on the beat of a song.",
+    "render": "Export the timeline to MP4, or ProRes 4444 with transparency.",
+    "prompt_edit": "Describe the edit in words and Kerf plans it.", "pipeline": "Run several tools in a row as one recipe.",
+    "speed_ramp": "Speed ramps from a curve: ease in, out or both.", "zoom_move": "A smooth zoom in or out on one clip.",
+    "layout": "Picture-in-picture, side by side or a grid.", "camera_shake": "Camera shake on cuts, beats or a whole clip.",
+    "stabilize": "Steady shaky footage in one click.", "add_layer": "Solids, gradients, vignettes, bars and grid guides.",
+    "frame_export": "Save the frame at the playhead as an image.", "beat_markers": "Markers on every beat of a song.",
+    "quick_mask": "Cut the subject out of the background, offline.", "project_sort": "Sort the project into tidy bins.",
+    "download": "Download video or audio from a link."}
+
+
 def describe():
     return {n: dict(title=f.title, group=f.group, defaults=f.defaults, choices=f.choices, help=f.help, tier=f.tier,
+                    summary=SUMMARY.get(n, ""),
                     review=f.review, entitled=license.entitled(f), presets=list_presets(n),
                     needs_timeline=f.needs_timeline, toolkit=f.toolkit)
             for n, f in REGISTRY.items()}

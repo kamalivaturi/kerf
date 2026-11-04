@@ -11,7 +11,7 @@ const PRIVACY_URL = "https://kamalivaturi.github.io/kerf/privacy.html";
 
 type Params = Record<string, string | number | boolean>;
 type Feature = {
-  title: string; group: string; defaults: Params; choices: Record<string, string[]>; help: string; tier: string;
+  title: string; group: string; defaults: Params; choices: Record<string, string[]>; help: string; tier: string; summary?: string;
   review: boolean; entitled: boolean; needs_timeline: boolean; presets: { builtin: string[]; user: string[] };
 };
 type Theme = "auto" | "light" | "dark";
@@ -267,10 +267,11 @@ export default function App() {
             {groups.map((g) => <button key={g} className={g === group ? "on" : ""} onClick={() => pickGroup(g)}>{g}</button>)}
           </nav>
         )}
-        <div className="chips">
+        <div className="tools-grid">
           {visible.map(([k, x]) => (
-            <button key={k} className={k === name ? "chip on" : "chip"} onClick={() => setName(k)}>
-              {fav(k) && <span className="star">★</span>}{x.title}{x.tier !== "free" && <em className="tier">{x.tier}</em>}
+            <button key={k} className={k === name ? "tool on" : "tool"} onClick={() => setName(k)} aria-pressed={k === name}>
+              <b>{fav(k) && <span className="star">★</span>}{x.title}{x.tier !== "free" && <em className="tier">{x.tier}</em>}</b>
+              {x.summary && <span>{x.summary}</span>}
             </button>
           ))}
           {!visible.length && <span className="help">{t("noMatch")}</span>}

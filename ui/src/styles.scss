@@ -197,6 +197,16 @@ input[type="range"] { padding: 0; border: 0; background: none; accent-color: var
 .chip { min-height: 32px; padding: 0 var(--space-sm); font-weight: 500;
   &.on { background: var(--color-accent-soft); border-color: var(--color-accent); color: var(--color-ink); }
   .tier { font-style: normal; font-size: var(--text-xs); margin-left: var(--space-2xs); color: var(--color-muted); } }
+// Edit tab tool cards: the name and one plain line of what the tool does (features.py SUMMARY); flex, as UXP has no grid
+.tools-grid { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-sm); }
+.tool { flex: 1 1 180px; display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-3xs);
+  min-height: 64px; padding: var(--space-xs) var(--space-sm); text-align: left; white-space: normal;
+  background: var(--color-paper-2); border: 1px solid var(--color-rule); border-radius: var(--radius-card);
+  b { font-weight: 600; color: var(--color-ink); }
+  span { font-size: var(--text-sm); line-height: 1.35; color: var(--color-muted); }
+  .tier { font-style: normal; font-size: var(--text-xs); margin-left: var(--space-2xs); color: var(--color-muted); }
+  &:hover { background: var(--color-hover); }
+  &.on { background: var(--color-accent-soft); border-color: var(--color-accent); span { color: var(--color-ink-2); } } }
 .star { color: var(--color-accent); margin-right: var(--space-2xs); }
 .chip.on .star { color: inherit; }
 .fav { flex: none; min-width: 32px; margin-left: auto; color: var(--color-muted); &.on { color: var(--color-accent); } }

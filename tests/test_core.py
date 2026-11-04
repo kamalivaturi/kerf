@@ -400,6 +400,12 @@ def test_units_round_trip_per_editor():
     assert tl.editor == "resolve" and tl.video[0][0].base_scale == pytest.approx(60.0)
 
 
+def test_every_tool_has_a_card_line():
+    """The Edit tab's tool cards show features.SUMMARY: a new tool without one would be a bare title."""
+    d = features.describe()
+    assert all(0 < len(v["summary"]) <= 70 for v in d.values()), [n for n, v in d.items() if not v["summary"]]
+
+
 def test_editor_actions_are_one_list():
     """Every action a panel asks about (host.has) is declared for some editor, and every toolkit feature exists."""
     import re
