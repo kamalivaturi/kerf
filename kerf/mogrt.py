@@ -12,6 +12,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 import zipfile
 from pathlib import Path
@@ -200,7 +201,7 @@ def tile(e, animated=False):
     w, h = info["width"], info["height"]
     ch = min(h, round(w * TILE[1] / TILE[0]))  # a 16:9 band of the full width
     y = min(max(0, round(h * 0.72 - ch / 2)), h - ch) if h > w else (h - ch) // 2  # tall: the caption sits ~72% down
-    tmp = out.with_name(out.stem + ".part" + out.suffix)
+    tmp = out.with_name(f"{out.stem}.{threading.get_ident()}.part{out.suffix}")  # the warm-up and a request may race
     if animated:
         media.ffmpeg("-i", src, "-filter_complex", f"crop={w}:{ch}:0:{y},scale={TILE[0]}:{TILE[1]}:flags=lanczos,fps=30,"
                      "split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=3",
@@ -213,6 +214,17 @@ def tile(e, animated=False):
         cv2.imencode(".png", img)[1].tofile(str(tmp))
     tmp.replace(out)  # two requests for the same card never see half a file
     return out
+
+
+def warm_tiles():
+    """Make every card picture and hover GIF ahead of time (the engine runs this in the background at start), so
+    the Graphics grid never waits for them. Cached files are skipped; a template that fails is left for later."""
+    for e in library():
+        for animated in (False, True):
+            try:
+                tile(e, animated)
+            except Exception:
+                pass
 
 
 def entry(eid):

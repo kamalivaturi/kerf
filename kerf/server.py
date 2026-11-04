@@ -11,6 +11,7 @@ import os
 import secrets
 import subprocess
 import sys
+import threading
 import time
 import traceback
 import urllib.request
@@ -213,6 +214,7 @@ def serve(port=PORT, follow=False):
     if follow:
         hosts.follow()  # Kerf only runs alongside Premiere Pro, After Effects or Resolve
     srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)  # bound first: a second engine never rewrites the locator
+    threading.Thread(target=mogrt.warm_tiles, daemon=True).start()  # Graphics cards ready before the tab opens
     print(f"Kerf {__version__} listening on http://127.0.0.1:{srv.server_port}  (token in {TOKEN_FILE})", flush=True)
     LOCATOR.write_text(json.dumps(dict(port=srv.server_port, token_file=str(TOKEN_FILE),
                                        helper=os.environ.get("KERF_HELPER", ""), version=__version__)))
