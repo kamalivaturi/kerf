@@ -174,6 +174,20 @@ input[type="range"] { padding: 0; border: 0; background: none; accent-color: var
   h2 { display: flex; align-items: center; margin: 0 0 var(--space-2xs); font-size: var(--text-lg); font-weight: 700; .close { margin-left: auto; } }
 }
 .help { color: var(--color-muted); margin: 0 0 var(--space-xs); max-width: 65ch; }
+// First-open tour (Welcome.tsx): a calm full-panel sheet, one idea per screen
+.welcome { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; display: flex; flex-direction: column;
+  background: var(--color-paper); padding: var(--space-md); }
+.wl-steps { display: flex; gap: var(--space-2xs); i { flex: 1; height: 3px; border-radius: 2px; background: var(--color-rule); &.on { background: var(--color-accent); } } }
+.wl-body { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: var(--space-xs); max-width: 420px;
+  margin: 0 auto; width: 100%;
+  h2 { margin: 0; font-size: var(--text-xl); line-height: 1.2; color: var(--color-ink); overflow-wrap: break-word; min-width: 0; }
+  .wl-count { margin: 0; font-size: var(--text-sm); color: var(--color-muted); }
+  .wl-text { margin: 0 0 var(--space-xs); color: var(--color-ink-2); } }
+.wl-checks { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: var(--space-2xs);
+  li { display: flex; justify-content: space-between; gap: var(--space-sm); padding: var(--space-xs) 0; border-bottom: 1px solid var(--color-rule);
+    span { color: var(--color-muted); } b { font-weight: 500; color: var(--color-ink); &.ok { color: var(--color-ok); } } } }
+.wl-pic { display: block; width: 312px; max-width: 100%; height: auto; border-radius: var(--radius-inner); border: 1px solid var(--color-rule); }
+.wl-nav { display: flex; justify-content: space-between; gap: var(--space-sm); max-width: 420px; width: 100%; margin: 0 auto; }
 .report { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-sm); margin: var(--space-xs) 0; font-size: var(--text-sm);
   color: var(--color-muted); b { color: var(--color-ink); font-weight: 600; font-variant-numeric: tabular-nums; } }
 

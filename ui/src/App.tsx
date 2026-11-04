@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api, runFeature, store } from "./api";
 import Graphics from "./Graphics";
 import Toolkit, { ToolTab } from "./Toolkit";
+import Welcome from "./Welcome";
 import { EDITOR_NAME, host, IN_EDITOR, IN_UXP, Live, liveSequence, RunResult, setEditorActions, setStandaloneMedia } from "./host";
 import { LANGS, setLang, t } from "./i18n";
 
@@ -79,6 +80,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [panel, setPanel] = useState<"" | "settings" | "history" | "news">("");
   const [view, setView] = useState<View>(store.get("view", "tools"));
+  const [welcomed, setWelcomed] = useState(store.get("welcomed", false)); // the first-open tour, once
   const goView = (v: View) => { setView(v); store.set("view", v); };
   const [projectKey, setProjectKey] = useState("standalone");
   const [history, setHistory] = useState<HistoryEntry[]>(store.get("history", []));
@@ -241,6 +243,8 @@ export default function App() {
       {live && !live.running.length && live.exit_in != null && <div className="banner wait" role="status">
         <span>Kerf runs alongside Premiere Pro, After Effects or DaVinci Resolve. Open one, or Kerf closes in {live.exit_in}s.</span>
         <button className="ghost" onClick={() => api.post("/settings", { follow_editors: "off" })}>Keep Kerf open</button></div>}
+      {!welcomed && <Welcome engine={engine} onClose={() => { store.set("welcomed", true); setWelcomed(true); }}
+        onOpen={(v, f) => { goView(v); setName(f); setGroup(features[f]?.group || group); }} />}
       {panel === "news" && <News onClose={() => setPanel("")} />}
       {panel === "settings" && <Settings prefs={prefs} setPrefs={setPrefs} onClose={() => setPanel("")} />}
       {panel === "history" && <History entries={history} onLoad={(h) => { goView("edit"); setName(h.feature); setGroup(features[h.feature]?.group || group); setTimeout(() => setParams(h.params), 0); setPanel(""); }}
