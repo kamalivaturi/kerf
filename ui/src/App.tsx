@@ -387,7 +387,8 @@ function Result({ res, notes, onUse }: { res: RunResult; notes: string[]; onUse?
       ))}
       {res.text && <div className="textout"><pre>{res.text}</pre>
         <button className="ghost" onClick={() => navigator.clipboard?.writeText(res.text!)}>Copy</button></div>}
-      {res.report && <details open><summary>Report</summary><pre>{JSON.stringify(res.report, null, 1)}</pre></details>}
+      {res.report && <p className="report">{Object.entries(res.report).filter(([, v]) => v !== null && v !== "" && typeof v !== "object")
+        .map(([k, v]) => <span key={k}>{k.replace(/_/g, " ")} <b>{String(v)}</b></span>)}</p>}
       {!!res.files?.length && <details><summary>Files ({res.files.length})</summary><pre>{res.files.join("\n")}</pre></details>}
     </div>
   );

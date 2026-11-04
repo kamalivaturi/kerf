@@ -174,6 +174,8 @@ input[type="range"] { padding: 0; border: 0; background: none; accent-color: var
   h2 { display: flex; align-items: center; margin: 0 0 var(--space-2xs); font-size: var(--text-lg); font-weight: 700; .close { margin-left: auto; } }
 }
 .help { color: var(--color-muted); margin: 0 0 var(--space-xs); max-width: 65ch; }
+.report { display: flex; flex-wrap: wrap; gap: var(--space-2xs) var(--space-sm); margin: var(--space-xs) 0; font-size: var(--text-sm);
+  color: var(--color-muted); b { color: var(--color-ink); font-weight: 600; font-variant-numeric: tabular-nums; } }
 
 .chips { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-sm); }
 .chip { min-height: 32px; padding: 0 var(--space-sm); font-weight: 500;
@@ -285,7 +287,7 @@ pre.news { max-height: 420px; overflow-y: auto; white-space: pre-wrap; }
   &.split { display: flex; align-items: stretch; gap: 0; padding: 0; overflow: hidden; height: var(--control);
     background: var(--color-paper-3); border: 1px solid var(--color-rule); border-radius: var(--radius-control);
     button { flex: 1; min-height: 0; height: 100%; border: 0; border-radius: 0; background: none; &:hover { background: var(--color-hover); } }
-    input[type="color"] { width: 36px; flex: 0 0 36px; height: 100%; min-height: 0; padding: var(--space-2xs); border: 0; border-left: 1px solid var(--color-rule);
+    input[type="color"] { width: 76px; flex: 0 0 76px; // Premiere shows a colour input as its hex text: room for #RRGGBB height: 100%; min-height: 0; padding: var(--space-2xs); border: 0; border-left: 1px solid var(--color-rule);
       border-radius: 0; background: none; cursor: pointer; } } }
 .tk-mini { min-height: 28px; padding: 0 var(--space-xs); font-size: var(--text-sm); font-weight: 500; &.on { color: var(--color-accent); } }
 .tk-field { display: flex; flex-direction: column; gap: var(--space-2xs); margin-top: var(--space-xs); font-size: var(--text-sm); color: var(--color-muted);
