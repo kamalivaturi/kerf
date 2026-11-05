@@ -24,6 +24,9 @@ const EASE: Record<string, (p: number) => number> = {
   bounce: (p) => { const n = 7.5625, d = 2.75; return p < 1 / d ? n * p * p : p < 2 / d ? n * (p -= 1.5 / d) * p + .75 : p < 2.5 / d ? n * (p -= 2.25 / d) * p + .9375 : n * (p -= 2.625 / d) * p + .984375; },
 };
 const lerp = (a: number, b: number, e: number) => a + (b - a) * e;
+// Premiere draws panels with GDI+ on Windows, which fails on a transform it can't invert ("Unable to multiply
+// transform. GDI Status: InvalidParameter"): a "pop" starts at scale 0, so stop just short of it (still invisible).
+const nz = (s: number) => (Math.abs(s) < 1e-3 ? (s < 0 ? -1e-3 : 1e-3) : s);
 const rgba = (hex: string, a: number) => { const n = parseInt(String(hex).slice(1), 16) || 0; return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; };
 
 /** Inline style of one animated unit (char/word/line) at time `tt`. Mirrors the AE expression selector. */
@@ -39,7 +42,7 @@ function unitStyle(a: Anim, i: number, tt: number, k: number): React.CSSProperti
   const tf: string[] = [], st: React.CSSProperties = {};
   for (const [name, v] of a.props) {
     const vv = v as any;
-    if (name.endsWith("Scale 3D")) tf.push(`scale(${lerp(vv[0] / 100, 1, e)},${lerp(vv[1] / 100, 1, e)})`);
+    if (name.endsWith("Scale 3D")) tf.push(`scale(${nz(lerp(vv[0] / 100, 1, e))},${nz(lerp(vv[1] / 100, 1, e))})`);
     else if (name.endsWith("Position 3D")) tf.push(`translate(${lerp(vv[0], 0, e) * k}px,${lerp(vv[1], 0, e) * k}px)`);
     else if (name.endsWith("Rotation")) tf.push(`rotate(${lerp(vv, 0, e)}deg)`);
     else if (name.endsWith("Opacity")) st.opacity = lerp(vv / 100, 1, e);
