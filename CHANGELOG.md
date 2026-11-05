@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.4 — 2026-11-05
 
 - **Older Resolve projects open without "Unknown tool found".** The seven Kerf 0.3.2 effects (Shake, Zoom,
   RGB Split, Vignette, Letterbox, Speed Ramp, Motion Blur) load again with their settings, drawn by Kerf FX, under
