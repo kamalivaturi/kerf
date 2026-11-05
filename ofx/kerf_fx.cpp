@@ -31,20 +31,21 @@ static const double PI = 3.14159265358979;
 // Every mode's params are named "<prefix>_<name>" and sit in the group "g_<prefix>", so modes never share a name
 // (several have an "amount") and a whole mode can be shown or hidden at once.
 static Kind gKind;                              // the mode whose params are being defined
+static bool gLegacy = false;  // defining one of the 0.3.2 single-effect plugins: plain names, no group
 static std::vector<std::string> gNames[KINDS];  // each mode's params, to show only the chosen mode's
 static std::string key(int k, const char *name) { return std::string(PREFIX[k]) + "_" + name; }
 
 static OfxPropertySetHandle define(OfxParamSetHandle ps, const char *type, const char *name, const char *label,
                                    const char *hint) {
-  std::string full = key(gKind, name);
-  if (std::find(gNames[gKind].begin(), gNames[gKind].end(), full) == gNames[gKind].end())
+  std::string full = gLegacy ? std::string(name) : key(gKind, name);
+  if (!gLegacy && std::find(gNames[gKind].begin(), gNames[gKind].end(), full) == gNames[gKind].end())
     gNames[gKind].push_back(full);
   if (!ps) return nullptr;  // only collecting names
   OfxPropertySetHandle p;
   Pa->paramDefine(ps, type, full.c_str(), &p);
   P->propSetString(p, kOfxPropLabel, 0, label);
   P->propSetString(p, kOfxParamPropHint, 0, hint);
-  P->propSetString(p, kOfxParamPropParent, 0, (std::string("g_") + PREFIX[gKind]).c_str());
+  if (!gLegacy) P->propSetString(p, kOfxParamPropParent, 0, (std::string("g_") + PREFIX[gKind]).c_str());
   return p;
 }
 static void number(OfxParamSetHandle ps, const char *name, const char *label, double def, double lo, double hi,
@@ -384,15 +385,16 @@ static void shiftBetween(const Img &a, const Img &b, double &dx, double &dy) {
 }
 
 // ------------------------------------------------------------------------------------------------ render
-static OfxStatus render(OfxImageEffectHandle fx, OfxPropertySetHandle in) {
+static OfxStatus render(OfxImageEffectHandle fx, OfxPropertySetHandle in, int legacy) {
   double t = 0, rs[2] = {1, 1};
   OfxRectI w;
   P->propGetDouble(in, kOfxPropTime, 0, &t);
   P->propGetIntN(in, kOfxImageEffectPropRenderWindow, 4, &w.x1);
   P->propGetDoubleN(in, kOfxImageEffectPropRenderScale, 2, rs);
-  Kind k = (Kind)std::clamp(pick(fx, "mode", t), 0, KINDS - 1);
-  auto N = [&](const char *name) { return num(fx, key(k, name).c_str(), t); };
-  auto I = [&](const char *name) { return pick(fx, key(k, name).c_str(), t); };
+  Kind k = legacy >= 0 ? (Kind)legacy : (Kind)std::clamp(pick(fx, "mode", t), 0, KINDS - 1);
+  auto pk = [&](const char *name) { return legacy >= 0 ? std::string(name) : key(k, name); };  // old plugins: plain names
+  auto N = [&](const char *name) { return num(fx, pk(name).c_str(), t); };
+  auto I = [&](const char *name) { return pick(fx, pk(name).c_str(), t); };
 
   Img src, dst;
   if (!fetch(fx, kOfxImageEffectOutputClipName, t, dst)) return kOfxStatFailed;
@@ -601,12 +603,21 @@ static OfxStatus render(OfxImageEffectHandle fx, OfxPropertySetHandle in) {
 }
 
 // ------------------------------------------------------------------------------------------------ actions
-static OfxStatus describe(OfxImageEffectHandle fx) {
+// Kerf 0.3.2 shipped each mode as its own plugin; projects saved then still name them, so they stay registered
+// (under Kerf › Older projects) with their old labels and param names, drawn by the same code as Kerf FX.
+static const char *LEGACY_IDS[CAPTIONS] = {"com.kerf.fx.Shake",     "com.kerf.fx.Zoom",     "com.kerf.fx.RGBSplit",
+                                           "com.kerf.fx.Vignette",  "com.kerf.fx.Letterbox", "com.kerf.fx.SpeedRamp",
+                                           "com.kerf.fx.MotionBlur"};
+static const char *LEGACY_LABELS[CAPTIONS] = {"Kerf Shake",     "Kerf Zoom",       "Kerf RGB Split",  "Kerf Vignette",
+                                              "Kerf Letterbox", "Kerf Speed Ramp", "Kerf Motion Blur"};
+
+static OfxStatus describe(OfxImageEffectHandle fx, int legacy) {
   OfxPropertySetHandle p;
   E->getPropertySet(fx, &p);
-  P->propSetString(p, kOfxPropLabel, 0, "Kerf FX");
-  P->propSetString(p, kOfxPropPluginDescription, 0, ABOUT);
-  P->propSetString(p, kOfxImageEffectPluginPropGrouping, 0, "Kerf");
+  P->propSetString(p, kOfxPropLabel, 0, legacy >= 0 ? LEGACY_LABELS[legacy] : "Kerf FX");
+  P->propSetString(p, kOfxPropPluginDescription, 0,
+                   legacy >= 0 ? "From Kerf 0.3.2, kept so older projects open. New edits: use Kerf FX." : ABOUT);
+  P->propSetString(p, kOfxImageEffectPluginPropGrouping, 0, legacy >= 0 ? "Kerf/Older projects" : "Kerf");
   P->propSetString(p, kOfxImageEffectPropSupportedContexts, 0, kOfxImageEffectContextFilter);  // Edit/Color pages
   P->propSetString(p, kOfxImageEffectPropSupportedContexts, 1, kOfxImageEffectContextGeneral);  // Fusion page
   P->propSetString(p, kOfxImageEffectPropSupportedPixelDepths, 0, kOfxBitDepthFloat);
@@ -620,7 +631,7 @@ static OfxStatus describe(OfxImageEffectHandle fx) {
   return kOfxStatOK;
 }
 
-static OfxStatus describeInContext(OfxImageEffectHandle fx) {
+static OfxStatus describeInContext(OfxImageEffectHandle fx, int legacy) {
   OfxPropertySetHandle c;
   E->clipDefine(fx, kOfxImageEffectSimpleSourceClipName, &c);
   P->propSetString(c, kOfxImageEffectPropSupportedComponents, 0, kOfxImageComponentRGBA);
@@ -629,6 +640,12 @@ static OfxStatus describeInContext(OfxImageEffectHandle fx) {
   P->propSetString(c, kOfxImageEffectPropSupportedComponents, 0, kOfxImageComponentRGBA);
   OfxParamSetHandle ps;
   E->getParamSet(fx, &ps);
+  if (legacy >= 0) {  // one mode, its params at their 0.3.2 names
+    gLegacy = true;
+    describeParams((Kind)legacy, ps);
+    gLegacy = false;
+    return kOfxStatOK;
+  }
   OfxPropertySetHandle p;
   Pa->paramDefine(ps, kOfxParamTypeChoice, "mode", &p);
   P->propSetString(p, kOfxPropLabel, 0, "Mode");
@@ -660,7 +677,7 @@ static OfxStatus instanceChanged(OfxImageEffectHandle fx, OfxPropertySetHandle i
   return kOfxStatOK;
 }
 
-static OfxStatus mainEntry(const char *action, const void *handle, OfxPropertySetHandle in) {
+static OfxStatus mainEntry(const char *action, const void *handle, OfxPropertySetHandle in, int legacy) {
   auto fx = (OfxImageEffectHandle)handle;
   if (!std::strcmp(action, kOfxActionLoad)) {
     if (!gHost) return kOfxStatErrMissingHostFeature;
@@ -669,30 +686,41 @@ static OfxStatus mainEntry(const char *action, const void *handle, OfxPropertySe
     Pa = (const OfxParameterSuiteV1 *)gHost->fetchSuite(gHost->host, kOfxParameterSuite, 1);
     return P && E && Pa ? kOfxStatOK : kOfxStatErrMissingHostFeature;
   }
-  if (!std::strcmp(action, kOfxActionDescribe)) return describe(fx);
-  if (!std::strcmp(action, kOfxImageEffectActionDescribeInContext)) return describeInContext(fx);
-  if (!std::strcmp(action, kOfxImageEffectActionRender)) return render(fx, in);
-  if (!std::strcmp(action, kOfxActionInstanceChanged)) return instanceChanged(fx, in);
+  if (!std::strcmp(action, kOfxActionDescribe)) return describe(fx, legacy);
+  if (!std::strcmp(action, kOfxImageEffectActionDescribeInContext)) return describeInContext(fx, legacy);
+  if (!std::strcmp(action, kOfxImageEffectActionRender)) return render(fx, in, legacy);
+  if (!std::strcmp(action, kOfxActionInstanceChanged)) return legacy >= 0 ? kOfxStatReplyDefault : instanceChanged(fx, in);
   if (!std::strcmp(action, kOfxActionCreateInstance)) {
-    showMode(fx);
+    if (legacy < 0) showMode(fx);
     return kOfxStatOK;
   }
   if (!std::strcmp(action, kOfxActionDestroyInstance) || !std::strcmp(action, kOfxActionUnload)) return kOfxStatOK;
   return kOfxStatReplyDefault;
 }
 
+template <int L>  // L: the 0.3.2 plugin's mode, or -1 for Kerf FX
 static OfxStatus entry(const char *action, const void *handle, OfxPropertySetHandle in, OfxPropertySetHandle) {
   try {
-    return mainEntry(action, handle, in);
+    return mainEntry(action, handle, in, L);
   } catch (...) {  // never let an exception cross into the host
     return kOfxStatFailed;
   }
 }
 static void setHost(OfxHost *h) { gHost = h; }
 
-static OfxPlugin PLUGIN = {kOfxImageEffectPluginApi, 1, "com.kerf.fx", 1, 0, setHost, entry};
+static OfxPlugin PLUGINS[] = {
+    {kOfxImageEffectPluginApi, 1, "com.kerf.fx", 1, 0, setHost, entry<-1>},
+    {kOfxImageEffectPluginApi, 1, LEGACY_IDS[SHAKE], 1, 0, setHost, entry<SHAKE>},
+    {kOfxImageEffectPluginApi, 1, LEGACY_IDS[ZOOM], 1, 0, setHost, entry<ZOOM>},
+    {kOfxImageEffectPluginApi, 1, LEGACY_IDS[SPLIT], 1, 0, setHost, entry<SPLIT>},
+    {kOfxImageEffectPluginApi, 1, LEGACY_IDS[VIGNETTE], 1, 0, setHost, entry<VIGNETTE>},
+    {kOfxImageEffectPluginApi, 1, LEGACY_IDS[LETTERBOX], 1, 0, setHost, entry<LETTERBOX>},
+    {kOfxImageEffectPluginApi, 1, LEGACY_IDS[SPEEDRAMP], 1, 0, setHost, entry<SPEEDRAMP>},
+    {kOfxImageEffectPluginApi, 1, LEGACY_IDS[MOTIONBLUR], 1, 0, setHost, entry<MOTIONBLUR>},
+};
+static const int COUNT = (int)(sizeof PLUGINS / sizeof PLUGINS[0]);
 
 extern "C" {
-OfxExport int OfxGetNumberOfPlugins(void) { return 1; }
-OfxExport OfxPlugin *OfxGetPlugin(int nth) { return nth == 0 ? &PLUGIN : nullptr; }
+OfxExport int OfxGetNumberOfPlugins(void) { return COUNT; }
+OfxExport OfxPlugin *OfxGetPlugin(int nth) { return nth >= 0 && nth < COUNT ? &PLUGINS[nth] : nullptr; }
 }

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Older Resolve projects open without "Unknown tool found".** The seven Kerf 0.3.2 effects (Shake, Zoom,
+  RGB Split, Vignette, Letterbox, Speed Ramp, Motion Blur) load again with their settings, drawn by Kerf FX, under
+  Effects › OpenFX › Kerf › Older projects.
 - **Kerf starts with your editor, no permission prompt.** Kerf's background watcher now also starts the engine when
   DaVinci Resolve opens, and puts its login entry back every time Kerf runs, so Premiere Pro no longer asks to open
   `kerf://start`.

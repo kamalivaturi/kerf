@@ -316,6 +316,15 @@ def png(path, frame):
 # Kerf FX is one effect: the Mode menu picks what it does; each mode's params are "<prefix>_<name>".
 MODES = ["Shake", "Zoom", "RGBSplit", "Vignette", "Letterbox", "SpeedRamp", "MotionBlur", "Captions"]
 PREFIX = ["shake", "zoom", "split", "vignette", "letterbox", "ramp", "blur", "cap"]
+LEGACY = {  # Kerf 0.3.2's plugin IDs and their param names, as saved in older projects
+    b"com.kerf.fx.Shake": ["amplitude", "frequency", "rotation", "axis", "seed", "hideEdges"],
+    b"com.kerf.fx.Zoom": ["direction", "amount", "duration", "at", "ease", "centerX", "centerY"],
+    b"com.kerf.fx.RGBSplit": ["amount", "angle"],
+    b"com.kerf.fx.Vignette": ["amount", "size", "softness", "roundness"],
+    b"com.kerf.fx.Letterbox": ["aspect", "opacity"],
+    b"com.kerf.fx.SpeedRamp": ["curve", "strength", "reverse", "smooth", "rampBlur"],
+    b"com.kerf.fx.MotionBlur": ["mode", "amount", "length", "angle"],
+}
 TEST = ROOT / "build" / "ofx" / "test"
 WORDS = TEST / "words.tsv"  # Kerf transcript: start<TAB>end<TAB>word (seconds)
 INDIC = TEST / "indic.tsv"
@@ -406,7 +415,7 @@ def main():
     lib.OfxGetPlugin.restype = C.POINTER(OfxPlugin)
     out_dir = TEST
     n, fails = lib.OfxGetNumberOfPlugins(), []
-    assert n == 1, f"plugin count {n}: Kerf FX is one effect"
+    assert n == 1 + len(LEGACY), f"plugin count {n}: Kerf FX plus the {len(LEGACY)} 0.3.2 effects older projects name"
     plug = lib.OfxGetPlugin(0).contents
     assert plug.pluginIdentifier == b"com.kerf.fx", plug.pluginIdentifier
     SETHOST(plug.setHost)(C.pointer(HOST))
@@ -501,6 +510,35 @@ def main():
     assert call(b"OfxActionDestroyInstance", inst) == 0
     print("ok   15 caption templates")
     assert call(b"OfxActionUnload") == 0
+
+    # Projects saved with Kerf 0.3.2 name its seven single effects: each loads under its old ID, with its old param
+    # names, and draws like the matching Kerf FX mode (Resolve said "Unknown tool found" without them).
+    for i, (pid, names) in enumerate(LEGACY.items(), start=1):
+        plug = lib.OfxGetPlugin(i).contents
+        mi = MODES.index(pid.decode().rsplit(".", 1)[1])
+        if plug.pluginIdentifier != pid or (plug.versionMajor, plug.versionMinor) != (1, 0):
+            fails.append(f"plugin {i}: {plug.pluginIdentifier} {plug.versionMajor}.{plug.versionMinor}, expected {pid} 1.0")
+            continue
+        SETHOST(plug.setHost)(C.pointer(HOST))
+        lcall = lambda action, h=None, args=None, e=MAIN(plug.mainEntry): e(action, h, args, None)  # noqa: E731
+        assert lcall(b"OfxActionLoad") == 0
+        desc = new(Effect())
+        assert lcall(b"OfxActionDescribe", desc) == 0
+        assert lcall(b"OfxImageEffectActionDescribeInContext", desc, props(OfxImageEffectPropContext="OfxImageEffectContextFilter")) == 0
+        missing = set(names) - set(objects[objects[desc].params])
+        if missing or "Older projects" not in objects[objects[desc].props]["OfxImageEffectPluginPropGrouping"][0]:
+            fails.append(f"{pid.decode()}: missing old params {sorted(missing)} or not under Kerf › Older projects")
+        w, h = SIZES[0][:2]
+        inst = instance(lcall, desc, "OfxImageEffectContextFilter", w, h, 1.0, mi)
+        for k, (settings, t) in enumerate(CASES[MODES[mi]]):
+            overrides.clear()
+            overrides.update(settings)  # plain 0.3.2 names
+            st = render(lcall, inst, w, h, 1.0, t)
+            if st != 0 or all(abs(a - b) < 1e-6 for a, b in zip(state["output"].buf, state["source"].buf)):
+                fails.append(f"{pid.decode()} case {k}: status {st} or no change to the picture")
+        assert lcall(b"OfxActionDestroyInstance", inst) == 0
+        assert lcall(b"OfxActionUnload") == 0
+    print(f"ok   {len(LEGACY)} Kerf 0.3.2 effects for older projects")
     state["size"] = SIZES[0][:2]
     png(out_dir / "Source.png", source_at(0))
     print("\n".join(fails) or f"all {len(MODES)} modes pass; previews in {out_dir}")
