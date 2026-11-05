@@ -137,7 +137,14 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/" or u.path.startswith("/app"):  # no browser app: Kerf lives inside the editors
             return self._send(404, dict(error="Kerf runs inside Premiere Pro, After Effects and DaVinci Resolve: "
                                               "open the Kerf panel there."))
-        img = u.path == "/mogrt/media" and secrets.compare_digest(q.get("token", ""), TOKEN)  # <img> can't send headers
+        img = (u.path in ("/mogrt/media", "/whatsnew/image")  # <img> can't send headers
+               and secrets.compare_digest(q.get("token", ""), TOKEN))
+        if img and u.path == "/whatsnew/image":  # a release's picture in What's new: whatsnew/<version>.png only
+            v = "".join(ch for ch in q.get("v", "") if ch.isdigit() or ch == ".")
+            f = Path(__file__).resolve().parent.parent / "whatsnew" / f"{v}.png"
+            if not v or not f.is_file():
+                return self._send(404, dict(error="no picture"))
+            return self._bytes(f.read_bytes(), "image/png")
         if not img and not self._guard():
             return
         routes = {

@@ -34,7 +34,8 @@ PINNED_SHA256 = {f"{MAC_INTEL}/ffmpeg.zip": "7c6b4125b191cbf773832dc51f424cf2b6b
 EXCLUDE = ["torch", "torchaudio", "torchvision", "tensorflow", "jax", "scipy", "pandas", "matplotlib", "sklearn", "numba",
            "transformers", "librosa", "PyQt5", "PyQt6", "PySide2", "PySide6", "tkinter", "gi", "IPython", "jupyter", "notebook",
            "pytest", "sympy", "playwright", "selenium"]
-DATA = ["ui/dist:ui/dist", "CHANGELOG.md:.", "NOTICES.md:.", "licenses:licenses", "mogrt:mogrt", "aftereffects:aftereffects"]
+DATA = ["ui/dist:ui/dist", "CHANGELOG.md:.", "NOTICES.md:.", "licenses:licenses", "mogrt:mogrt", "aftereffects:aftereffects",
+        "whatsnew:whatsnew"]
 
 
 def fetch_ffmpeg(dest):

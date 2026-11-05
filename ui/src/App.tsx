@@ -604,13 +604,45 @@ ${errs || "none"}
   openHelp(`https://github.com/kamalivaturi/kerf/issues/new?title=${encodeURIComponent("Bug: ")}&body=${encodeURIComponent(body)}`);
 }
 
+type Release = { version: string; date: string; note: string; items: { title: string; text: string }[] };
+const plain = (s: string) => s.replace(/\*\*|`/g, "").trim();
+// CHANGELOG.md → releases: "## 0.3.3 — 2026-11-03 (note)" then "- **Title.** text" bullets (continued lines indented)
+function releases(md: string): Release[] {
+  return md.split(/\n## /).slice(1).map((sec) => {
+    const [head, ...rest] = sec.split("\n");
+    const m = head.match(/^(\S+)(?:\s+—\s+(\S+))?\s*(.*)$/) || [];
+    const items = ("\n" + rest.join("\n")).split(/\n- /).slice(1).map((b) => b.replace(/\s*\n\s+/g, " ").trim()).map((b) => {
+      const bold = b.match(/^\*\*(.+?)\*\*\s*([\s\S]*)$/);
+      return bold ? { title: plain(bold[1]).replace(/[.:]$/, ""), text: plain(bold[2]) } : { title: "", text: plain(b) };
+    });
+    return { version: m[1] || head, date: m[2] || "", note: (m[3] || "").replace(/^\(|\)$/g, ""), items };
+  });
+}
+
+// What's new: the latest release as a feature (its picture when there is one, the headline change, the rest),
+// earlier releases folded below.
 function News({ onClose }: { onClose: () => void }) {
-  const [text, setText] = useState("");
-  useEffect(() => { api.get("/changelog").then((r) => setText(r.text)).catch((e) => setText((e as Error).message)); }, []);
+  const [list, setList] = useState<Release[] | null>(null), [err, setErr] = useState(""), [pic, setPic] = useState("");
+  useEffect(() => { api.get("/changelog").then((r) => setList(releases(r.text))).catch((e) => setErr((e as Error).message)); }, []);
+  const top = list?.[0];
+  useEffect(() => { if (top) api.whatsnewUrl(top.version).then(setPic).catch(() => {}); }, [top?.version]);
   return (
-    <section className="card fade">
+    <section className="card fade whatsnew">
       <h2>{t("whatsNew")} <button className="ghost close" onClick={onClose} aria-label="Close">✕</button></h2>
-      <pre className="news">{text.replace(/^# .*\n+/, "") || "…"}</pre>
+      {err && <p className="error">{err}</p>}
+      {!list && !err && <p className="help">…</p>}
+      {top && <>
+        {pic && <img className="wn-pic" src={pic} alt={`Kerf ${top.version}`} onError={() => setPic("")} />}
+        <h3>{top.items[0]?.title || `Kerf ${top.version}`}</h3>
+        <p className="wn-meta"><span className="wn-ver">{top.version}</span>{top.date}</p>
+        {top.items[0]?.text && <p>{top.items[0].text}</p>}
+        {top.items.length > 1 && <ul className="wn-list">{top.items.slice(1).map((it, i) =>
+          <li key={i}>{it.title && <b>{it.title}. </b>}{it.text}</li>)}</ul>}
+      </>}
+      {list && list.length > 1 && <div className="wn-older">{list.slice(1).map((r) =>
+        <details key={r.version}><summary>{r.version}{r.date && <span> {r.date}</span>}</summary>
+          <ul className="wn-list">{r.items.map((it, i) => <li key={i}>{it.title && <b>{it.title}. </b>}{it.text}</li>)}</ul>
+        </details>)}</div>}
     </section>
   );
 }

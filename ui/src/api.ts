@@ -35,6 +35,10 @@ export const api = {
   async post(path: string, body: unknown) {
     return parse(await fetch((await BASE()) + path, { method: "POST", headers: await headers(), body: JSON.stringify(body) }));
   },
+  async whatsnewUrl(version: string) { // a release's picture for What's new (whatsnew/<version>.png)
+    await headers();
+    return `${await BASE()}/whatsnew/image?v=${encodeURIComponent(version)}&token=${encodeURIComponent(token)}`;
+  },
   async mediaUrl(id: string, kind: "gif" | "mp4" | "png" | "tile" | "tilegif") {
     await headers();
     return `${await BASE()}/mogrt/media?id=${encodeURIComponent(id)}&kind=${kind}&token=${encodeURIComponent(token)}`;
