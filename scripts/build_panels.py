@@ -2,6 +2,7 @@
 
     kerf-premiere.ccx          Premiere Pro UXP panel (ui/dist-uxp), installed with Adobe's own plugin installer
     com.kerf.aftereffects/     After Effects HTML panel (scripts/build_cep.py)
+    Kerf.py                    DaVinci Resolve script (Workspace > Scripts > Kerf: remove silences)
 Run `npm run build` in ui/ first.
 """
 import shutil
@@ -26,6 +27,7 @@ def main():
         for f in sorted(p for p in uxp.rglob("*") if p.is_file() and p.suffix != ".map"):
             z.write(f, f.relative_to(uxp).as_posix())
     shutil.copytree(build_cep.build(), OUT / "com.kerf.aftereffects")
+    shutil.copy2(ROOT / "resolve" / "Kerf.py", OUT / "Kerf.py")
     print("panels in", OUT)
 
 

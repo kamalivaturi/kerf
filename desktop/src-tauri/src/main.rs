@@ -371,7 +371,8 @@ fn install_panels(res: &Path, version: &str, force: bool) {
             let _ = copy_dir(&p.join("com.kerf.aftereffects"), &dest);
         }
         if let Some(dir) = resolve_scripts() {
-            let _ = fs::remove_file(dir.join("Kerf.py")); // Kerf in Resolve is Kerf FX only now: drop the old script window
+            // Workspace > Scripts > Kerf: the timeline edits (silences) Kerf FX can't do from inside one clip
+            let _ = fs::create_dir_all(&dir).and_then(|_| fs::copy(p.join("Kerf.py"), dir.join("Kerf.py")).map(|_| ()));
         }
         mark("panels-version", version);
     }
