@@ -42,6 +42,16 @@ def vtuple(v):
     return tuple(int(x) for x in v.lstrip("v").split(".") if x.isdigit())
 
 
+def update_progress():
+    """The helper's background download (~/.kerf/update.json: version, state downloading|ready, percent), for the
+    panels' update notice; a file left from a version already installed is ignored."""
+    try:
+        d = json.loads((media.HOME / "update.json").read_text("utf-8"))
+    except (OSError, ValueError):
+        return None
+    return d if isinstance(d, dict) and vtuple(str(d.get("version", ""))) > vtuple(__version__) else None
+
+
 def check_update():
     try:
         req = urllib.request.Request(f"https://api.github.com/repos/{REPO}/releases/latest",
@@ -143,7 +153,7 @@ class Handler(BaseHTTPRequestHandler):
             "/languages": speech.languages,
             "/fx": lambda: dict(presets=tools.fx_list()),
             "/diagnostics": diagnostics,
-            "/host": hosts.status,
+            "/host": lambda: dict(hosts.status(), update=update_progress()),
         }
         if u.path == "/mogrt/media":  # previews of library entries only (never arbitrary paths)
             e, kind = mogrt.entry(q.get("id")), q.get("kind", "gif")

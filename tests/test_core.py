@@ -622,3 +622,19 @@ def test_mogrt_preview_lookup_follows_the_index():
             mogrt.INDEX.unlink(missing_ok=True)
         else:
             mogrt.INDEX.write_text(old, "utf-8")
+
+
+def test_update_progress_for_the_panel_notice():
+    """The helper writes its background download to ~/.kerf/update.json; /host passes it to the panels' notice,
+    except a file left from a version that is already installed."""
+    from kerf import __version__, server
+    f = media.HOME / "update.json"
+    try:
+        f.write_text(json.dumps(dict(version="99.0.0", state="downloading", percent=34)), "utf-8")
+        assert server.update_progress() == dict(version="99.0.0", state="downloading", percent=34)
+        f.write_text(json.dumps(dict(version=__version__, state="ready", percent=100)), "utf-8")
+        assert server.update_progress() is None
+        f.write_text("{not json", "utf-8")
+        assert server.update_progress() is None
+    finally:
+        f.unlink(missing_ok=True)

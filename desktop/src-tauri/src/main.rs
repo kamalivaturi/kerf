@@ -35,6 +35,20 @@ fn auto_update_on() -> bool {
         .map_or(true, |v| v.get("auto_update").and_then(|x| x.as_str()) != Some("off"))
 }
 
+/// Download progress for the panels (~/.kerf/update.json): the engine passes it on and they show a small ring.
+fn update_state(version: &str, state: &str, percent: u64) {
+    if let Some(k) = kerf_dir() {
+        let doc = serde_json::json!({ "version": version, "state": state, "percent": percent });
+        let _ = fs::write(k.join("update.json"), doc.to_string());
+    }
+}
+
+fn clear_update_state() {
+    if let Some(k) = kerf_dir() {
+        let _ = fs::remove_file(k.join("update.json"));
+    }
+}
+
 /// Check GitHub for a newer release shortly after launch and every 6 hours; download it in the background.
 /// It is installed when Kerf quits (after the editors close), so nobody loses work to a surprise restart.
 async fn update_loop(app: tauri::AppHandle) {
@@ -43,9 +57,26 @@ async fn update_loop(app: tauri::AppHandle) {
         if auto_update_on() {
             let found: Result<Option<Update>, tauri_plugin_updater::Error> = async { app.updater()?.check().await }.await;
             if let Ok(Some(update)) = found {
-                if let Ok(bytes) = update.download(|_, _| {}, || {}).await {
-                    *app.state::<Staged>().0.lock().unwrap() = Some((update, bytes));
-                    return;
+                let version = update.version.clone();
+                update_state(&version, "downloading", 0);
+                let (v, mut got, mut shown) = (version.clone(), 0u64, 0u64);
+                let progress = move |chunk: usize, total: Option<u64>| {
+                    got += chunk as u64;
+                    if let Some(t) = total.filter(|t| *t > 0) {
+                        let p = (got * 100 / t).min(99);
+                        if p != shown {
+                            shown = p; // one write per percent, not per chunk
+                            update_state(&v, "downloading", p);
+                        }
+                    }
+                };
+                match update.download(progress, || {}).await {
+                    Ok(bytes) => {
+                        update_state(&version, "ready", 100);
+                        *app.state::<Staged>().0.lock().unwrap() = Some((update, bytes));
+                        return;
+                    }
+                    Err(_) => clear_update_state(), // try again at the next check
                 }
             }
         }
@@ -502,6 +533,7 @@ fn main() {
                     let _ = c.kill(); // only the engine we started
                 }
                 if let Some((update, bytes)) = app.state::<Staged>().0.lock().unwrap().take() {
+                    clear_update_state();
                     let _ = update.install(bytes); // engine stopped, so its files can be replaced
                 }
             }

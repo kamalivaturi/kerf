@@ -87,6 +87,7 @@ export default function App() {
   const [update, setUpdate] = useState<{ latest: string; url: string; auto?: boolean } | null>(null);
   const [media, setMedia] = useState(store.get("media", ""));
   const [live, setLive] = useState<HostStatus | null>(null);
+  const [hiddenUpdate, setHiddenUpdate] = useState(""); // the update notice the editor closed, by version
   const seq = liveSequence(live?.live); // effects follow this frame size / fps / aspect
   const applyRef = useRef<() => void>(() => {});
 
@@ -237,7 +238,9 @@ export default function App() {
           {icon}<span>{label}</span></button>)}
       </nav>
 
-      {update && <div className="banner">{update.auto
+      {live?.update && hiddenUpdate !== live.update.version &&
+        <UpdateNotice u={live.update} onClose={() => setHiddenUpdate(live.update!.version)} />}
+      {update && !live?.update && <div className="banner">{update.auto
         ? <>Kerf {update.latest} is downloading in the background and installs after you close your editors. <a href={update.url} target="_blank" rel="noreferrer">What’s new</a></>
         : <>Kerf {update.latest} is available. <a href={update.url} target="_blank" rel="noreferrer">Get update</a></>}</div>}
       {live && !live.running.length && live.exit_in != null && <div className="banner wait" role="status">
@@ -417,7 +420,23 @@ function History({ entries, onLoad, onClear, onClose }: {
   );
 }
 
-type HostStatus = { running: string[]; live: Record<string, Live>; follow: boolean; exit_in: number | null };
+type HostStatus = { running: string[]; live: Record<string, Live>; follow: boolean; exit_in: number | null;
+  update?: { version: string; state: "downloading" | "ready"; percent: number } | null };
+
+// Kerf's own update, downloading in the background (the helper writes the progress, /host passes it on)
+function UpdateNotice({ u, onClose }: { u: NonNullable<HostStatus["update"]>; onClose: () => void }) {
+  const c = 2 * Math.PI * 16, p = Math.max(0, Math.min(100, u.percent));
+  return <div className="update-note" role="status">
+    <p>{u.state === "ready"
+      ? `Kerf ${u.version} is ready. It installs when you close your editors; your edits are safe.`
+      : `Downloading Kerf ${u.version}. It installs when you close your editors; your edits are safe.`}</p>
+    <span className="ring" aria-label={`${p}% downloaded`}>
+      <svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16" className="track" />
+        <circle cx="20" cy="20" r="16" className="done" strokeDasharray={c} strokeDashoffset={c * (1 - p / 100)} /></svg>
+      <b>{p}%</b></span>
+    <button className="ghost close" onClick={onClose} aria-label="Hide this notice">×</button>
+  </div>;
+}
 const EDITORS: Record<string, string> = { premiere: "Premiere Pro", aftereffects: "After Effects", resolve: "Resolve" };
 
 function LiveChips({ live, engine }: { live: HostStatus | null; engine: string }) {
