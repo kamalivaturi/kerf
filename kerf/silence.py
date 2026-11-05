@@ -139,15 +139,15 @@ def run(tl, p, ctx):
             vad = vad_ranges(tl, tracks, *settings(p))
             ranges = [(max(a, c), min(b, d)) for a, b in ranges for c, d in vad if min(b, d) > max(a, c)]
     ranges = [(a, min(b, tl.duration)) for a, b in ranges if a < tl.duration]
+    if not p["preview"] and str(p.get("items", "")).strip():  # review step: keep only the speech segments the editor ticked
+        keep_ids = {int(x) for x in str(p["items"]).split(",") if x.strip().lstrip("-").isdigit()}
+        ranges = [r for i, r in enumerate(ranges) if i in keep_ids]
     kept = float(sum(b - a for a, b in ranges))
     report = dict(threshold_db=round(thr, 1) if thr is not None else "ai_vad", segments=len(ranges), duration_before=round(tl.duration, 2),
                   duration_after=round(kept, 2), removed=round(tl.duration - kept, 2))
     if p["preview"]:
         return dict(report=report, items=[dict(id=i, label=f"speech {fmt_time(a)}–{fmt_time(b)}", start=a, end=b)
                                           for i, (a, b) in enumerate(ranges)])
-    if str(p.get("items", "")).strip():  # review step: keep only the speech segments the editor ticked
-        keep_ids = {int(x) for x in str(p["items"]).split(",") if x.strip().lstrip("-").isdigit()}
-        ranges = [r for i, r in enumerate(ranges) if i in keep_ids]
     cuts = sorted({t for r in ranges for t in r})
     mode = p["mode"]
     if mode == "remove":

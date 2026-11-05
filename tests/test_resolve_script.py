@@ -45,7 +45,7 @@ class Tl:
     def GetSetting(self, k): return {"timelineFrameRate": "30", "timelineResolutionWidth": "1920", "timelineResolutionHeight": "1080"}[k]
     def GetStartFrame(self): return 86400
     def GetTrackCount(self, kind): return self.tracks if kind == "video" else 1
-    def GetItemListInTrack(self, kind, i): return self.items if (kind, i) == ("video", 1) else []
+    def GetItemListInTrack(self, kind, i): return self.items if i == 1 else []  # each clip and its linked audio
     def GetCurrentTimecode(self): return "01:00:02:00"
     def GetStartTimecode(self): return "01:00:00:00"
     def AddMarker(self, frame, color, name, note, dur): self.markers.append((frame, color, name)); return True
@@ -135,6 +135,16 @@ def test_resolve_script_end_to_end(tmp_path, monkeypatch):
     assert [s["op"] for s in res["steps"]] == ["timeline"]
     notes = k["apply"](res)
     assert proj.current is not tl and any("Created timeline" in n for n in notes), notes
+
+    # Analyze lists the speech to keep; unticking one segment cuts it too (what Remove silences sends after review)
+    p = dict(preset="paced", detection="loudness", mode="remove")
+    items = features.run("silences", d, dict(p, preview=True), out_dir=str(tmp_path / "out"))["items"]
+    assert len(items) >= 3 and k["kept_ids"](items, [True] * len(items)) == ",".join(str(x["id"]) for x in items)
+    assert k["kept_ids"](items, [False] * len(items)) == "-1"
+    ticked = [i != 1 for i in range(len(items))]
+    fewer = features.run("silences", d, dict(p, items=k["kept_ids"](items, ticked)), out_dir=str(tmp_path / "out"))
+    assert fewer["report"]["segments"] == len(items) - 1  # the report counts what was kept after review
+    assert fewer["report"]["duration_after"] < res["report"]["duration_after"]
 
     # a taken name gets a number; steps this window doesn't do are reported, not run
     proj.current = tl

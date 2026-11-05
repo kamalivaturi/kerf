@@ -194,7 +194,15 @@ STYLE = (
     f"QComboBox:hover {{ background: {HOVER}; }} QComboBox:focus, QTextEdit:focus {{ border-color: {ACCENT}; }}"
     f"QComboBox QAbstractItemView {{ background: {PAPER2}; border: 1px solid {RULE_STRONG}; }}"
     f"QTextEdit#Out {{ background: {PAPER3}; border-color: {RULE}; }}"
+    f"QTreeWidget {{ background: {PAPER}; border: 1px solid {RULE_STRONG}; border-radius: 6px; }}"
 )
+SECONDARY = (f"QPushButton {{ background: {PAPER3}; color: {INK}; border: 1px solid {RULE_STRONG}; border-radius: 6px; padding: 8px 12px;"
+             f" font-weight: 600; }} QPushButton:hover {{ background: {HOVER}; }} QPushButton:pressed {{ background: {PRESS}; }}")
+
+
+def kept_ids(items, ticked):
+    """The review list's ticked speech segments as the silences feature's `items` param ("-1": keep none)."""
+    return ",".join(str(x["id"]) for x, on in zip(items, ticked) if on) or "-1"
 
 
 def geometry(w=380, h=380):
@@ -239,10 +247,16 @@ def main():
         ui.Label({"Text": "Cuts the quiet parts of the open timeline into a new timeline. The original stays as it is.",
                   "WordWrap": True, "Weight": 0, "StyleSheet": f"color: {MUTED};"}),
         pick("Preset", "Pace"), pick("Detection", "Detect by"), pick("Mode", "Then"),
-        ui.Button({"ID": "Run", "Text": "Remove silences", "Weight": 0}),
-        ui.TextEdit({"ID": "Out", "ReadOnly": True, "MinimumSize": [200, 64], "PlaceholderText": "Results appear here."}),
+        ui.HGroup({"Weight": 0, "Spacing": 6}, [
+            ui.Button({"ID": "Analyze", "Text": "Analyze", "StyleSheet": SECONDARY,
+                       "ToolTip": "List the speech Kerf would keep, so you can untick any to cut before applying"}),
+            ui.Button({"ID": "Run", "Text": "Remove silences"})]),
+        ui.Tree({"ID": "Items", "Weight": 2, "Hidden": True}),  # shown only after Analyze
+        ui.TextEdit({"ID": "Out", "ReadOnly": True, "Weight": 1, "MinimumSize": [200, 64], "PlaceholderText": "Results appear here."}),
     ]))
     it = win.GetItems()
+    it["Items"].SetHeaderLabels(["Speech to keep (untick to cut)"])
+    review = []  # the analyzed segments, while the list is showing
     for id_, key in keys.items():
         for v in choices[key]:
             it[id_].AddItem(label(v))
@@ -251,17 +265,50 @@ def main():
     def say(text):
         it["Out"].PlainText = text
 
-    def run(ev):
-        params = {key: choices[key][int(it[id_].CurrentIndex)] for id_, key in keys.items()}
-        it["Run"].Enabled = False
+    def clear_review(ev=None):
+        review.clear()
+        it["Items"].Clear()
+        it["Items"].Hidden = True
+        win.RecalcLayout()
+
+    def params():
+        return {key: choices[key][int(it[id_].CurrentIndex)] for id_, key in keys.items()}
+
+    def analyze(ev):
+        it["Analyze"].Enabled = it["Run"].Enabled = False
         try:
-            say("Removing silences\u2026")
-            res = call("/run", dict(feature="silences", timeline=read_timeline(), params=params, host="resolve"))
-            report = res.get("report") or {}
-            say("\n".join(["\u2713 " + n for n in apply(res)] + [f"{label(k)}: {v}" for k, v in list(report.items())[:4]]))
+            say("Finding silences\u2026")
+            res = call("/run", dict(feature="silences", timeline=read_timeline(), params=dict(params(), preview=True), host="resolve"))
+            clear_review()
+            review.extend(res.get("items") or [])
+            for x in review:
+                r = it["Items"].NewItem()
+                r.Text[0] = x["label"]
+                r.CheckState[0] = "Checked"
+                it["Items"].AddTopLevelItem(r)
+            it["Items"].Hidden = not review
+            win.RecalcLayout()
+            removed = (res.get("report") or {}).get("removed")
+            say(f"{len(review)} speech segment(s), {removed} s of silence. Untick any to cut, then Remove silences."
+                if review else "No speech found to keep.")
         except Exception as e:
             say(f"\u26a0 {e}")
-        it["Run"].Enabled = True
+        it["Analyze"].Enabled = it["Run"].Enabled = True
+
+    def run(ev):
+        p = params()
+        if review:
+            p["items"] = kept_ids(review, [it["Items"].TopLevelItem(k).CheckState[0] == "Checked" for k in range(len(review))])
+        it["Analyze"].Enabled = it["Run"].Enabled = False
+        try:
+            say("Removing silences\u2026")
+            res = call("/run", dict(feature="silences", timeline=read_timeline(), params=p, host="resolve"))
+            report = res.get("report") or {}
+            say("\n".join(["\u2713 " + n for n in apply(res)] + [f"{label(k)}: {v}" for k, v in list(report.items())[:4]]))
+            clear_review()  # the list was for that timeline; the new one is current now
+        except Exception as e:
+            say(f"\u26a0 {e}")
+        it["Analyze"].Enabled = it["Run"].Enabled = True
 
     def beat(ev=None):
         s = heartbeat()
@@ -269,6 +316,9 @@ def main():
             else "Kerf engine not reachable"
 
     win.On.Run.Clicked = run
+    win.On.Analyze.Clicked = analyze
+    for id_ in keys:  # other settings find other segments: the list no longer matches
+        setattr(getattr(win.On, id_), "CurrentIndexChanged", clear_review)
     win.On.KerfWin.Close = lambda ev: disp.ExitLoop()
     try:  # live project / timeline while the Kerf window is open
         timer = ui.Timer({"ID": "KerfBeat", "Interval": 1000})

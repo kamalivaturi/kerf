@@ -6,7 +6,9 @@
   DaVinci Resolve opens, and puts its login entry back every time Kerf runs, so Premiere Pro no longer asks to open
   `kerf://start`.
 - **Remove silences in DaVinci Resolve.** Workspace › Scripts › Kerf cuts the quiet parts of the open timeline into
-  a new timeline (pace, detection and mode as in the Premiere panel). The looks stay in Effects › OpenFX › Kerf.
+  a new timeline (pace, detection and mode as in the Premiere panel). Analyze lists the speech it keeps so you can
+  untick any to cut first, and the report after a review counts only what was kept. The looks stay in
+  Effects › OpenFX › Kerf.
 
 ## 0.3.3 — 2026-11-05
 
