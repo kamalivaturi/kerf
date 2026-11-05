@@ -88,7 +88,7 @@ fn engine_up() -> bool {
     TcpStream::connect_timeout(&"127.0.0.1:7878".parse().unwrap(), Duration::from_millis(300)).is_ok()
 }
 
-/// Kerf's login watcher (kerf --watch): no window, no engine of its own. When Premiere Pro or After Effects opens and
+/// Kerf's login watcher (kerf --watch): no window, no engine of its own. When Premiere Pro, After Effects or Resolve opens and
 /// Kerf isn't running, it starts this helper, so the panels find Kerf ready and never launch anything themselves
 /// (Premiere asks permission whenever a panel opens an app or a link). The engine still stops after the editors close.
 fn watch() {
@@ -110,17 +110,17 @@ fn editor_open() -> bool {
         quiet(Command::new("tasklist").args(["/fo", "csv", "/nh"])).output()
             .map(|o| {
                 let s = String::from_utf8_lossy(&o.stdout).to_lowercase();
-                s.contains("\"adobe premiere pro") || s.contains("\"afterfx.exe\"")
+                s.contains("\"adobe premiere pro") || s.contains("\"afterfx.exe\"") || s.contains("\"resolve.exe\"")
             })
             .unwrap_or(false)
     } else {
-        Command::new("pgrep").args(["-if", "Adobe Premiere Pro|After Effects"]).output()
+        Command::new("pgrep").args(["-if", "Adobe Premiere Pro|After Effects|DaVinci Resolve"]).output()
             .map(|o| o.status.success()).unwrap_or(false)
     }
 }
 
 /// Starts the watcher at every login and right now (Windows: the user's Run key; macOS: a LaunchAgent). Linux has
-/// no Premiere Pro or After Effects, and Resolve's Kerf FX needs no engine, so there is nothing to watch there.
+/// no Premiere Pro or After Effects, so it isn't watched there yet (Resolve on Linux starts Kerf from its script).
 fn install_watcher() {
     let Ok(me) = std::env::current_exe() else { return };
     if cfg!(windows) {
@@ -356,6 +356,7 @@ fn elevated(args: &[&str]) -> Option<i32> {
 /// Kerf FX keeps its own marker: a bundle locked by a running Resolve retries alone, not the Adobe installs.
 fn install_panels(res: &Path, version: &str, force: bool) {
     let p = res.join("panels");
+    install_watcher(); // every start, not once per version: an uninstall or a cleaner can drop the login entry
     if force || !marked("panels-version", version) {
         let ccx = p.join("kerf-premiere.ccx");
         if let (Some((agent, flag)), true) = (adobe_installer(), ccx.is_file()) {
@@ -372,7 +373,6 @@ fn install_panels(res: &Path, version: &str, force: bool) {
         if let Some(dir) = resolve_scripts() {
             let _ = fs::remove_file(dir.join("Kerf.py")); // Kerf in Resolve is Kerf FX only now: drop the old script window
         }
-        install_watcher();
         mark("panels-version", version);
     }
     let fx = p.join("KerfFX.ofx.bundle");
