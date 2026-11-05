@@ -1,7 +1,13 @@
 # Changelog
 
-## 0.3.3 — 2026-11-03
+## 0.3.3 — 2026-11-05
 
+- **A clearer Kerf panel.** The Edit tab shows each tool as a card with one line on what it does; What's new shows
+  the latest release first; a short welcome on first open says where Kerf lives in each editor; Kerf's own update
+  downloads with a small progress ring and installs when you close your editors; result reports are one line;
+  field outlines are easier to see.
+- **Graphics previews load fast and show their caption.** All 194 cards appear in under a second, 9:16 cards show
+  the caption instead of a black box, and hover previews play smoothly.
 - **Kerf FX is one effect with a Mode menu.** In Resolve, add Effects › OpenFX › Kerf › Kerf FX and pick Shake, Zoom,
   RGB split, Vignette, Letterbox, Speed ramp, Motion blur or Captions; only that mode's controls show.
 - **Captions in DaVinci Resolve.** Kerf FX's Captions mode draws word-timed captions on the clip in 15 templates
