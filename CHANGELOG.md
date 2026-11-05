@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.5 — 2026-11-05
+
+- **No more "Unable to multiply transform" in Premiere Pro.** Scrolling or hovering in Graphics played card
+  previews that started at zero size, which Premiere's Windows drawing rejects; previews now start just above it.
+
 ## 0.3.4 — 2026-11-05
 
 - **Older Resolve projects open without "Unknown tool found".** The seven Kerf 0.3.2 effects (Shake, Zoom,
